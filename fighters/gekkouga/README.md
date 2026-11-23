@@ -1745,7 +1745,7 @@ solid collision from the bottom", "the smash attack charging star effect normal 
 
 - **Forward smash** (`gekkouga_build.py` `tune`, `FSMASH_EXTRA` 30): a second water sword (0x3300007, size 5) at Y -30
   on the hand (the blade 55 -> 85, its width the same), the tip flame and the Sword_Glow end at -85, hitbox ID 3 (ID
-  0's size 87.5 / 17.5) at Y -62.5: reach 80 from the hand. The user's screenshot (`$S/gk_in/clone_fx/fsmash_reach.png`,
+  0's size, 17.5) at Y -62.5: reach 80 from the hand. The user's screenshot (`$S/gk_in/clone_fx/fsmash_reach.png`,
   the old blade as the ruler: 3.1 px a unit): DK at 72 - 82. The clones' copies follow (their scripts are his).
   Preview `$S/gk_preview/fsmash_reach_tuning.png`.
 - **Trails:**
