@@ -40229,6 +40229,7 @@ void gk_ability_update()
     gk_check_hit();
     gk_heartbeat();
     gk_land_fx();
+    gk_ledge_mode();                      // tuning v1: his ledge hang: they act on his inputs
     if (gk_vi(8) != 0)
     {
         gk_free_frame();                  // aligned kick v1: kicking / split / regrouping: their own movement
@@ -42072,6 +42073,7 @@ void gk_ak_begin()
 {
     float ox;
     int c;
+    gk_svi(63, 0);                        // (tuning v1: a kick from a ledge split: no regroup after the ledge)
     gk_svi(8, 0x1);
     gk_svi(9, 0x1);
     gk_svi(10, 0);
@@ -42552,9 +42554,9 @@ void gk_free_frame()
     sy = ControlModuleF(0x1);
     cmd = global24;
     held = ControlModule(0x2712, 0);
-    if (gk_mirror_off(global4) || global4 == 0x160)
+    if ((gk_mirror_off(global4) && !gk_on_ledge(global4)) || global4 == 0x160)
     {
-        sx = 0;                           // he is hit / on a ledge / calling them: no input for them
+        sx = 0;                           // he is hit / calling them: no input for them (tuning v1: on a ledge they act)
         sy = 0;
         cmd = 0;
         held = 0;
@@ -42777,6 +42779,63 @@ void gk_mir_step(int c)
     }
     gk_set_c(c, nx, ny, dy);
     gk_set_fall_t(c, gk_fall_t(c) + 1);
+}
+
+// tuning v1 (the user: "please make it so clones can act when the main body is at ledge"): while he hangs (his ledge
+// statuses 0x72 - 0x7A: catch, wait, climb, ledge attack / roll / jump) the clones act on his inputs, each in its own
+// situation (split's rules: on the ground walk / run, jab / tilts / smashes, jumps, shield...; in the air aerials, drift;
+// his ledge motions not copied: clones don't grab ledges). Split already: they just keep acting (his ledge no longer
+// stops their inputs, gk_free_frame). In formation: at his ledge grab they go split (gk_ledge_split: their own place,
+// facing his way, standing or falling), slot 63 = 1; when he leaves the ledge they regroup (the regroup's eased walk / float
+// back, then formation: gk_rg_begin), unless the aligned kick took them (slot 63 dropped). Slot 63: body 3's k 15 (unused)
+void gk_ledge_mode()
+{
+    if (gk_vi(8) == 0 && gk_on_ledge(global4) && gk_alive != 0 && !gk_det)
+    {
+        gk_ledge_split();
+        return;
+    }
+    if (gk_vi(63) != 0 && !gk_on_ledge(global4))
+    {
+        gk_svi(63, 0);
+        if (gk_vi(8) == 0x2)
+        {
+            gk_rg_begin();                // back to formation, eased
+        }
+    }
+}
+
+void gk_ledge_split()
+{
+    int c;
+    c = 0x1;
+    while (c <= 0x2)
+    {
+        if (gk_alive & c)
+        {
+            gk_bs(c, 5, PostureModuleF(0));
+            gk_bs(c, 6, 0);
+            gk_set_vy(c, 0);
+            gk_bsi(c, 9, 0);
+            gk_bsi(c, 11, 0);
+            gk_bsi(c, 12, 0);
+            if (gk_fall_t(c) <= 2)
+            {
+                gk_set_fall_t(c, 0);
+                gk_idle(c);
+            }
+            else
+            {
+                gk_bsi(c, 0, 10);
+                gk_fcmd(c, 0x24, 0);
+            }
+        }
+        c += 1;
+    }
+    gk_svi(8, 0x2);
+    gk_svi(63, 0x1);
+    gk_bs(3, 2, PostureModuleF(0x1));     // (his movement from now: gk_mir_track)
+    gk_bs(3, 3, PostureModuleF(0x2));
 }
 
 // a hit on a clone while it shields with him (family 1: mirroring split, or copying him in formation): blocked

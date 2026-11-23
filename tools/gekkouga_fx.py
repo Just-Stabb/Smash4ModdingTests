@@ -64,6 +64,9 @@ SK_SPINE_X = 2.2                   # skeleton v1.5: its spine (the bones' median
 FIRE_BODY_H = 30.0                 # on a burning fighter (fire_small_4): its base on his feet (TransN), ~16 of flame, ~21 wide
 FIRE_TIP_H = 15.0                  # at the outer ends of his water (fire_torch_012): centred on the call (x the call's size:
                                    # ~7 of flame at 1)
+TRAIL_FULL = True                  # tuning v1: the trails' flames wide, two clips (False: fire trail fix v1 - clone moves v1)
+TRAIL_WIDE = 1.9
+TRAIL_SECOND = 0.7
 FIRE_TRAIL_H = 22.0                # the smashes' trails (fire_ground_10): its base on the call's point, ~14.5 of flame
 FIRE_RING = dict(n=15, r0=5.0, v=0.9, air=0.8, life=14, seed=7)   # burn v2.2 / v2.3: neutral air's ring of flames: n
                                    # flames round a circle of radius r0, flying out at v a frame x air a frame (~9 by frame
@@ -108,6 +111,12 @@ def _fire_sets():
     trail = dict(atlas='fire_ground_10', blend=1, size=(FIRE_TRAIL_H * cell_aspect('fire_ground_10'), FIRE_TRAIL_H),
                  fade=FIRE_FADE)
     trail['offset'] = (0.0, (feet_cell_v('fire_ground_10') - 0.5) * FIRE_TRAIL_H)
+    if TRAIL_FULL:                  # tuning v1 (the user: "please make the trail fire more full"): each flame wider (its
+        t2 = dict(trail, size=(trail['size'][0] * TRAIL_WIDE, trail['size'][1]))   # quad x TRAIL_WIDE across: they
+        h = FIRE_TRAIL_H * TRAIL_SECOND                                             # overlap at the trails' 7 apart) and a
+        t3 = dict(atlas='fire_small_5', blend=1, size=(h * cell_aspect('fire_small_5') * TRAIL_WIDE, h), fade=FIRE_FADE,
+                  mirror=True, rate=0.8, offset=(0.0, (feet_cell_v('fire_small_5') - 0.5) * h))   # second, lower flame of
+        trail = dict(layers=[t2, t3])   # another clip in it (mirrored, slower: the band not one flame repeated)
     ring = dict(ring=FIRE_RING, left=False)
     ring_l = dict(ring=FIRE_RING, left=True)
     return [('PtcGekkougaFireBody', body), ('PtcGekkougaFireTip', tip), ('PtcGekkougaFireTrail', trail),
