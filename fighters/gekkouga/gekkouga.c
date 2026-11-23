@@ -40051,10 +40051,13 @@ void gk_input()
     sx = ControlModuleF(0);
     if (gk_ability > 0 && gk_abs(sx) <= 0.25f)
     {
+        if (gk_vi(60) == 0)
+        {
+            gk_lw_eat();                  // clone fix v3: the kick locked (the activating press, the first 10 frames):
+        }                                 // this press is dropped, not buffered for later
         return;                           // aligned kick v1: no left / right: the game's down special input goes on
     }                                     // (func_43 / func_58 ... -> gk_lw_press -> gk_ak_try, when he can act)
-    WorkModule(0, 32.0f + 0, 0x0f0003c9); // Buffer_Clear (specials) for this fighter: no down special status
-    global24 = global24 - (global24 & 0xf000); // nor this frame's special bits (the status loop reads them after this hook)
+    gk_lw_eat();                          // no down special status
     if (gk_ability <= 0)
     {
         return;                           // burnout: down special disabled
@@ -40138,9 +40141,35 @@ int gk_lw_press()
     return 0x1;
 }
 
+// a special press dropped: Buffer_Clear (specials) for this fighter, and this frame's special bits (the status loop
+// reads them after his frame hook)
+void gk_lw_eat()
+{
+    WorkModule(0, 32.0f + 0, 0x0f0003c9);
+    global24 = global24 - (global24 & 0xf000);
+}
+
+// clone fix v3 (the user: "make it so the use of down special just activates the clones ... disable clone kick for the
+// first 10 frames of clones existing"): slot 60 the kick armed: 0 from the activation; 1 once gk_ak_lock() frames of the
+// ability have run AND special is not held (the activating press let go). Until then gk_ak_try refuses and gk_input
+// drops any down special press (gk_lw_eat), so neither the activating press (held or buffered) nor a press in the lockout
+// starts the kick later; a fresh press after it does.
+int gk_ak_lock() { return 11; }          // gk_seq after the ability's frame: the left clone is made on its 2nd frame, so a
+                                        // press is refused through its frame 11 (the clones' first 10) and taken from 12
+
+void gk_ak_arm()
+{
+    if (gk_vi(60) == 0 && gk_seq >= gk_ak_lock() && ControlModule(0x2712, 0x1) == 0)
+    {
+        gk_svi(60, 0x1);
+    }
+}
+
 void gk_activate()
 {
     gk_lw_charge = 0;
+    gk_svi(60, 0);                        // clone fix v3: the kick locked; the activating press used up (one press,
+    gk_lw_eat();                          // one action: not buffered on into the kick)
     gk_ability = gk_ability_frames();
     gk_alive = 0;
     gk_off_l = -gk_gap();
@@ -40181,6 +40210,7 @@ void gk_ability_update()
         gk_spawn(0x2);
     }
     gk_seq += 1;
+    gk_ak_arm();                          // clone fix v3: the kick's lockout
     gk_clone_hitlag();
     gk_check_hit();
     gk_heartbeat();
@@ -41845,7 +41875,8 @@ int gk_cl_diag()
 // v1", the slot table). 0 - 15 his own: 0 gk_fx_t, 1 gk_cursor_t, 2 gk_cl_why, 3 gk_cl_t, 4 gk_gen_req, 5 gk_hold_first
 // (moved out of the globals), 8 the clones' mode (0 formation, 1 the aligned kick, 2 split, 3 regrouping), 9 the kick
 // used this airtime, 10 the kick's clock, 11 its variant (1 tapped, 2 held), 12 the regroup's clock, 13 the clones' effects
-// epoch (flags 256), 14 his situation last frame (clone articles v1: 6 / 7, 15, 57 - 59: there); 16 x b + k body b's
+// epoch (flags 256), 14 his situation last frame (clone articles v1: 6 / 7, 15, 57 - 59: there; clone fix v3: 60 the
+// kick armed); 16 x b + k body b's
 // (1 the left-spawned clone, 2 the right-spawned one, 3 him): k 0 action, 1 frames in it, 2 motion kind, 3 its start
 // frame, 4 the command's seq, 5 facing, 6 X speed, 7 Y speed (his; the clones' are gk_lvy / gk_rvy), 8 flight frames
 // left, 9 air jumps used, 10 smash charge, 11 smash chain, 12 tilted (the kick), 13 aux (smash type + 8 x auto / the
@@ -41916,6 +41947,11 @@ float gk_ak_tilt() { return 270.0f; }     // his kick turned straight up (Fighte
 int gk_ak_try()
 {
     int m;
+    if (gk_vi(60) == 0)
+    {
+        gk_lw_eat();
+        return 0;                         // clone fix v3: locked (the activating press, the first 10 frames)
+    }
     if (gk_vi(9) != 0)
     {
         return 0;                         // once an airtime
