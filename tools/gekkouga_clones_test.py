@@ -1038,6 +1038,173 @@ def clone_tests(mscsb, src):
     check('v8: ... once (no VisibilityModule call while nothing changes)', [x for x in g.log if x[0] == 'visible'], [])
 
 
+def ak_setup(mscsb, src):
+    """aligned kick v1: him at x 0 on the floor (y 10) with both clones out (x -14 / +14), formation; his kinetics logged
+    (KineticModule 0x11: energy 1 his Y speed, 3 his X) and FighterUtil 6 (his rotation)"""
+    m = fresh(mscsb, src)
+    g = m.game
+    g.kin, g.rot = {}, []
+
+    def sysf(sid, a, old=g.sys):
+        if sid == 0x10 and a[0] == 0x11:
+            g.kin[a[1]] = fv(a[2])
+            return 0
+        if sid == 0xC and a[0] == 0x6:
+            g.rot.append(fv(a[1]))
+            return 0
+        if sid == 0x12 and a[0] == 0x4:
+            g.log.append(('rate', fv(a[1])))
+            return 0
+        if sid == 0xE and a[0] == 0xA:
+            return 0
+        return old(sid, a)
+    g.sys = sysf
+    m.setg('gk_lw_charge', 300)
+    m('gk_lw_press')
+    g.x, g.y = 0.0, 10.0
+    frames(m, 12)
+    g.status_req = []
+    return m, g
+
+
+def ak_frame(m, g, st=0x161, held=False, press=(), stick=(0.0, 0.0), cmd=0, atk=False, guard=False):
+    """one frame: his per-frame hook (gekkouga_frame), then (in his kick status) its tick, then his kinetics applied"""
+    m.vm.g[4] = st
+    m.vm.g[24] = cmd
+    g.press = set(press)
+    g.held = ({1} if held else set()) | ({0} if atk else set()) | ({3} if guard else set())
+    g.stick = stick
+    g.vars[0x0F00031E] = float(m.g('gk_alive') & g.beat)
+    g.kin = {}
+    m('gekkouga_frame')
+    if st == 0x161:
+        m('gk_ak_tick')
+        g.x = round(g.x + g.kin.get(3, 0.0), 3)
+        g.y = round(g.y + g.kin.get(1, 0.0), 3)
+        g.situation = 2 if g.y > 10.001 else 0
+
+
+def ak_cmd(g, c):
+    """clone c's command in the channel (VAR_28 / VAR_29): (kind, start frame, facing left, tilted, paused, seq)"""
+    v = int(g.vars.get(0x0F00031B + c, 0.0) + 0.5)
+    return (v % 1024, (v // 1024) % 1024, (v >> 20) & 1, (v >> 21) & 1, (v >> 22) & 1, (v >> 23) & 1)
+
+
+def aligned_kick_tests(mscsb, src):
+    """aligned kick v1 (README "Aligned kick v1"): the trigger, the startup (all three still, the clones' delays skipped),
+    both variants' trajectories, his higher peak, the swap mid-move (place and momentum), the end in Fall, once an
+    airtime, the channel's commands"""
+    # ---- the trigger
+    m, g = ak_setup(mscsb, src)
+    check('aligned kick: clones out in formation at -14 / +14, his Y 10, the mode 0',
+          (m.gf('gk_lx'), m.gf('gk_rx'), m.gf('gk_ly'), int(g.vars.get(0x0F000388, 0))), (-14.0, 14.0, 10.0, 0))
+    g.press, g.stick = {1}, (-0.8, -0.8)
+    m.vm.g[4], m.vm.g[24] = 0, 0x8000
+    m('gekkouga_frame')
+    check('down special + left: still the silent swap (no status)', (g.status_req, round(g.x, 3)), ([], -14.0))
+    m, g = ak_setup(mscsb, src)
+    for st, air in ((0, 0), (0xE, 2)):
+        g.situation = air
+        r = m('gk_lw_press')
+        check('down special with no left / right, %s: the aligned kick (his SpecialLwAttack slot 0x161)' %
+              ('standing' if not air else 'in the air'), (r, g.status_req), (1, [(0x161, 1)]))
+        g.status_req = []
+    g.situation = 0
+    # ---- the move: its main (the counter's up-diagonal kick, rotated straight up), the startup
+    g.log = []
+    m.vm.g[4] = 0x161
+    m('gk_ak_main')
+    check('its main: the kick motion (0x28D) at 5/8 (the startup: 8 frames to its kick frame 5), turned straight up '
+          '(FighterUtil 6, 270), the up-diagonal hitboxes\' flag 0x2100001C on, the clones kicking (mode 1, the kick used)',
+          ([x for x in g.log if x[0] == 'rate'][:1], g.rot[:1], 0x2100001C in g.flags, int(g.vars.get(0x0F000388)),
+           int(g.vars.get(0x0F000389)), int(g.vars.get(0x0F000390, 0))),
+          ([('rate', 0.625)], [270.0], True, 1, 1, 12))
+    ak_frame(m, g)
+    c1, c2 = ak_cmd(g, 1), ak_cmd(g, 2)
+    check('the channel: free (flags 128); each clone the kick motion 0x28D paused on the startup\'s frame, tilted along its '
+          'flight, facing the centre line (the left one right, the right one left): their delays skipped (aligned)',
+          (int(g.vars.get(0x0F00031F)) - 4747000 & 0x80, c1[:5], c2[:5]), (0x80, (0x28D, 0, 0, 1, 1), (0x28D, 0, 1, 1, 1)))
+    for _ in range(4):
+        ak_frame(m, g)
+    check('the startup: frame 5 of 8: his place, the clones\' still; their motion on frame 5 x 5/8 = 3',
+          (g.x, g.y, m.gf('gk_lx'), m.gf('gk_ly'), m.gf('gk_rx'), ak_cmd(g, 1)[1]), (0.0, 10.0, -14.0, 10.0, 14.0, 3))
+    return m, g
+
+
+def ak_run(mscsb, src, held, swap_at=None, frames_=60):
+    """the whole move from the press, held or tapped; [(his x, y), left (x, y), right (x, y)] each frame"""
+    m, g = ak_setup(mscsb, src)
+    m('gk_lw_press')
+    m.vm.g[4] = 0x161
+    m('gk_ak_main')
+    g.status_req = []
+    track = []
+    st = 0x161
+    for t in range(1, frames_):
+        press, stick = (), (0.0, 0.0)
+        if swap_at is not None and t == swap_at:
+            press, stick = (1,), (-0.8, -0.8)
+        ak_frame(m, g, st=st, held=held and t <= 8, press=press, stick=stick)
+        if st == 0x161 and m('gk_ak_loop'):
+            st = g.status_req[-1][0]
+        track.append(((g.x, g.y), (m.gf('gk_lx'), m.gf('gk_ly')), (m.gf('gk_rx'), m.gf('gk_ry'))))
+    return m, g, track
+
+
+def aligned_kick_more_tests(mscsb, src):
+    res = {}
+    for held in (False, True):
+        m, g, tr = ak_run(mscsb, src, held, frames_=24)
+        res[held] = (m, g, tr)
+    m, g, tr = res[False]
+    hy = [p[0][1] for p in tr]
+    ly = [p[1][1] for p in tr]
+    lx = [p[1][0] for p in tr]
+    rx = [p[2][0] for p in tr]
+    check('tapped (special let go before the kick): variant 1; the flights from the kick frame (8): him straight up, 78 in '
+          '15 frames (5.2 a frame), x still', (int(g.vars.get(0x0F00038B)), round(hy[7] - hy[6], 3), round(hy[21] - 10.0, 3),
+                                                {p[0][0] for p in tr}), (1, 5.2, 78.0, {0.0}))
+    check('tapped: the left clone up-right (53 degrees), the right one up-left, 64 along their diagonals: they cross above '
+          'him and end 24.5 past the centre line (-14 -> +24.5, +14 -> -24.5), 51.1 up',
+          (round(lx[21], 1), round(rx[21], 1), round(ly[21] - 10.0, 1), lx[12] > rx[12]), (24.5, -24.5, 51.1, True))
+    check('his peak clearly above theirs (> 20 higher)', round(max(hy) - max(ly), 1) > 20, True)
+    m, g, tr = res[True]
+    lx = [p[1][0] for p in tr]
+    rx = [p[2][0] for p in tr]
+    ly = [p[1][1] for p in tr]
+    hy = [p[0][1] for p in tr]
+    check('held through the startup: variant 2; shorter flights (46.5): they end at the spawn spacing on the other side '
+          '(+14 / -14), 37.1 up; his still 78',
+          (int(g.vars.get(0x0F00038B)), round(lx[21], 1), round(rx[21], 1), round(ly[21] - 10.0, 1), round(hy[21] - 10.0, 1)),
+          (2, 14.0, -14.0, 37.1, 78.0))
+    # ---- the end: Fall (not a free fall), split; their fall
+    m, g, tr = ak_run(mscsb, src, False, frames_=24)
+    check('the move\'s end (23 frames): Fall (0xE, not a free fall 0x10); upright again (FighterUtil 6, 0 at its end)',
+          g.status_req[-1:], [(0xE, 0)])
+    check('the clones split (mode 2) once both flights are over, in the air, upright (their tilt off)',
+          (int(g.vars.get(0x0F000388)), m('gk_bvi', 1, 0), m('gk_bvi', 2, 0), ak_cmd(g, 1)[3], ak_cmd(g, 2)[3]), (2, 10, 10, 0, 0))
+    # ---- the swap mid-flight: his path and the clone's exchanged
+    m, g, tr = ak_run(mscsb, src, False, swap_at=12, frames_=24)
+    hx = [p[0][0] for p in tr]
+    lx = [p[1][0] for p in tr]
+    check('swap at flight frame 5 (down special + left): he takes the left clone\'s place and its momentum (on up-right: '
+          'x grows 2.57 a frame), it takes his (straight up from his old place: x still)',
+          (round(hx[12] - hx[11], 2), round(lx[12] - lx[11], 2), round(tr[11][0][0] - tr[10][1][0], 2)),
+          (2.57, 0.0, 2.57))
+    # ---- once an airtime
+    m, g, tr = ak_run(mscsb, src, False, frames_=30)
+    g.status_req = []
+    m.vm.g[4], g.situation = 0xE, 2
+    m('gekkouga_frame')
+    r = m('gk_lw_press')
+    check('once an airtime: again in the air: nothing', (r, g.status_req), (0, []))
+    g.situation = 0
+    m.vm.g[4] = 0
+    m('gekkouga_frame')
+    r = m('gk_lw_press')
+    check('... landed: again', (r, g.status_req), (1, [(0x161, 1)]))
+
+
 def tilt_chain_tests(mscsb, src):
     """tilt chain v1 (README "Tilt chain v1"): a jab (0x25) or a tilt (0x28 / 0x29 / 0x2A) that hits an opponent
     (AttackModule 0x2727 kind 2; a shield doesn't count; a clone's hit does) can be cancelled from the frame after the hit,
