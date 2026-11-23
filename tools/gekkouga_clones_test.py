@@ -2330,7 +2330,7 @@ def ice_tests(mscsb, src, tr_mscsb, out, user):
     kb0 = ((3.0 / 10 + 3.0 * 3.0 / 20) * 1.4 + 18) * 0.85 + 10
     p52 = next(p for p in range(0, 300) if ((((p + 3) / 10 + (p + 3) * 3.0 / 20) * 1.4 + 18) * 0.85 + 10) > 52.5)
     check('ice: the uncharged shot\'s knockback (3 %%, KBG 85, BKB 10, weight 100): %.1f at 0 %%, over 52.5 (a freeze, 12 x 3 = '
-          '36 frames) from %d %%: under that only the ice hit effect' % (kb0, p52), (round(kb0, 1), p52), (26.4, 88))
+          '36 frames) from %d %%: under that only the ice hit effect' % (kb0, p52), (round(kb0, 1), p52), (26.2, 89))
     names_txt = open(os.path.join(HERE, 'Sm4shCommand', 'SM4SHCommand', 'ModAnimNames.txt')).read()
     check('ice: FireTrailIceBoom in ModAnimNames.txt (-> its carrier\'s animation)',
           '\nFireTrailIceBoom -> firetrail/FitPacmanFirehydrantMainD03SpecialLw.omo' in names_txt, True)
@@ -4825,7 +4825,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 45)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 46)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',

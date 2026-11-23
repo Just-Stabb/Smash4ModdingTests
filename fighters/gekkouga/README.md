@@ -2016,7 +2016,7 @@ by `tools/fx_video_to_flipbook.py` (new `--retime`: piecewise speed-ups of a one
   charge. Its sound script splits small / big by `Float_Var_Compare(5, <, 0.5)`, the shuriken's float 5 (its charge, 0 -
   1). Now `Float_Var_Compare(5, <, 0.1)` (a tap): IDs 0 / 1 with Effect 4 (ice) and the ice hit sound (SFXType 0x1C);
   else the vanilla hitboxes.
-- Weak: freezing needs knockback over 52.5. ID 0 (3 %, KBG 85, BKB 10) gives 26 at 0 % and passes 52.5 at about 88 %
+- Weak: freezing needs knockback over 52.5. ID 0 (3 %, KBG 85, BKB 10) gives 26 at 0 % and passes 52.5 at about 89 %
   (weight 100): under that the hit only shows the ice effect; over it a short freeze (12 x 3 % = 36 frames).
 - Its effect script (empty in vanilla) gets, under the same compare, PtcGekkougaIceSparkle (`0x3300024`) following its
   joint 0 for its flight: the common bank's PtcCommonIce `kirakira1` (the frozen fighter's twinkles: colour 1 cyan
@@ -2033,11 +2033,14 @@ no command changed.
 **Previews** (`tools/gekkouga_ice_preview.py`): `$S/gk_preview/ice_boom.gif` / `.png` (the explosion at burn amounts 5 /
 20 / 60), `ice_flash.gif` / `.png` (the flashing victim, then the blast), `ice_sparkle.gif` / `.png`.
 
-**Tests:** `gekkouga_clone_cave_test` (`ice_checks`: the hook, the trigger / clearing / recording against `ice_amount`,
+**Tests** (all 0 failures): `gekkouga_clone_cave_test` 304 / 338 (release / A_release; gkb14 = RELEASE - ice byte for
+byte) (`ice_checks`: the hook, the trigger / clearing / recording against `ice_amount`,
 not ice / not burning / armed, burns refused, the 52 flash frames and the request at 51, owner / fallback / none, a KO,
 a reset, the claim's order and no context); `gekkouga_clones_test ... --vst=greninja_smash_tune_v1.zip` (`ice_tests`:
 `gk_ib_tick`, the blast's hitbox at three levels, its end, a trail with no context, the shuriken's scripts, the knockback
-numbers); `gekkouga_fx_test --common=...` (`ice_checks`: ids, placement, the retimed flipbook, the copied sparkles).
+numbers) 539 checks; `gekkouga_fx_test --common=...` 60 (`ice_checks`: ids, placement, the retimed flipbook, the copied
+sparkles); import_call_check 0 on both exes; supamario_ui_cave_test 0 failures; msc_stack_check 0 problems (his globals
+122 <= 128, firetrail 31); the opcode guard OK.
 
 **Not confirmed in game:** everything here; in particular that the victim hit handler sees every hurtbox hit once (and
 no shield hit), that the shuriken's float 5 is its charge (only its sound script's use says so), the article's blast

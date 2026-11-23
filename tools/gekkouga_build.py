@@ -990,7 +990,7 @@ def cmd_acmd(user_dir, vanilla_model, out_dir, test_only=None):
 # Its effect script (empty in vanilla) gets the ice sparkles (his bank's PtcGekkougaIceSparkle, the common bank's frozen-
 # fighter twinkles) on its joint 0 for its flight, under the same compare. Freezing needs knockback over 52.5 (the
 # community sheet's Element tab): ID 0's KB (3 %, KBG 85, BKB 10) on a 100-weight fighter is 26 at 0 %% and reaches 52.5
-# at about 87 %; under that the hit only shows the ice effect, over it a short freeze (12 x 3 % = 36 frames). The clones'
+# at about 89 %; under that the hit only shows the ice effect, over it a short freeze (12 x 3 % = 36 frames). The clones'
 # shurikens are this article (clone articles v1): theirs follow. The ice element makes it a trigger for the ice detonation
 SH_SHOT = 'Shot'
 SH_ICE_CHARGE = 0.1
