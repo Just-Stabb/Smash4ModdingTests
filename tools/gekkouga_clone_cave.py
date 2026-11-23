@@ -105,7 +105,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
                       'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2',
-                      'gready', 'skbot', 'shalf', 'ice', 'ice2', 'bgrav', 'pbeetle'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'gready', 'skbot', 'shalf', 'ice', 'ice2', 'bgrav', 'pbeetle', 'ice3', 'ccol'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -140,6 +140,13 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', '
 #   pbeetle parabeetle v1 (needs burn2): the Parabeetle article (kind PB_KIND, his article 10): its claim (his VAR_12),
 #           its collision (parabeetle.lvd: one drop-through floor line on its top, the skeleton's GroundModule route) made,
 #           moved with it every frame (riders carried) and removed (pb_frame)
+#   ice3    parabeetle v2 (needs ice2): the ice detonation's flash drawn through the outline caves (an Outline_Set
+#           entry's body tint: the model's own FB1 blinkColor, and an Outline_Shell band), not ColorBlendModule slot 1
+#           (the user's log: slot 1 on with priority 1000 for 150 frames, nothing drawn); its request / sound moved off
+#           the slots his aligned kick uses (ICE3_VAR: New_Var 60 - 63; ICE3_SND_VAR: TIMER_13 / 14); S4BR names the build
+#   ccol    parabeetle v2: the clone article's model in its owner's costume: at the clone's model set-up (CC_HOOK) its
+#           entry (+8) and costume (+0x4A) set to the Greninja making it (his TIMER_15, CC_VAR) before the game's
+#           0x02B62F14 picks the model by them
 #   bstart  v8: the clone's start (specializer +0x34) runs bunshin's own (0x02AF6738: black overlay, LinkModule link 3
 #           attributes 0 / 0xD, EffectModule +0xB4 / +0xA4), then clears the black (ColorBlendModule vt +0x44(0), as
 #           Terminate_Overlays' handler 0x02BE37B8 does); without it the start does nothing (v7)
@@ -1021,12 +1028,14 @@ def chk_(reg, bad):
         bge %s''' % (reg, bad, reg, bad)
 
 
-def ice_src(D, btint=True, snd=False):  # snd: feature ice2
+def ice_src(D, btint=True, snd=False, fx=False):  # snd: feature ice2; fx: feature ice3
     """ice detonation v1 (feature ice): ice_hit (ICE_HOOK's branch), ice_arm, ice_vic (the countdown, from burn_tick),
     ice_req (the blast's request), ice_gk_ok; snd (feature ice2): ice_snd, the detonation's sound asked of a Greninja on
     arming, stopped when the countdown is cancelled; the flash's slot raised over slot 0 (ICE_PRIO) while it runs, put back
     (0x32) when it ends; its diag S4IF"""
     S = (lambda t: t) if snd else (lambda t: '')
+    S2 = (lambda t: t) if snd and not fx else (lambda t: '')    # ice2's slot 1 priority (not with ice3)
+    X = (lambda t: t) if fx else (lambda t: '')
     stop = S('''
         mr r3, r31
         li r4, 2
@@ -1300,6 +1309,16 @@ iv_live:
         addi r0, r27, -1
         slwi r0, r0, 4
         add r4, r4, r0                  # this frame's colour
+''' + ('''
+        mr r3, r31                      # ice3: the flash drawn by the outline caves (the body tint: its FB1 blinkColor;
+        mr r4, r26                      # the band round it): ColorBlendModule slot 1 (ice v1 / v2) never drew
+        lis r5, %(ice_flash_hi)d
+        addi r5, r5, %(ice_flash_lo)d
+        addi r0, r27, -1
+        slwi r0, r0, 4
+        add r5, r5, r0                  # this frame's colour
+        mr r6, r27
+        bl ice_fx_on''' if fx else '''
         lwz r3, %(wcol)d(r26)''' + chk('r3', 'iv_req') + S('''
         mr r25, r3                      # ice2: its ColorBlendModule
         li r4, %(ice_prio)d
@@ -1341,7 +1360,7 @@ iv_live:
         lbz r7, 0x50(r25)               # slot 0 on
         lbz r8, 0x9C(r25)               # slot 1 on
         lwz r9, 0x4C(r25)               # slot 0's priority
-        lwz r10, 0x98(r25)              # slot 1's''' + osr()) if snd else '') + '''
+        lwz r10, 0x98(r25)              # slot 1's''' + osr()) if snd else '')) + '''
 iv_req: cmpwi r27, %(ice_ask)d
         bne iv_step
         mr r3, r31
@@ -1358,13 +1377,15 @@ iv_ko:''' + D('''
         mr r6, r27''' + osr()) + S('''
 iv_stop:''') + stop + '''
 iv_off: li r0, 0
-        stw r0, 0(r28)
+        stw r0, 0(r28)''' + X('''
+        mr r3, r31
+        bl ice_fx_off                   # ice3: the flash's entries let go (its own colour back)''') + '''
         lwz r3, %(wcol)d(r26)''' + chk('r3', 'iv_out') + '''
         li r4, %(ice_slot)d
         lwz r12, 0(r3)
         lwz r12, %(cclear)d(r12)
         mtctr r12
-        bctrl''' + S('''
+        bctrl''' + S2('''
         lwz r3, %(wcol)d(r26)
         li r4, 0x32
         li r5, %(ice_slot)d
@@ -1373,7 +1394,9 @@ iv_off: li r0, 0
         mtctr r12
         bctrl                           # ice2: its priority back (0x32, the game's: 0x02C1A0C4 / 0x02C1A2C8)''') + '''
         b iv_out
-iv_gone:''' + stop + '''
+iv_gone:''' + stop + X('''
+        mr r3, r31
+        bl ice_fx_off''') + '''
         li r0, 0                        # no such fighter: nothing to clear
         stw r0, 0(r28)
 iv_out: lmw r25, 0x30(r1)
@@ -1576,7 +1599,8 @@ is_set: lwz r12, %(acc)d(r3)
         add r4, r4, r12
         lis r12, %(ice_k_hi)d
         addi r12, r12, %(ice_k_lo)d
-        lfs f1, 20(r12)                 # 1.0
+        lfs f1, ''' + ('28(r12)                 # ice3: 4.0 (ICE3_SND_VALUE: his TIMER counts it down)' if fx else
+                         '20(r12)                 # 1.0') + '''
         lwz r12, 0(r3)
         lwz r12, 0x4C(r12)
         mtctr r12
@@ -1592,8 +1616,317 @@ is_out: lmw r28, 0x30(r1)
         mtlr r0
         addi r1, r1, 0x40
         blr
+''') + X(r'''
+# ==== ice3 (parabeetle v2; the user's log: ColorBlendModule slot 1 on, priority 1000 over slot 0's 100, for 150 frames, and
+# no flash seen): the flash drawn the way Outline_Set / Outline_Shell draw (confirmed in game): (r3 a victim 0-7, r4 its
+# accessor, r5 this frame's colour (r, g, b, a), r6 the countdown's frame). Its record (ice_fx, 16 a victim): +0 its
+# Outline_Set entry (OL_TAB: the body tint, written into the model's FB1 blinkColor at its draw: lit (1 - a) + rgb a, and
+# the colour x ICE3_RIM at the edges), +4 its Outline_Shell entry (OS_TAB: a band of the colour round the body), +8 the
+# accessor they were made for. Each its own entry or a free one (none free: none); held (phase 2), weight 1
+ice_fx_on:
+        stwu r1, -0x60(r1)
+        mflr r0
+        stw r0, 0x64(r1)
+        stmw r24, 0x40(r1)
+        mr r31, r3
+        mr r30, r4
+        mr r29, r5
+        mr r24, r6
+        lis r28, %(ice_fx_hi)d
+        addi r28, r28, %(ice_fx_lo)d
+        slwi r0, r31, 4
+        add r28, r28, r0
+        stw r30, 8(r28)''' + OL.mi_of('r30', 'r27', 'ifo_out') + r'''
+        lis r3, %(ol_tab_hi)d
+        addi r3, r3, %(ol_tab_lo)d
+        li r4, %(ol_n)d
+        li r5, %(ol_ent)d
+        mr r6, r30
+        bl ice_ent
+        stw r3, 0(r28)
+        mr. r12, r3
+        beq ifo_os
+        stw r30, 0(r12)
+        stw r27, 4(r12)
+        li r0, 2                        # held: no fades, no Frames, no pulse
+        stw r0, 8(r12)
+        li r0, 0
+        stw r0, 0x10(r12)
+        stw r0, 0x14(r12)
+        stw r0, 0x18(r12)
+        stw r0, 0x38(r12)
+        stw r0, 0x3C(r12)
+        lis r11, %(ice3_k_hi)d
+        addi r11, r11, %(ice3_k_lo)d
+        lfs f1, 0(r11)                  # 1.0
+        stfs f1, 0xC(r12)
+        stfs f1, 0x40(r12)
+        lfs f2, 8(r11)                  # ICE3_RIM
+        lfs f0, 0(r29)
+        stfs f0, 0x28(r12)
+        fmuls f0, f0, f2
+        stfs f0, 0x1C(r12)
+        lfs f0, 4(r29)
+        stfs f0, 0x2C(r12)
+        fmuls f0, f0, f2
+        stfs f0, 0x20(r12)
+        lfs f0, 8(r29)
+        stfs f0, 0x30(r12)
+        fmuls f0, f0, f2
+        stfs f0, 0x24(r12)
+        lfs f0, 12(r29)
+        stfs f0, 0x34(r12)              # the tint: the flash's alpha
+        bl 0x%(ol_count)08X
+ifo_os: lis r3, %(os_tab_hi)d
+        addi r3, r3, %(os_tab_lo)d
+        li r4, %(os_n)d
+        li r5, %(os_ent)d
+        mr r6, r30
+        bl ice_ent
+        stw r3, 4(r28)
+        mr. r12, r3
+        beq ifo_dg
+        stw r30, 0(r12)
+        stw r27, 4(r12)
+        li r0, 2
+        stw r0, 8(r12)
+        li r0, 0
+        stw r0, 0x10(r12)
+        stw r0, 0x14(r12)
+        stw r0, 0x18(r12)
+        stw r0, 0x30(r12)               # blend 0: over what is behind
+        stw r0, 0x38(r12)
+        stw r0, 0x3C(r12)
+        lis r11, %(ice3_k_hi)d
+        addi r11, r11, %(ice3_k_lo)d
+        lfs f1, 0(r11)
+        stfs f1, 0xC(r12)
+        stfs f1, 0x40(r12)
+        lfs f0, 0(r29)
+        stfs f0, 0x1C(r12)
+        lfs f0, 4(r29)
+        stfs f0, 0x20(r12)
+        lfs f0, 8(r29)
+        stfs f0, 0x24(r12)
+        lfs f0, 12(r29)
+        lfs f2, 12(r11)                 # ICE3_SHELL_ALPHA
+        fmuls f0, f0, f2
+        stfs f0, 0x28(r12)
+        lfs f0, 16(r11)                 # ICE3_SHELL_W
+        stfs f0, 0x2C(r12)
+        bl 0x%(os_count)08X
+ifo_dg:''' + D(r'''
+        andi. r0, r24, 7
+        cmpwi r0, 1
+        bne ifo_out                     # diag: every 8th frame (1, 9, 17 ...) every channel and the entries
+        lis r11, %(ice3_k_hi)d
+        addi r11, r11, %(ice3_k_lo)d
+        lfs f2, 20(r11)                 # 100.0
+        li r26, 0
+ifo_ch: slwi r0, r26, 2
+        lfsx f1, r29, r0
+        fmuls f1, f1, f2
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r0, 0x1C(r1)
+        addi r12, r1, 0x20
+        slwi r9, r26, 2
+        stwx r0, r12, r9
+        addi r26, r26, 1
+        cmpwi r26, 4
+        blt ifo_ch
+        li r26, 0                       # its entries: body tint index x 100 + outline index (99 none)
+        lwz r12, 0(r28)
+        li r9, 99
+        cmpwi r12, 0
+        beq ifo_e1
+        lis r11, %(ol_tab_hi)d
+        addi r11, r11, %(ol_tab_lo)d
+        subf r12, r11, r12
+        li r0, %(ol_ent)d
+        divwu r9, r12, r0
+ifo_e1: mulli r26, r9, 100
+        lwz r12, 4(r28)
+        li r9, 99
+        cmpwi r12, 0
+        beq ifo_e2
+        lis r11, %(os_tab_hi)d
+        addi r11, r11, %(os_tab_lo)d
+        subf r12, r11, r12
+        li r0, %(os_ent)d
+        divwu r9, r12, r0
+ifo_e2: add r10, r26, r9
+        lis r3, %(gk_fif_hi)d
+        addi r3, r3, %(gk_fif_lo)d
+        mr r4, r31
+        mr r5, r24
+        lwz r6, 0x20(r1)
+        lwz r7, 0x24(r1)
+        lwz r8, 0x28(r1)
+        lwz r9, 0x2C(r1)''' + osr()) + r'''
+ifo_out:
+        lmw r24, 0x40(r1)
+        lwz r0, 0x64(r1)
+        mtlr r0
+        addi r1, r1, 0x60
+        blr
+
+# (r3 a victim 0-7): its flash's entries let go (each only if still the accessor's it was made for), its record cleared
+ice_fx_off:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r29, 0x20(r1)
+        lis r31, %(ice_fx_hi)d
+        addi r31, r31, %(ice_fx_lo)d
+        slwi r0, r3, 4
+        add r31, r31, r0
+        lwz r30, 8(r31)
+        lwz r12, 0(r31)
+        cmpwi r12, 0
+        beq ifx_os
+        lwz r0, 0(r12)
+        cmplw r0, r30
+        bne ifx_os
+        li r0, 0
+        stw r0, 0(r12)
+        stw r0, 8(r12)
+        bl 0x%(ol_count)08X
+ifx_os: lwz r12, 4(r31)
+        cmpwi r12, 0
+        beq ifx_z
+        lwz r0, 0(r12)
+        cmplw r0, r30
+        bne ifx_z
+        li r0, 0
+        stw r0, 0(r12)
+        stw r0, 8(r12)
+        bl 0x%(os_count)08X
+ifx_z:  li r0, 0
+        stw r0, 0(r31)
+        stw r0, 4(r31)
+        stw r0, 8(r31)
+        lmw r29, 0x20(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+# (r3 a table, r4 its entries, r5 an entry's size, r6 an accessor) -> r3 the accessor's entry, else the first free one, else
+# 0 (r0, r7 - r12)
+ice_ent:
+        li r9, 0
+        mr r10, r3
+ien_l:  lwz r0, 0(r10)
+        cmplw r0, r6
+        beq ien_have
+        cmpwi r9, 0
+        bne ien_n
+        cmpwi r0, 0
+        bne ien_n
+        mr r9, r10
+ien_n:  add r10, r10, r5
+        addi r4, r4, -1
+        cmpwi r4, 0
+        bne ien_l
+        mr r3, r9
+        blr
+ien_have:
+        mr r3, r10
+        blr
 ''')
 
+
+
+def cc_src(D):
+    """parabeetle v2 (feature ccol): CC_HOOK's call -> cc_model (r3 the weapon): for the clone (CLONE_KIND) its +8 / +0x4A
+    from the Greninja making it before the game's model set-up (CC_SETUP) runs; every other kind straight on"""
+    return r'''
+# ==== parabeetle v2 (ccol): a weapon's model set-up (0x02B62F14, from 0x02B63268 for kinds past 0x165): the clone's costume.
+# The Greninja making it: the first live one whose TIMER_15 (CC_VAR) is set (his MSC sets 3 right before its generate),
+# else the first live Greninja. His +8 (the battle object's entry) and that entry's costume (the resource manager's
+# [+0x58 + 4 entry] +0x2B, the colour his body and weapons were loaded with) to its +8 / +0x4A
+cc_model:
+        lwz r0, 4(r3)
+        cmpwi r0, %(clone_kind)d
+        bne cc_go
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r24, 0x20(r1)
+        mr r31, r3
+        lwz r25, 8(r31)                 # (diag: was)
+        lbz r24, 0x4A(r31)
+        li r27, 0                       # the first live Greninja (fallback)
+        li r26, 0
+        li r28, 1
+ccm_l:  cmpwi r28, %(slots)d
+        bgt ccm_end
+        mr r3, r28
+        bl gk_entry
+        mr. r29, r3
+        beq ccm_n
+        lwz r0, 4(r29)
+        cmpwi r0, %(gkind)d
+        bne ccm_n
+        cmpwi r27, 0
+        bne ccm_v
+        mr r27, r29
+        mr r26, r28
+ccm_v:  lwz r12, %(acc)d(r29)''' + chk_('r12', 'ccm_n') + r'''
+        lwz r3, %(work)d(r12)''' + chk_('r3', 'ccm_n') + r'''
+        lis r4, %(cc_var_hi)d
+        ori r4, r4, %(cc_var_lo)d
+        lwz r12, 0(r3)
+        lwz r12, 0x44(r12)
+        mtctr r12
+        bctrl
+        lis r12, %(half_hi)d
+        lfs f0, %(half_lo)d(r12)
+        fcmpu cr0, f1, f0
+        ble ccm_n
+        mr r27, r29                     # his clone being made
+        mr r26, r28
+        ori r26, r26, 0x100
+        b ccm_end
+ccm_n:  addi r28, r28, 1
+        b ccm_l
+ccm_end:
+        cmpwi r27, 0
+        beq ccm_call
+        lwz r30, 8(r27)
+        clrlwi r30, r30, 16             # his entry
+        cmplwi r30, %(slots)d
+        blt ccm_e
+        addi r30, r26, -1               # (not one: his player slot)
+        clrlwi r30, r30, 24
+ccm_e:  lis r12, %(cc_mgr_hi)d
+        lwz r12, %(cc_mgr_lo)d(r12)''' + chk_('r12', 'ccm_call') + r'''
+        slwi r0, r30, 2
+        add r12, r12, r0
+        lwz r12, 0x58(r12)''' + chk_('r12', 'ccm_call') + r'''
+        lbz r29, 0x2B(r12)              # his costume
+        stw r30, 8(r31)
+        stb r29, 0x4A(r31)''' + D(r'''
+        lis r3, %(gk_fck_hi)d
+        addi r3, r3, %(gk_fck_lo)d
+        clrlwi r4, r26, 24
+        mr r5, r30
+        mr r6, r25
+        mr r7, r29
+        mr r8, r24
+        srwi r9, r26, 8''' + osr()) + r'''
+ccm_call:
+        mr r3, r31
+        lmw r24, 0x20(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+cc_go:  lis r12, %(cc_setup_hi)d
+        ori r12, r12, %(cc_setup_lo)d
+        mtctr r12
+        bctr                            # (out of a b's reach)
+'''
 
 def bfx_tier(instances):
     """the tier of a victim's burns: instances [(frames left, interval, damage a tick)] (the exe's bfx_vic)"""
@@ -1702,6 +2035,48 @@ ICE_SLOTS_EXTRA = 2               # article 9's list: TR_MAX + this (room for bl
 ICE_SND_LEAD = ICE2_FRAMES        # the boom this many frames after the sound's start (the clip padded: tools/gekkouga_sound.py)
 ICE_SND_VAR = 0x0F0003B4          # his gk_vi(52): play; gk_vi(53): stop
 ICE_SND_ID = 0x07680061           # his row 0x768, label 97 (tools/gekkouga_sound.py ICE_SOUND)
+# parabeetle v2 (feature ice3; the slot clash found in parabeetle v1: ICE_VAR / ICE_SND_VAR were his New_Var 48 - 53, his
+# own aligned kick / regroup state is gk_bv(3, 1..8) = 49 - 56): the request in New_Var 60 - 63 (freed: clones.c's slot
+# map), the sound's play / stop in his TIMER_13 / TIMER_14 (counting down by themselves: written ICE3_SND_VALUE, his MSC
+# acts on > 0.5 and clears them)
+ICE3_VAR = 0x0F0003BC             # his New_Var 60 - 63: the blast request (type, x, y, way)
+ICE3_SND_VAR = 0x0F00032D         # his TIMER_13: play; TIMER_14: stop
+ICE3_SND_VALUE = 4.0              # (ice_k +28)
+ICE3_RIM = 1.0                    # the body tint entry's rim: the flash's colour x this at the edges (black adds nothing)
+ICE3_SHELL_ALPHA = 1.0            # the band's alpha = the flash's alpha x this
+ICE3_SHELL_W = 3.0                # the band's width (pixels of 1280 x 720)
+OL_TAB, OL_N, OL_ENT = 0x04BE3828, 16, 0x50   # Outline_Set's table in exe_v46z_ui10 (outline_cave.py ol_tab: +0 accessor,
+OL_COUNT = 0x04BE3374             # +4 model instance, +8 phase (2 held), +0xC w, +0x10 / +0x14 rates, +0x18 Frames, +0x1C
+OL_COUNT_WORDS = (0x3D8004BE, 0x398C3828, 0x39600010, 0x39200000)   # rim rgb, +0x28 rgb, +0x34 tint, +0x38 Flash, +0x3C
+                                  # since, +0x40 the weight drawn); ol_count (asserted) recounts ol_g +0, which its FB1
+                                  # write (0x04BE3674: blinkColor = lit (1 - t) + rgb t, t = tint x weight) needs
+
+
+def ice_vars(feats):
+    """(the blast request's variable, the sound's play variable) for a feature set"""
+    return (ICE3_VAR, ICE3_SND_VAR) if 'ice3' in feats else (ICE_VAR, ICE_SND_VAR)
+
+
+def ice3_k():
+    """ice_fx's constants: +0 1.0, +4 0.0, +8 ICE3_RIM, +12 ICE3_SHELL_ALPHA, +16 ICE3_SHELL_W, +20 100.0"""
+    return struct.pack('>6f', 1.0, 0.0, ICE3_RIM, ICE3_SHELL_ALPHA, ICE3_SHELL_W, 100.0)
+
+
+# ---- parabeetle v2 (feature ccol; the user: "Clones don't share the same costume as the original Greninja if an alternate
+# palette was selected"). The game picks a weapon's model in the weapon's set-up (vt +0x24 0x02B63268 of the weapon class,
+# vtable 0x100F78F8): its +8 (low 16 bits: its owner's entry, the battle objects' common +8; bit 30 / 29 other encodings)
+# gives +0x4A = the resource entry [[0x102F9028] + 0x58 + 4 x entry] +0x2B (the low byte of its +0x28: the costume the
+# entry's fighter and its weapons were loaded with, 0x030C0AAC / 0x030C0B94; category-2 weapons loaded by 0x030C0C00 with
+# it), only for kinds with u16 flag 0x20 (0x0320E6D4: the clone's 0x87C has it); then the model set-up (0x02B62F14) asks
+# the resource for the key (0x030C3A40(kind, +0x4A) << 28 | kind x 0x29) and passes +8 (u16 flag 0x10) as the entry. The
+# clone's model/clone/c00 - c07 are his body's (all 8 shipped). CC_HOOK is that set-up's call for kinds past 0x165 (every
+# expanded kind): for CLONE_KIND it sets +8 = the making Greninja's +8 and +0x4A = his resource entry's costume first
+CC_HOOK = 0x02B63420              # bl 0x02B62F14 (the model set-up) in 0x02B63268
+CC_SETUP = 0x02B62F14
+CC_TRAMP = 0x037EE520             # 4 words (zero in exe_v46z_ui10 / _diag and gkb17 / gkb17's diag: the zero run 0x037EE4DC -
+                                  # 0x037EE52C before HYD_TRAMP): the cave is out of a bl's reach from CC_HOOK
+CC_RES_MGR = 0x102F9028           # [this] the resource manager: +0x58 + 4 x entry -> the entry (+0x2B its costume)
+CC_VAR = 0x0F00032F               # his TIMER_15: set to 3 by his MSC right before ArticleModule(0x2710, 6 / 7)
 
 
 # ---- parabeetle v1 (feature pbeetle; fighters/gekkouga/README.md "Parabeetle v1"; the user: "spawn a parabeetle under him
@@ -2132,6 +2507,8 @@ RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 
 # RELEASE - ice); usmash spike v2 / trail dim v1: + ice2 (exe_v46z_gkb16: the sound, the tripled countdown, the flash's slot priority; bgrav: his gravity / fall speeds in the burnout; gkb15 is RELEASE - ice2 - bgrav)
 # parabeetle v1: + pbeetle (exe_v46z_gkb17: the Parabeetle article, its claim and drop-through collision; gkb16 is
 # RELEASE - pbeetle)
+RELEASE = RELEASE | {'ice3', 'ccol'}   # parabeetle v2: + ice3, ccol (exe_v46z_gkb18; gkb17 is RELEASE - ice3 - ccol)
+BUILD_TAG = 'exe_v46z_gkb18'      # parabeetle v2 (ice3): named in the diag build's S4BR line (which exe ran)
 VARIANTS = (('A_release', RELEASE),)
 # skeleton v1.6 (the user: "Please stop packaging G_pose. It has no use anymore."): A_release only. The pose feature
 # stays (the exes shipped with it up to v1.5 still rebuild from this script); v1.5 and before: + ('G_pose', (RELEASE -
@@ -4657,7 +5034,8 @@ def build(rpx, diag=False, feats=None):
             ('gk_fsf', 'S4SF skeleton collision removed: owner slot=%d\n'),
             ('gk_fsh', 'S4SH skeleton hit: owner slot=%d attacker=%X hitbox=%d damage x10=%d HP left x10=%d at x=%d y=%d\n'),
             ('gk_fsx', 'S4SX skeleton owner slot=%d phase=%d (1 running, 2 exploded, 3 smoked at 0 HP) damage taken x10=%d at x=%d y=%d\n'),
-            ('gk_fbr', 'S4BR match state cleared (match start / end, training reset, restart): clear #%d, seen by slot=%d\n'),
+            ('gk_fbr', 'S4BR match state cleared (match start / end, training reset, restart): clear #%d, seen by slot=%d' +
+             (' [%s, TEST_ONLY diag build]\n' % BUILD_TAG if 'ice3' in feats else '\n')),
             ('gk_fbt', 'S4BT burn ticks: owner slot=%d victim slot=%d stacks=%d damage x1000 this second=%d\n'),
             ('gk_fbk', 'S4BK burns cleared: victim slot=%d status=%X (KO: Dead / Rebirth; -1 gone) seen by owner slot=%d\n'),
             ('gk_fh', 'S4GH hit check: attacker=%X (category x 16 + index) hitbox=%d clone id=%d hitlag=%d at x=%d y=%d\n'),
@@ -4672,8 +5050,9 @@ def build(rpx, diag=False, feats=None):
         fmts += [('gk_fsn', 'S4SN skeleton sound: owner slot=%d request #%d label=%d (row 0x768) answer=%d its SoundModule=%08X\n')]
     if 'burn2' in feats:
         fmts += [('gk_fbf', 'S4BF burn fire: victim slot=%d level %d -> %d (instances on it, at most 5)\n'),
-                 ('gk_ftr', 'S4TR fire trail claimed: owner slot=%d type=%d (1 forward, 2 up, 3 down) at x=%d y=%d '
-                            'context=%d\n')]
+                 ('gk_ftr', 'S4TR fire trail claimed: owner slot=%d' + (' (1-8: player 1 = 1)' if 'ice3' in feats else '') +
+                  ' type=%d (1 forward, 2 up, 3 down' + (', 4 the ice blast' if 'ice3' in feats else '') + ') at x=%d y=%d '
+                  'context=%d\n')]
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
     A.setdefault('gk_fsn', 0)
@@ -4690,6 +5069,10 @@ def build(rpx, diag=False, feats=None):
     A['ice_flash'] = alloc(16 * ice_frames(feats), 4) if ice else 0   # ... the flash's colour per frame
     A['ice_st'] = alloc(ICE_ST * SLOTS, 4) if ice else 0       # ... per victim
     A['ice_reqofs'] = alloc(16, 4) if ice else 0               # ... tr_claim's request offsets (the blast's first)
+    ice3 = 'ice3' in feats
+    assert not ice3 or 'ice2' in feats, 'ice3 needs ice2'
+    A['ice_fx'] = alloc(16 * SLOTS, 4) if ice3 else 0          # parabeetle v2 (ice3): per victim its flash's entries
+    A['ice3_k'] = alloc(len(ice3_k()), 4) if ice3 else 0       # ... and their constants
     A['bg_k'] = alloc(12, 4) if 'bgrav' in feats else 0       # bgrav: BG_RATE^2, BG_RATE, 0.0
     A['gk_fg'] = alloc(48, 4) if 'bgrav' in feats and diag else 0
     if 'bgrav' in feats and diag:
@@ -4698,12 +5081,19 @@ def build(rpx, diag=False, feats=None):
                     ('gk_fib', 'S4IB ice blast asked: victim slot=%d of Greninja slot=%d (-1 none) amount x100=%d\n'),
                     ('gk_fic', 'S4IC ice countdown cancelled (KO): victim slot=%d status=%X at frame %d\n'),
                     ('gk_fid', 'S4ID ice sound: victim slot=%d cmd=%d (1 play, 2 stop) Greninja slot=%d (-1 none)\n'),
-                    ('gk_fif', 'S4IF ice flash: victim slot=%d frame=%d red x100=%d slot0 on=%d slot1 on=%d prio0=%d '
-                               'prio1=%d\n')):
+                    ('gk_fif', ('S4IF ice flash [%s]: victim slot=%%d frame=%%d rgb x100=%%d %%d %%d alpha x100=%%d entries=%%d '
+                                '(Outline_Set body tint x 100 + Outline_Shell band; 99 none)\n' % BUILD_TAG) if 'ice3' in feats
+                     else 'S4IF ice flash: victim slot=%d frame=%d red x100=%d slot0 on=%d slot1 on=%d prio0=%d prio1=%d\n')):
         on = ice and diag and (nm not in ('gk_fid', 'gk_fif') or 'ice2' in feats)
         A[nm] = alloc((len(fs_) + 4) & ~3, 4) if on else 0
         if on:
             fmts.append((nm, fs_))
+    A['gk_fck'] = 0
+    if 'ccol' in feats and diag:
+        fs_ = ('S4CK clone model: owner slot=%%d entry=%%d (was %%d) costume=%%d (was %%d) found by=%%d (1 his TIMER_15, 0 the first '
+               'Greninja) [%s]\n' % BUILD_TAG)
+        A['gk_fck'] = alloc((len(fs_) + 4) & ~3, 4)
+        fmts.append(('gk_fck', fs_))
     pb = 'pbeetle' in feats
     A['pb_ents'] = alloc(8 * len(PB_MOTIONS)) if pb else 0     # parabeetle v1: its motion entries (wait / rise / ridden)
     A['pb_minfo'] = alloc(W.MINFO_SIZE) if pb else 0
@@ -4912,10 +5302,19 @@ def build(rpx, diag=False, feats=None):
     if 'ice' in feats:
         for nm in ('ice_k', 'ice_flash', 'ice_st', 'ice_reqofs', 'gk_fia', 'gk_fib', 'gk_fic', 'gk_fid', 'gk_fif'):
             p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
-        p.update(ice_snd_var_hi=ICE_SND_VAR >> 16, ice_snd_var_lo=ICE_SND_VAR & 0xFFFF, ice_prio=ICE_PRIO)
+        p.update(ice_snd_var_hi=ice_vars(feats)[1] >> 16, ice_snd_var_lo=ice_vars(feats)[1] & 0xFFFF, ice_prio=ICE_PRIO)
+        if 'ice3' in feats:
+            for nm in ('ice_fx', 'ice3_k'):
+                p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
+            p.update(ol_tab_hi=ha(OL_TAB), ol_tab_lo=K.slo(OL_TAB), ol_n=OL_N, ol_ent=OL_ENT, ol_count=OL_COUNT,
+                     os_tab_hi=ha(OS_TAB), os_tab_lo=K.slo(OS_TAB), os_n=OS_N, os_ent=OS_ENT, os_count=OS_COUNT)
         p.update(hit_elem=HIT_ELEMENT, ice_elem=ICE_ELEMENT, ice_back=ICE_BACK, hit_att=HIT_ATTACKER, look_hi=SH_LOOKUP >> 16,
                  look_lo=SH_LOOKUP & 0xFFFF, ice_frames=ice_frames(feats), ice_ask=ice_frames(feats) - ICE_LEAD, ice_slot=BTINT_SLOT,
-                 ice_var_hi=ICE_VAR >> 16, ice_var_lo=ICE_VAR & 0xFFFF, ice_stz=ICE_ST)
+                 ice_var_hi=ice_vars(feats)[0] >> 16, ice_var_lo=ice_vars(feats)[0] & 0xFFFF, ice_stz=ICE_ST)
+    if 'ccol' in feats:
+        p['gk_fck_hi'], p['gk_fck_lo'] = ha(A['gk_fck']), K.slo(A['gk_fck'])
+        p.update(clone_kind=CLONE_KIND, cc_var_hi=CC_VAR >> 16, cc_var_lo=CC_VAR & 0xFFFF, cc_mgr_hi=ha(CC_RES_MGR),
+                 cc_mgr_lo=K.slo(CC_RES_MGR), cc_setup_hi=CC_SETUP >> 16, cc_setup_lo=CC_SETUP & 0xFFFF)
     if 'pbeetle' in feats:
         for nm in ('pb_desc', 'pb_lvd', 'pb_verts', 'gk_fpb', 'gk_fpc', 'gk_fpf'):
             p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
@@ -7255,7 +7654,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats, 'skbot' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats, 'ice' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (ice_src(D, snd='ice2' in feats) if 'ice' in feats else '') + (bg_src(D) if 'bgrav' in feats else '') + (pb_source(D, L['vt_orig'][0x94]) if 'pbeetle' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats, 'skbot' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats, 'ice' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (ice_src(D, snd='ice2' in feats, fx='ice3' in feats) if 'ice' in feats else '') + (cc_src(D) if 'ccol' in feats else '') + (bg_src(D) if 'bgrav' in feats else '') + (pb_source(D, L['vt_orig'][0x94]) if 'pbeetle' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''
@@ -7407,10 +7806,26 @@ w_dcase:
         out.blob(A['ice_k'], ice_k(), 'ice detonation constants')
         out.blob(A['ice_flash'], b''.join(struct.pack('>4f', *c) for c in ice_flash(ice_frames(feats))), 'ice detonation flash colours')
         out.blob(A['ice_st'], bytes(ICE_ST * SLOTS), 'ice detonation per victim')
-        out.blob(A['ice_reqofs'], struct.pack('>4I', ICE_VAR - GK_VAR_TR, 0, 4, 8), 'fire trail request offsets (the blast first)')
+        out.blob(A['ice_reqofs'], struct.pack('>4I', ice_vars(feats)[0] - GK_VAR_TR, 0, 4, 8),
+                 'fire trail request offsets (the blast first)')
+        if 'ice3' in feats:
+            out.blob(A['ice_fx'], bytes(16 * SLOTS), 'ice flash entries per victim')
+            out.blob(A['ice3_k'], ice3_k(), 'ice flash constants')
+            assert tuple(img.w(OL_COUNT + 4 * i) for i in range(4)) == OL_COUNT_WORDS, 'ol_count'
+            assert all(img.w(OL_TAB + 4 * i) == 0 for i in range(OL_N * OL_ENT // 4)), 'ol_tab'
         assert img.w(ICE_HOOK) == ICE_ORIG and ICE_HOOK not in img.relocs(), 'the victim hit handler at 0x%08X' % ICE_HOOK
         out.put(ICE_HOOK, asm1(ICE_HOOK, 'b 0x%X' % lab['ice_hit']), 'the victim hit handler -> ice_hit (ice detonation v1)',
                 ICE_ORIG)
+    if 'ccol' in feats:
+        cc_orig = img.w(CC_HOOK)
+        assert K.branch_target(CC_HOOK, cc_orig) == CC_SETUP and cc_orig & 1 and CC_HOOK not in img.relocs(), \
+            'the weapon model set-up call at 0x%08X' % CC_HOOK
+        out.put(CC_HOOK, asm1(CC_HOOK, 'bl 0x%X' % CC_TRAMP), 'the weapon model set-up -> CC_TRAMP -> cc_model (the '
+                'clone\'s costume, parabeetle v2)', cc_orig)
+        tw = [0x3D800000 | (lab['cc_model'] >> 16), 0x618C0000 | (lab['cc_model'] & 0xFFFF), 0x7D8903A6, 0x4E800420]
+        for i, w in enumerate(tw):
+            assert img.w(CC_TRAMP + 4 * i) == 0, 'CC_TRAMP 0x%08X' % (CC_TRAMP + 4 * i)
+            out.put(CC_TRAMP + 4 * i, w, 'CC_TRAMP (lis / ori / mtctr / bctr -> cc_model)', 0)
     if 'bgrav' in feats:
         out.blob(A['bg_k'], struct.pack('>3f', BG_RATE * BG_RATE, BG_RATE, 0.0), 'burnout gravity multipliers (bgrav)')
         assert BG_RATE == SLOW_RATE

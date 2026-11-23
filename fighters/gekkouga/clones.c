@@ -77,7 +77,7 @@ int gk_fp_slot;        // smash tune v1: the fighter his forward smash hit or wa
                        // yet, -1 the pursuit over for this forward smash)
 int gk_fp_t;           // ... frames pursued (after his hitlag)
 float gk_fp_v;         // ... his pursuit speed last frame
-int gk_ib_t;           // ice detonation v1: frames the executable's blast request (his gk_vi(48) - 51) has been up
+int gk_ib_t;           // ice detonation v1: frames the executable's blast request (his gk_vi(60) - 63) has been up
 int gk_pb_cd;          // parabeetle v1: frames left on his up special's cooldown (gk_pb_cooldown() from a spawn)
 int gk_pb_req_t;       // ... frames his parabeetle request (his VAR_12) stays up for the executable's claim
 int gk_pb_q;           // ... the clones' parabeetles still to ask for (1 the left-spawned, 2 the right; + 4 on the ground)
@@ -120,7 +120,9 @@ int gk_pb_req_frames() { return 5; }      // its request's life (not claimed: dr
 float gk_pb_boost() { return 2.75f; }     // on cooldown: up at this speed into special fall: 2.75^2 / (2 x 0.18) = 21 units,
                                           // a quarter of a straight-up Hydro Pump (2 jets 3.7 / 3.33 x 10 frames + the
                                           // end's 0.7: about 85; his vl special_hi 0x07000003 / 0x17000004 / 0x07000007)
-float gk_pb_hop() { return 2.4f; }        // on the ground: a hop (16 units) onto the beetle made over his feet
+float gk_pb_lift() { return 9.5f; }       // parabeetle v2: on the ground he is put this far up, its line at his feet
+                                          // (its swoop's lowest, 6 down and its wings' bob, then 1 over the floor)
+int gk_pb_snap_frames() { return 12; }    // ... the snap: his TIMER_12, held still while his beetle's line is made
 int gk_is_sound() { return 0x7680061; }   // usmash spike v2 / trail dim v1: the ice detonation's fuse and boom (his row
                                           // 0x768, label 97: tools/gekkouga_sound.py ICE_SOUND), in place of the skeleton's
                                           // explosion sound (label 96) the blast played
@@ -141,7 +143,7 @@ void gekkouga_frame()
     int flags;
     int gen;
     st = global4;
-    gk_svi(61, 0);                        // clone fix v3 diag: no removal reason written this frame yet
+    gk_dg_set(0x1, 0);                    // clone fix v3 diag: no removal reason written this frame yet
     gen = (int)(WorkModuleF(0, 0x0f00030e) + 0.5f);   // skeleton v1: the executable's clear-all count & 7 (VAR_14)
     if (gk_gen_seen && gen != gk_gen)
     {
@@ -256,7 +258,7 @@ void gekkouga_frame()
     flags = flags | gk_ac_diag();         // aerial chain v1 diag (256 up: the exe's S4GF line logs a change)
     flags = flags | gk_tc_diag();         // tilt chain v1 diag (2097152 + the same fields, in a jab / tilt)
     flags = flags | gk_cl_diag();         // clone fixes v2 diag (1048576 toggled: an S4GF line with VAR_23)
-    if (gk_vi(62))                        // clone fix v3 diag: ... and flipped at each shuriken copy's report (freeze
+    if (gk_dg(0x2))                       // clone fix v3 diag: ... and flipped at each shuriken copy's report (freeze
     {                                     // fix v1: no `^`: bitXor (MSC op 0x19) is in no MSC the game ships; v3's
         if (flags & 1048576)              // flags ^ ... froze the game at his load)
         {
@@ -304,7 +306,7 @@ void gk_input()
     sx = ControlModuleF(0);
     if (gk_ability > 0 && gk_abs(sx) <= 0.25f)
     {
-        if (gk_vi(60) == 0)
+        if (gk_vi(23) == 0)
         {
             gk_lw_eat();                  // clone fix v3: the kick locked (the activating press, the first 10 frames):
         }                                 // this press is dropped, not buffered for later
@@ -412,16 +414,16 @@ int gk_ak_lock() { return 11; }          // gk_seq after the ability's frame: th
 
 void gk_ak_arm()
 {
-    if (gk_vi(60) == 0 && gk_seq >= gk_ak_lock() && ControlModule(0x2712, 0x1) == 0)
+    if (gk_vi(23) == 0 && gk_seq >= gk_ak_lock() && ControlModule(0x2712, 0x1) == 0)
     {
-        gk_svi(60, 0x1);
+        gk_svi(23, 0x1);
     }
 }
 
 void gk_activate()
 {
     gk_lw_charge = 0;
-    gk_svi(60, 0);                        // clone fix v3: the kick locked; the activating press used up (one press,
+    gk_svi(23, 0);                        // clone fix v3: the kick locked; the activating press used up (one press,
     gk_lw_eat();                          // one action: not buffered on into the kick)
     gk_ability = gk_ability_frames();
     gk_alive = 0;
@@ -502,7 +504,8 @@ void gk_spawn(int id)
     gk_set_c(id, PostureModuleF(0x1) + off, PostureModuleF(0x2), 0);
     gk_set_fall_t(id, 0);
     gk_set_hn(id, 0);                     // clone delay: no history yet: his place now, held for its delay
-    if (id == 0x1)
+    WorkModule(0, 3.0f + 0, 0x0f00032f);  // parabeetle v2: his TIMER_15: the executable's cc_model gives the clone made
+    if (id == 0x1)                        // now his costume (it counts itself down to 0)
     {
         r = ArticleModule(0x2710, 0x6);
     }
@@ -823,7 +826,7 @@ void gk_physics()
     {
         copy = 0x1;
     }
-    if (!det && gk_pb_ride > 0 && !gk_on_ledge(global4))
+    if (!det && (gk_pb_ride > 0 || WorkModuleF(0, 0x0f00032c) > 0.5f) && !gk_on_ledge(global4))
     {
         copy = 0x1;                       // parabeetle v1: he stands on his beetle: the clones ride theirs (spawned under
     }                                     // them, moving as his): his vertical movement
@@ -1124,7 +1127,7 @@ void gk_heartbeat()
 void gk_why(int code, int id)
 {
     WorkModule(0, (float)(code + id) + 0, 0x0f000317);
-    gk_svi(61, 0x1);
+    gk_dg_set(0x1, 0x1);
 }
 
 int gk_why_q(float v)
@@ -1920,42 +1923,42 @@ void gk_reset()
     gk_ac_end();
     gk_tc_end();
     gk_ib_t = 0;
-    gk_svi(48, 0);                        // ice detonation v1: no blast request
+    gk_svi(60, 0);                        // ice detonation v1: no blast request (parabeetle v2: slots 60 - 63)
     SoundModule(0x2714, gk_is_sound());   // usmash spike v2 / trail dim v1: a detonation's sound stopped (its countdown
-    gk_svi(52, 0);                        // is off: the executable's reset), no play / stop pending
-    gk_svi(53, 0);
+    WorkModule(0, 0 + 0, 0x0f00032d);    // is off: the executable's reset), no play / stop pending (parabeetle v2:
+    WorkModule(0, 0 + 0, 0x0f00032e);    // his TIMER_13 / 14)
     gk_pb_clear();                        // parabeetle v1
 }
 
 // ---- ice detonation v1 (fighters/gekkouga/README.md "Ice detonation v1"): an ice hit on a burning fighter clears its burns
 // and arms a blast on it (the executable: tools/gekkouga_clone_cave.py ice_arm / ice_vic); one frame before it goes off the
-// executable asks a Greninja for it (the burns' owner, else the first who can): his gk_vi(48) = type 4 + the burn amount /
+// executable asks a Greninja for it (the burns' owner, else the first who can): his gk_vi(60) = type 4 + the burn amount /
 // 100, 49 / 50 the place, 51 the way. He makes a fire trail (article 9), which the executable's claim gives that request
 // first (no burn context): weapons/firetrail.c's blast mode (the hitbox, its explosion). Not claimed (no room): made once
 // more; the request dropped after gk_ib_frames(). (Its sound: gk_is_tick, from the arming on; the blast plays none: ice
 // detonation v1's skeleton explosion sound here is gone, the user's "Replace what the old sound was")
 // usmash spike v2 / trail dim v1 (the user: "Can you make this sound time with the ice detonation's timer and explosion?"):
 // the executable (tools/gekkouga_clone_cave.py ice_snd, feature icesnd) asks him, on the ice hit that arms a countdown,
-// to play the detonation's sound (gk_vi(52) = 1): its boom is cut to come ICE_SND_LEAD (52) frames on, with the blast;
-// a cancelled countdown (a KO, no Greninja to make the blast) asks him to stop it (gk_vi(53) = 1). Stop first: a new
+// to play the detonation's sound (his TIMER_13 > 0): its boom is cut to come ICE_SND_LEAD (52) frames on, with the blast;
+// a cancelled countdown (a KO, no Greninja to make the blast) asks him to stop it (TIMER_14 > 0). Stop first: a new
 // arming the same frame still plays
 void gk_is_tick()
 {
-    if (WorkModuleF(0, 0x0f0003b5) > 0.5f)
+    if (WorkModuleF(0, 0x0f00032e) > 0.5f)
     {
         SoundModule(0x2714, gk_is_sound());
-        gk_svi(53, 0);
+        WorkModule(0, 0 + 0, 0x0f00032e);
     }
-    if (WorkModuleF(0, 0x0f0003b4) > 0.5f)
+    if (WorkModuleF(0, 0x0f00032d) > 0.5f)
     {
         SoundModule(0x2710, gk_is_sound());
-        gk_svi(52, 0);
+        WorkModule(0, 0 + 0, 0x0f00032d);
     }
 }
 
 void gk_ib_tick()
 {
-    if (WorkModuleF(0, 0x0f0003b0) < 0.5f)
+    if (WorkModuleF(0, 0x0f0003bc) < 0.5f)
     {
         gk_ib_t = 0;
         return;
@@ -1967,7 +1970,7 @@ void gk_ib_tick()
     gk_ib_t += 1;
     if (gk_ib_t > gk_ib_frames())
     {
-        gk_svi(48, 0);                    // not claimed: dropped
+        gk_svi(60, 0);                    // not claimed: dropped
         gk_ib_t = 0;
     }
 }
@@ -2419,7 +2422,7 @@ int gk_cl_diag()
     }
     t = gk_vi(3) + 1;                     // (gk_cl_t)
     gk_svi(3, t);
-    if (t % 10 == 0 && gk_vi(61) == 0)  // (clone fix v3: not over a clone's removal reason written this frame)
+    if (t % 10 == 0 && gk_dg(0x1) == 0)  // (clone fix v3: not over a clone's removal reason written this frame)
     {
         WorkModule(0, (float)(gk_vi(2) * 10000 + gk_cl_err(0x1) * 100 + gk_cl_err(0x2)) + 0, 0x0f000317);
         gk_svi(2, 0);                     // (gk_cl_why)
@@ -2439,7 +2442,12 @@ int gk_cl_diag()
 // (1 the left-spawned clone, 2 the right-spawned one, 3 him): k 0 action, 1 frames in it, 2 motion kind, 3 its start
 // frame, 4 the command's seq, 5 facing, 6 X speed, 7 Y speed (his; the clones' are gk_lvy / gk_rvy), 8 flight frames
 // left, 9 air jumps used, 10 smash charge, 11 smash chain, 12 tilted (the kick), 13 aux (smash type + 8 x auto / the
-// aerial / the landing lag), 14 / 15 the regroup's start X / Y
+// aerial / the landing lag), 14 / 15 the regroup's start X / Y.
+// Parabeetle v2 (the slot map, tools/gekkouga_clones_test.py slot_map_tests: no two users of one slot): body 3 (him) uses
+// k 1 - 8 (49 - 56); ice detonation v1 / v2's request / sound were 48 - 53 (a clash): now the request is 60 - 63 (the
+// executable's ICE3_VAR), the sound's play / stop his TIMER_13 / 14 (0x0F00032D / E); the kick armed 60 -> 23 and the
+// ledge kick 63 -> 39 (the clones' unused k 7), the clone fix v3 diag's flags 61 / 62 -> bits of 48 (gk_dg); TIMER_15
+// (0x0F00032F) the clone being made (the executable's cc_model: its costume), TIMER_12 (0x0F00032C) the Parabeetle snap
 // ===================================================================
 int gk_vi(int i)
 {
@@ -2469,6 +2477,28 @@ void gk_bs(int b, int k, float v)
 void gk_bsi(int b, int k, int v)
 {
     WorkModule(0, (float)v + 0, 0x0f000380 + 16 * b + k);
+}
+
+// slot 48: the clone fix v3 diag's two flags (parabeetle v2: they were slots 61 / 62): bit 1 a removal reason written
+// this frame, bit 2 the shuriken reports' parity
+int gk_dg(int bit)
+{
+    return (gk_vi(48) & bit) != 0;
+}
+
+void gk_dg_set(int bit, int on)
+{
+    int w;
+    w = gk_vi(48);
+    if (w & bit)
+    {
+        w = w - bit;
+    }
+    if (on)
+    {
+        w = w + bit;
+    }
+    gk_svi(48, w);
 }
 
 void gk_cl_why_or(int bits)
@@ -2506,7 +2536,7 @@ float gk_ak_tilt() { return 270.0f; }     // his kick turned straight up (Fighte
 int gk_ak_try()
 {
     int m;
-    if (gk_vi(60) == 0)
+    if (gk_vi(23) == 0)
     {
         gk_lw_eat();
         return 0;                         // clone fix v3: locked (the activating press, the first 10 frames)
@@ -2585,7 +2615,7 @@ void gk_ak_begin()
 {
     float ox;
     int c;
-    gk_svi(63, 0);                        // (tuning v1: a kick from a ledge split: no regroup after the ledge)
+    gk_svi(39, 0);                        // (tuning v1: a kick from a ledge split: no regroup after the ledge)
     gk_svi(8, 0x1);
     gk_svi(9, 0x1);
     gk_svi(10, 0);
@@ -3307,9 +3337,9 @@ void gk_ledge_mode()
         gk_ledge_split();
         return;
     }
-    if (gk_vi(63) != 0 && !gk_on_ledge(global4))
+    if (gk_vi(39) != 0 && !gk_on_ledge(global4))
     {
-        gk_svi(63, 0);
+        gk_svi(39, 0);
         if (gk_vi(8) == 0x2)
         {
             gk_rg_begin();                // back to formation, eased
@@ -3345,7 +3375,7 @@ void gk_ledge_split()
         c += 1;
     }
     gk_svi(8, 0x2);
-    gk_svi(63, 0x1);
+    gk_svi(39, 0x1);
     gk_bs(3, 2, PostureModuleF(0x1));     // (his movement from now: gk_mir_track)
     gk_bs(3, 3, PostureModuleF(0x2));
 }
@@ -4427,7 +4457,7 @@ void gk_sh_report()
     r = beat / 256;
     WorkModule(0, (float)(beat % 256) + 0, 0x0f00031e);
     gk_why(700 + 100 * ((r / 4) % 2) + 1000 * (r / 8), r % 4);
-    gk_svi(62, 0x1 - gk_vi(62));
+    gk_dg_set(0x2, 0x1 - gk_dg(0x2));
 }
 
 void gk_sh_tick()
@@ -4462,6 +4492,7 @@ void gk_sh_tick()
 void gk_pb_end()
 {
     int ground;
+    int dir;
     ground = 0;
     if (global18 == 0)
     {
@@ -4471,23 +4502,77 @@ void gk_pb_end()
     if (gk_pb_cd > 0)
     {
         func_2329();                      // the special fall's landing lag / air speed (vanilla SpecialHiEnd's key 6)
-        gk_pb_lift(gk_pb_boost());
+        gk_pb_lift_v(gk_pb_boost());
         gk_puff_at(PostureModuleF(0x1), PostureModuleF(0x2));   // the cue: no beetle (on cooldown)
         func_16(0x10, 0);                 // SpecialFall
         return;
     }
-    gk_pb_spawn(ground);
+    dir = gk_pb_dir();
     if (ground)
     {
-        gk_pb_lift(gk_pb_hop());
+        func_102();                       // parabeetle v2: in the air (the game's own ground / air switch) ...
+        WorkModule(0x2, gk_pb_lift() + 0, 0x0f000001);   // ... put up onto where its line will be (the game's set_pos)
     }
-    func_16(0xe, 0);                      // Fall: actionable
+    KineticModule(0x11, 0x1, 0);          // held still (gk_pb_tick: every frame until he is on it)
+    KineticModule(0xb, 0x1);
+    WorkModule(0, (float)gk_pb_snap_frames() + 0, 0x0f00032c);   // his TIMER_12: the snap pending
+    gk_pb_spawn(ground, dir);
+    func_16(0xe, 0);                      // Fall: actionable (a jump / attack / dodge drops the snap)
+}
+
+// parabeetle v2 (the user: "make the beetle spawn in whatever direction the player was holding in while doing up special,
+// and make the Greninja use up special in that direction"): the stance's own direction, as vanilla's jet takes it: the
+// stance (func_2303) reads the stick at its frame WorkModule(6, 0x17000001), turns him (PostureModule) and keeps the
+// unit vector (x on screen, y up; neutral (0, 1)) in 0x1000006 / 0x1000007. Down is clamped to level (a down-diagonal is
+// that side; straight down is neutral). -> q + 128 x side (q the angle from straight up, 0 - 90 degrees; side 1 right,
+// 0 left: the stick's when held at least 0.2 to a side, else his facing)
+int gk_pb_dir()
+{
+    float dx;
+    float dy;
+    float len;
+    int q;
+    int side;
+    dx = WorkModuleF(0, 0x1000006);
+    dy = WorkModuleF(0, 0x1000007);
+    if (dy < 0)
+    {
+        dy = 0;
+    }
+    len = MathF(0, dx * dx + dy * dy);
+    if (len < 0.5f)
+    {
+        dx = 0;
+        dy = 1.0f;
+        len = 1.0f;
+    }
+    dx = dx / len;
+    dy = dy / len;
+    q = (int)(MathF(0x1, gk_abs(dx), dy) * 180.0f / M_PI + 0.5f);
+    side = 0;
+    if (PostureModuleF(0) > 0)
+    {
+        side = 0x1;
+    }
+    if (dx >= 0.2f)
+    {
+        side = 0x1;
+    }
+    else if (dx <= -0.2f)
+    {
+        side = 0;
+    }
+    else
+    {
+        q = 0;                            // (within 0.2 of straight up: straight up, toward his facing)
+    }
+    return q + 128 * side;
 }
 
 // up at v: off the ground first (as vanilla's moves that leave it: situation air, the ground correction off), his
 // gravity on (the stance stopped every energy), its speed; his VAR_13 = v: set again on his first frame in the new status
-// (gk_pb_tick), in case its set-up resets it
-void gk_pb_lift(float v)
+// (gk_pb_tick), in case its set-up resets it (the boost on cooldown)
+void gk_pb_lift_v(float v)
 {
     if (global18 == 0)
     {
@@ -4499,19 +4584,20 @@ void gk_pb_lift(float v)
     WorkModule(0, v + 0, 0x0f00030d);
 }
 
-void gk_pb_spawn(int ground)
+void gk_pb_spawn(int ground, int dir)
 {
-    gk_pb_q = gk_art_clones() + 4 * ground;   // clone articles: the clones in formation (copying his move) get theirs
-    gk_pb_req(0x1, ground);
+    gk_pb_q = gk_art_clones() + 4 * ground + 8 * dir;   // clone articles: the clones in formation (copying his move) get
+    gk_pb_req(0x1, ground, dir);                        // theirs, the same way (they copy his up special)
     gk_pb_cd = gk_pb_cooldown();
 }
 
-void gk_pb_req(int which, int ground)
+// the request: his VAR_12 = its travel side x (which + 4 x ground + 8 x the angle from straight up)
+void gk_pb_req(int which, int ground, int dir)
 {
     float code;
     int r;
-    code = (float)(which + 4 * ground);
-    if (PostureModuleF(0) < 0)
+    code = (float)(which + 4 * ground + 8 * (dir % 128));
+    if (dir < 128)
     {
         code = -code;
     }
@@ -4529,6 +4615,18 @@ void gk_pb_tick()
     if (gk_pb_cd > 0)
     {
         gk_pb_cd -= 1;
+    }
+    if (WorkModuleF(0, 0x0f00032c) > 0.5f)   // parabeetle v2: the snap pending (his TIMER_12)
+    {
+        if (global4 == 0xe)
+        {
+            KineticModule(0x11, 0x1, 0);  // held still over his beetle until its line is made (gk_pb_heartbeat)
+            KineticModule(0xb, 0x1);
+        }
+        else if (global4 != 0x154)
+        {
+            WorkModule(0, 0 + 0, 0x0f00032c);   // he did something else (a jump, an attack, hit): no snap
+        }
     }
     v = WorkModuleF(0, 0x0f00030d);
     if (v > 0)
@@ -4567,12 +4665,12 @@ void gk_pb_tick()
     if (c & 0x1)
     {
         gk_pb_q -= 0x1;
-        gk_pb_req(0x2, gk_pb_q >= 4);
+        gk_pb_req(0x2, (gk_pb_q / 4) % 2, gk_pb_q / 8);
     }
     else
     {
         gk_pb_q -= 0x2;
-        gk_pb_req(0x3, gk_pb_q >= 4);
+        gk_pb_req(0x3, (gk_pb_q / 4) % 2, gk_pb_q / 8);
     }
 }
 
@@ -4581,7 +4679,15 @@ void gk_pb_tick()
 void gk_pb_heartbeat()
 {
     int beat;
+    int snap;
     beat = (int)(WorkModuleF(0, 0x0f00031e) + 0.5f);
+    snap = 0;
+    if (beat & 0x10)
+    {
+        beat = beat - 0x10;               // parabeetle v2: his beetle's line made under his feet: the snap
+        WorkModule(0, (float)beat + 0, 0x0f00031e);
+        snap = 0x1;
+    }
     if (beat & 0x8)
     {
         WorkModule(0, (float)(beat - 0x8) + 0, 0x0f00031e);
@@ -4591,6 +4697,26 @@ void gk_pb_heartbeat()
     {
         gk_pb_ride -= 1;
     }
+    if (snap)
+    {
+        gk_pb_snap();
+    }
+}
+
+// parabeetle v2: the snap (his TIMER_12 still up, still in the Fall his up special left him in): on its line (his feet
+// are on it: it was made there and kept there), the game's own ground switch (func_101: KineticModule(0, 6), situation
+// ground, GroundModule(0x2710, 1): the ground correction takes the line under his feet), Wait (actionable: jump, attacks,
+// drop through)
+void gk_pb_snap()
+{
+    if (WorkModuleF(0, 0x0f00032c) < 0.5f || global4 != 0xe)
+    {
+        return;
+    }
+    WorkModule(0, 0 + 0, 0x0f00032c);
+    func_101();
+    func_16(0, 0);
+    gk_pb_ride = 2;                       // his clones ride theirs from now (gk_physics)
 }
 
 // a KO / a reset: his beetles removed (anyone on one falls), no request, no cooldown. A beetle lives 270 frames, less
@@ -4608,4 +4734,5 @@ void gk_pb_clear()
     gk_pb_ride = 0;
     WorkModule(0, 0 + 0, 0x0f00030c);
     WorkModule(0, 0 + 0, 0x0f00030d);
+    WorkModule(0, 0 + 0, 0x0f00032c);
 }

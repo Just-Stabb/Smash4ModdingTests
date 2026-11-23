@@ -1,14 +1,15 @@
-// Greninja's Parabeetle (weapon kind 0x1A4, his article 10: fighters/gekkouga/README.md "Parabeetle v1"). The framework
-// is his moon article's (vanilla moon.mscsb, decompiled, as weapons/skeleton.c): one status that does nothing; the
-// beetle itself is pb_frame(), run every frame (global14). His up special's stance end asks for it (his VAR_12: the
+// Greninja's Parabeetle (weapon kind 0x1A4, his article 10: fighters/gekkouga/README.md "Parabeetle v1" / "v2"). The
+// framework is his moon article's (vanilla moon.mscsb, decompiled, as weapons/skeleton.c): one status that does nothing;
+// the beetle itself is pb_frame(), run every frame (global14). His up special's stance end asks for it (his VAR_12: the
 // request code, clones.c gk_pb_req) and makes it (ArticleModule 0x2710, 10); the executable (tools/gekkouga_clone_cave.py
-// pb_frame) gives it its owner (its VAR_0) and the code (its VAR_1: his facing x (1 his own, 2 / 3 his left / right
-// clone's, + 4 when he was on the ground)), and makes its collision from parabeetle.lvd (one drop-through floor line on
-// its top, the hydrant's route as the skeleton's), moved with it every frame (riders carried) while its VAR_5 is 1 and
-// removed when it is 2. This script flies it: from just under his (or the clone's) feet, forward his way, a swoop down
-// then a steady rise, pb_life() frames; then it flies off up and away (no collision) and is removed. Its model and
-// motions are the user's Wii Parabeetle (tools/mdl0_to_nud.py, tools/chr0_to_omo.py): motion 0 wait (flying), 1 rise,
-// 2 ridden (the press when landed on).
+// pb_frame) gives it its owner (its VAR_0) and the code (its VAR_1: its travel side x (1 his own, 2 / 3 his left / right
+// clone's, + 4 when he was on the ground, + 8 x the stick's angle from straight up)), and makes its collision from
+// parabeetle.lvd (one drop-through floor line on its top, the hydrant's route as the skeleton's), moved with it every
+// frame (riders carried) while its VAR_5 is 1 and removed when it is 2. This script flies it: its line at his (or the
+// clone's) feet until he is on it (v2: the snap), then mostly up, a little to the held side, a short swoop down first,
+// pb_life() frames; then it flies off up and away (no collision) and is removed. Its model and motions are the user's Wii
+// Parabeetle (tools/mdl0_to_nud.py, tools/chr0_to_omo.py): motion 0 wait (flying), 1 rise, 2 ridden (the press when
+// landed on); wait / rise restarted at their end (v2: they played once).
 int global0;
 int global1;
 int global2;
@@ -624,38 +625,49 @@ int pb_t;              // frames flying
 int pb_phase;          // 1 flying (its collision on), 2 leaving (no collision)
 int pb_slot;           // its owner's slot (1 - 8)
 int pb_which;          // 1 his, 2 / 3 his left / right clone's
-int pb_ground;         // 1: asked for on the ground (it starts higher: its swoop ends just over the floor)
+int pb_ground;         // 1: asked for on the ground (he was lifted pb_lift() onto it: clones.c gk_pb_end)
 int pb_kind;           // the motion kind playing (0 wait, 1 rise, 2 ridden)
 int pb_kind_t;         // frames in it
 int pb_rode;           // frames something has been on it (0: nothing)
 int pb_free;           // frames nothing has been on it since something was
 int pb_on_n;           // frames in a row something's feet have been on its line (on it from the 2nd: one falling or
                        // jumping through the line's band is in it for a frame at most)
+int pb_hold;           // parabeetle v2: frames held at its rider's feet before it flies (the snap: pb_hold_step)
+int pb_ready;          // ... frames since its line was made (its executable VAR_6 1) while held; his told (VAR_30 bit 16)
+int pb_q;              // ... the stick's angle from straight up, 0 - 90 degrees (his request's code / 8)
+int pb_loops;          // ... its wait / rise motion restarted this many times (the wings never stop: pb_loop)
 float pb_x0;           // where it started (its origin: its collision line is pb_top() over it), its way
 float pb_y0;
-float pb_dir;
+float pb_dir;          // its travel side (+1 right, -1 left: the held stick's, else his facing), its facing
+float pb_h;            // parabeetle v2: its sideways speed (units a frame, signed: pb_dir x pb_hspeed(pb_q))
 float pb_x;
 float pb_y;
 float pb_vx;           // leaving: its speed
 float pb_vy;
 
+// parabeetle v2 (the user: "make the beetle's travel arc far more vertical than horizontal", "spawn in whatever direction
+// the player was holding"): up 144 over its 4 s, sideways 12 (neutral / straight up: toward his facing) to 41 (held 45
+// degrees or more to a side): the rise 3.5 x the sideways travel when a side is held, 12 x neutral
 int pb_life() { return 240; }             // 4 s flying (the user: "about 4 seconds"), then it flies off
 int pb_leave_frames() { return 30; }      // ... for 0.5 s (no collision), then removed
-float pb_speed() { return 0.75f; }        // forward, units a frame (Greninja walks 1.43 / runs 2.08): 180 units in 4 s
-float pb_dip() { return 8.0f; }           // the swoop: down this far ...
-int pb_dip_frames() { return 20; }        // ... over this many frames (half a cosine: its speed 0 at both ends)
-float pb_rise_v() { return 0.4f; }        // then it rises: up to this many units a frame ...
-int pb_rise_ease() { return 30; }         // ... reached in this many frames (an even push), then steady: up 74 by 240
+float pb_h0() { return 0.05f; }           // sideways, units a frame: straight up / neutral (toward his facing) ...
+float pb_hs() { return 0.17f; }           // ... held 45 degrees or more from straight up (a side), linear in between
+int pb_q_full() { return 45; }
+float pb_dip() { return 6.0f; }           // the swoop: down this far ... (v1 8 / 20)
+int pb_dip_frames() { return 16; }        // ... over this many frames (half a cosine: its speed 0 at both ends)
+float pb_rise_v() { return 0.7f; }        // then it rises: up to this many units a frame (v1 0.4) ...
+int pb_rise_ease() { return 20; }         // ... reached in this many frames (an even push), then steady: up 144 by 240
 float pb_top() { return 10.6f; }          // its collision line over its origin (tools/gekkouga_clone_cave.py PB_TOP: the
                                           // shell's top, 10.84 at the model's scale 1.25 in every motion, its root's bob
                                           // taken out: pb_bob)
 float pb_half() { return 10.0f; }         // ... from x - this to x + this (20 wide: 1.7 x his 12)
-float pb_gap() { return 0.3f; }           // in the air its top starts this far under his feet
-float pb_lift() { return 11.5f; }         // on the ground: its line this far over his feet: its lowest (the swoop's bottom,
-                                          // frame 20, the wait motion's bob then 2.5 under its first frame's) 1 over the floor
-float pb_leave_vx() { return 1.6f; }      // leaving: forward ...
-float pb_leave_vy() { return 0.6f; }      // ... and up, rising faster each frame
-float pb_leave_ay() { return 0.12f; }
+int pb_hold_max() { return 12; }          // the snap: held at its rider's feet at most this many frames ...
+int pb_ready_frames() { return 2; }       // ... and this many after its line is made (he lands on it: clones.c gk_pb_snap)
+int pb_motion_end() { return 79; }        // wait / rise: 80 frames (0 - 79; the CHR0s loop: 79 -> 0): restarted at 79
+float pb_leave_vx() { return 3.0f; }      // leaving: sideways its speed x this + pb_leave_vx0() ...
+float pb_leave_vx0() { return 0.3f; }
+float pb_leave_vy() { return 1.2f; }      // ... and up, rising faster each frame
+float pb_leave_ay() { return 0.1f; }
 float pb_ride_below() { return 1.0f; }    // something's feet within this under its line ...
 float pb_ride_above() { return 1.5f; }    // ... or this over it ...
 float pb_ride_side() { return 1.5f; }     // ... and its X within the line's ends +- this: on it
@@ -784,15 +796,56 @@ void pb_motion(int k)
     }
 }
 
-// its start: the code the executable copied from his request (its VAR_1), the place from his (the slot's position) or
-// his clone's (his shared variables). Its place (pb_x, pb_y) is its path's; the article is at pb_y + pb_bob() (its
-// root's bob, its line with it)
+// parabeetle v2: its sideways speed for the stick's angle q from straight up (0 - 90): pb_h0() at 0 to pb_hs() from
+// pb_q_full() on, linear in between
+float pb_hspeed(int q)
+{
+    if (q >= pb_q_full())
+    {
+        return pb_hs();
+    }
+    return pb_h0() + (pb_hs() - pb_h0()) * (float)q / (float)pb_q_full();
+}
+
+// parabeetle v2 (the user: "the beetle stops animating its wings part way through traveling"): the motion module plays a
+// weapon's motion once and holds its last frame (v1 started rise once and never again: its wings stopped 80 frames into
+// the climb). Wait / rise are restarted at their last frame (the CHR0s loop: frame 79 is frame 0 again) every time
+float pb_loop()
+{
+    if (pb_kind == 0x2)
+    {
+        return 0;
+    }
+    if (MotionModuleF(0x1) >= (float)pb_motion_end())
+    {
+        MotionModule(0x1, pb_kind, 0, 1.0f);
+        pb_loops += 1;
+    }
+    return 0;
+}
+
+// its rider's feet (n 0 / 1: X / Y): his (the slot's position) or his clone's (his shared variables)
+float pb_rider(int n)
+{
+    if (pb_which == 0x2)
+    {
+        return pb_shared(n);
+    }
+    if (pb_which == 0x3)
+    {
+        return pb_shared(0x2 + n);
+    }
+    return pb_slot_pos(pb_slot, n);
+}
+
+// its start: the code the executable copied from his request (its VAR_1: its travel side x (1 his, 2 / 3 the left / right
+// clone's, + 4 on the ground, + 8 x the stick's angle from straight up in degrees)), the place its rider's. Its place
+// (pb_x, pb_y) is its path's; the article is at pb_y + pb_bob() (its root's bob, its line with it). Parabeetle v2: its line
+// exactly at its rider's feet (no gap: the snap, pb_hold_step)
 void pb_start()
 {
     int c;
     float code;
-    float x;
-    float y;
     pb_slot = (int)(pb_var(0) + 0.5f);
     code = pb_var(1);
     pb_dir = 1.0f;
@@ -802,6 +855,12 @@ void pb_start()
         code = -code;
     }
     c = (int)(code + 0.5f);
+    pb_q = c / 8;
+    if (pb_q > 90)
+    {
+        pb_q = 90;
+    }
+    c = c % 8;
     pb_ground = 0;
     if (c >= 4)
     {
@@ -809,43 +868,62 @@ void pb_start()
         c -= 4;
     }
     pb_which = c;
-    if (c == 0x2)
-    {
-        x = pb_shared(0);
-        y = pb_shared(0x1);
-    }
-    else if (c == 0x3)
-    {
-        x = pb_shared(0x2);
-        y = pb_shared(0x3);
-    }
-    else
+    if (c != 0x2 && c != 0x3)
     {
         pb_which = 0x1;
-        x = pb_slot_pos(pb_slot, 0);
-        y = pb_slot_pos(pb_slot, 0x1);
     }
+    pb_h = pb_dir * pb_hspeed(pb_q);
     pb_kind = -1;
     pb_motion(0);
-    pb_x0 = x;
-    pb_y0 = y - pb_top() - pb_gap() - pb_bob();   // its line (its place + its bob + pb_top()) just under his feet
-    if (pb_ground)
-    {
-        pb_y0 = y - pb_top() + pb_lift() - pb_bob();
-    }
+    pb_x0 = pb_rider(0);
+    pb_y0 = pb_rider(0x1) - pb_top() - pb_bob();   // its line (its place + its bob + pb_top()) at its rider's feet
     pb_x = pb_x0;
     pb_y = pb_y0;
-    PostureModule(0, pb_dir);
+    PostureModule(0, pb_dir);             // facing its travel side
     PostureModule(0x2);
     PostureModule(0x3, pb_x, pb_y + pb_bob(), 0);
     VisibilityModule(0x2710, 0x1);
     pb_on = 0x1;
     pb_t = 0;
+    pb_hold = 0;
+    pb_ready = 0;
     pb_phase = 0x1;
     pb_set(5, 1.0f);                      // the executable: its collision made, moved with it
     pb_rode = 0;
     pb_free = 0;
     EffectModule(0x3, pb_fx_puff(), pb_x, pb_y + pb_top() * 0.5f, 0, 0, 0, 0, pb_fx_puff_size(), 0, 0xffffffff);
+}
+
+// parabeetle v2 (the user: "make Greninja snap to the beetle immediately after spawning it rather than falling onto it"):
+// before it flies it stays under its rider's feet (its line at them every frame); once the executable has made its line
+// (its VAR_6 1) it tells him (bit 16 of his VAR_30: clones.c gk_pb_heartbeat lands him on it: the game's ground switch,
+// func_101, and Wait) and flies pb_ready_frames() later (or after pb_hold_max() frames whatever happens). His clones'
+// beetles the same (they copy his vertical movement meanwhile). -> 1 still held
+int pb_hold_step()
+{
+    int beat;
+    pb_hold += 1;
+    if (pb_var(6) > 0.5f && pb_var(6) < 1.5f)
+    {
+        pb_ready += 1;
+        if (pb_which == 0x1)
+        {
+            beat = (int)(pb_shared(6) + 0.5f);
+            if ((beat & 0x10) == 0)
+            {
+                WorkModule(0, (float)(beat + 0x10) + 0, 0x0f000340 + 8 * (pb_slot - 1) + 6);
+            }
+        }
+    }
+    if (pb_ready > pb_ready_frames() || pb_hold > pb_hold_max())
+    {
+        pb_x0 = pb_x;                     // it flies from here
+        pb_y0 = pb_y;
+        return 0;
+    }
+    pb_x = pb_rider(0);
+    pb_y = pb_rider(0x1) - pb_top() - pb_bob();
+    return 0x1;
 }
 
 // on its line: a fighter's feet (any slot: the position variables), or a clone of its owner's (his shared places, while
@@ -931,7 +1009,7 @@ void pb_anim(int ride)
         }
         pb_rode += 1;
         pb_free = 0;
-        if (pb_kind == 0x2 && pb_kind_t < pb_ridden_frames())
+        if (pb_kind == 0x2 && pb_kind_t < pb_ridden_frames() - 1)   // (v2: its 7 frames 0 - 6, not an 8th on its last)
         {
             return;
         }
@@ -947,7 +1025,7 @@ void pb_anim(int ride)
         }
         pb_rode = 0;
     }
-    if (pb_kind == 0x2 && pb_kind_t < pb_ridden_frames())
+    if (pb_kind == 0x2 && pb_kind_t < pb_ridden_frames() - 1)   // (v2: its 7 frames 0 - 6, not an 8th on its last)
     {
         return;
     }
@@ -966,7 +1044,7 @@ void pb_leave()
     pb_phase = 0x2;
     pb_t = 0;
     pb_set(5, 2.0f);                      // the executable: its collision removed (anyone on it falls)
-    pb_vx = pb_leave_vx() * pb_dir;
+    pb_vx = pb_h * pb_leave_vx() + pb_dir * pb_leave_vx0();
     pb_vy = pb_leave_vy();
     pb_motion(0x1);
 }
@@ -997,6 +1075,7 @@ void pb_frame()
         return;
     }
     pb_kind_t += 1;
+    pb_loop();                            // parabeetle v2: the wings never stop (every phase, hitstop included)
     if (pb_phase == 0x2)
     {
         pb_t += 1;
@@ -1015,13 +1094,18 @@ void pb_frame()
     {
         return;
     }
+    if (pb_t == 0 && pb_hold_step())
+    {
+        PostureModule(0x3, pb_x, pb_y + pb_bob(), 0);   // parabeetle v2: held at its rider's feet (the snap)
+        return;
+    }
     pb_t += 1;
     if (pb_t >= pb_life())
     {
         pb_leave();
         return;
     }
-    pb_x = pb_x0 + pb_speed() * pb_dir * (float)pb_t;
+    pb_x = pb_x0 + pb_h * (float)pb_t;    // parabeetle v2: sideways by the stick (mostly up: pb_curve)
     pb_y = pb_y0 + pb_curve(pb_t);
     ride = pb_riders();
     if (ride & 0x1)

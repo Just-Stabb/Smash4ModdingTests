@@ -2989,6 +2989,210 @@ def render_checks(e, lab, A, N, fl, put, hit, frame, st, vacc):
     e.setw(vacc + C.W_COLOUR, old)
 
 
+
+def ccol_checks(patched, info, diag):
+    """parabeetle v2 (feature ccol; the user: "Clones don't share the same costume as the original Greninja if an
+    alternate palette was selected"): the weapon model set-up's call (CC_HOOK) through CC_TRAMP to cc_model: other kinds
+    straight on; the clone's +8 (entry) / +0x4A (costume) from the Greninja making it (his TIMER_15) or the first live one,
+    his entry's costume in the resource manager's table, before the game's model set-up (0x02B62F14) runs"""
+    lab, A, F, img = info['labels'], info['A'], info['feats'], info['img']
+    if 'ccol' not in F:
+        check('ccol off: the model set-up\'s call is the game\'s (bl 0x%08X)' % C.CC_SETUP,
+              K.branch_target(C.CC_HOOK, img.w(C.CC_HOOK)), C.CC_SETUP)
+        return
+    e = Run(patched)
+    e.osr_full = []
+    if diag:
+        e.stub(C.OSREPORT_VENEER, lambda e_: e_.osr_full.append(tuple(e_.r(i) for i in range(3, 11))))
+    check('ccol: the weapon model set-up call (0x%08X, in 0x02B63268 for kinds past 0x165) -> CC_TRAMP 0x%08X (lis / ori / '
+          'mtctr / bctr) -> cc_model' % (C.CC_HOOK, C.CC_TRAMP),
+          (K.branch_target(C.CC_HOOK, e.w(C.CC_HOOK)), e.w(C.CC_HOOK) & 1, [e.w(C.CC_TRAMP + 4 * i) for i in range(4)]),
+          (C.CC_TRAMP, 1, [0x3D800000 | (lab['cc_model'] >> 16), 0x618C0000 | (lab['cc_model'] & 0xFFFF), 0x7D8903A6,
+                           0x4E800420]))
+    calls = []
+    e.stub(C.CC_SETUP, lambda e_: calls.append((e_.r(3), e_.w(e_.r(3) + 8), e_.mu.mem_read(e_.r(3) + 0x4A, 1)[0])))
+    for i in range(8):
+        e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
+    mgr = e.alloc(0x100, b'\0')
+    e.setw(C.CC_RES_MGR, mgr)
+    res = {}
+    for ent, colour in ((0, 0), (1, 5), (2, 7), (3, 2), (4, 6)):
+        r = e.alloc(0x40, b'\0')
+        e.mu.mem_write(r + 0x28, struct.pack('>I', colour))
+        e.setw(mgr + 0x58 + 4 * ent, r)
+        res[ent] = colour
+
+    def weapon(kind, ent=0x1234, col=0):
+        w = e.alloc(0x100, b'\0')
+        e.setw(w + 4, kind)
+        e.setw(w + 8, ent)
+        e.mu.mem_write(w + 0x4A, bytes([col]))
+        return w
+
+    def run(w):
+        del calls[:]
+        e.osr_full = []
+        e.call(lab['cc_model'], w)
+        return calls[0] if calls else None
+    gk2 = e.fighter(2)
+    e.mu.mem_write(gk2['f'] + 0x1E, b'\x04')
+    e.setw(gk2['f'] + 8, 1)                         # his entry 1 (costume 5)
+    w = weapon(C.PB_KIND, 0x1234, 3)
+    check('ccol: another kind (the Parabeetle\'s): straight on to the game\'s set-up, untouched', run(w), (w, 0x1234, 3))
+    e.vars = {}
+    w = weapon(C.CLONE_KIND, 0x1234, 0)
+    check('ccol: the clone, one live Greninja (player 3, entry 1, his costume c05), no TIMER_15: his (the first live '
+          'Greninja\'s): +8 = 1, +0x4A = 5, then the game\'s set-up', run(w), (w, 1, 5))
+    if diag:
+        check('ccol diag: S4CK (owner player 3 (the table\'s 2), entry 1 (was 0x1234), costume 5 (was 0), found by 0 the '
+              'first Greninja)', [x[1:7] for x in e.osr_full if x[0] == A['gk_fck']], [(3, 1, 0x1234, 5, 0, 0)])
+    gk4 = e.fighter(4)
+    e.mu.mem_write(gk4['f'] + 0x1E, b'\x04')
+    e.setw(gk4['f'] + 8, 3)                         # entry 3 (costume c02)
+    for whose, want in ((4, (3, 2)), (2, (1, 5))):
+        e.vars = {C.CC_VAR: 3.0}
+        # (the emulator's WorkModule stub answers every fighter the same: make the other one fail the read instead)
+        other = gk2 if whose == 4 else gk4
+        blk = e.w(other['f'] + C.ACC)
+        saved = e.w(blk + C.WORK)
+        e.setw(blk + C.WORK, 0)
+        w = weapon(C.CLONE_KIND, 0, 0)
+        got = run(w)
+        e.setw(blk + C.WORK, saved)
+        check('ccol: two Greninjas (players 3 / 5, costumes c05 / c02), the one making it (his TIMER_15 set: the table\'s %d): '
+              'his entry %d and costume c%02d' % (whose, want[0], want[1]), got[1:], want)
+    e.vars = {}
+    w = weapon(C.CLONE_KIND, 0, 0)
+    check('ccol: two Greninjas, no TIMER_15 set: the first live one (player 3, c05)', run(w)[1:], (1, 5))
+    e.setw(gk2['f'] + 8, 9)                         # (not an entry: his player slot - 1 = 1)
+    w = weapon(C.CLONE_KIND, 0, 0)
+    check('ccol: his +8 not an entry (9): his player slot - 1 (the table\'s index 2: player 3 -> entry 2, c07)', run(w)[1:],
+          (2, 7))
+    e.setw(gk2['f'] + 8, 1)
+    e.setw(mgr + 0x58 + 4 * 1, 0)
+    w = weapon(C.CLONE_KIND, 0x22, 4)
+    check('ccol: his entry has no resource record: left as it was (the game\'s own pick)', run(w)[1:], (0x22, 4))
+    e.setw(C.CC_RES_MGR, 0)
+    w = weapon(C.CLONE_KIND, 0x22, 4)
+    check('ccol: no resource manager: left as it was', run(w)[1:], (0x22, 4))
+    for f in (gk2, gk4):
+        e.mu.mem_write(f['f'] + 0x1E, b'\x00')
+    e.setw(C.CC_RES_MGR, mgr)
+    w = weapon(C.CLONE_KIND, 0x22, 4)
+    check('ccol: no live Greninja: left as it was', run(w)[1:], (0x22, 4))
+    # the game's own decode (0x02B63268's) of +8 into +0x4A, for the record: entry e -> the entry's costume
+    check('ccol: the game\'s weapon set-up reads +8 (its 0x02B632B0 lwz 8(r30)), decodes the entry into +0x4A from the '
+          'resource manager\'s [+0x58 + 4 entry] +0x2B (0x02B63330 - 0x02B63344) and calls the model set-up at 0x%08X'
+          % C.CC_HOOK, (img.w(0x02B632B0), img.w(0x02B63330), img.w(0x02B63340), img.w(0x02B63344)),
+          (0x83FE0008, 0x809E0008, 0x88030028 + 3, 0x981E004A))
+
+
+def fx3_entries(e, vacc):
+    """ice3: the victim's Outline_Set entry (ol_tab: phase, w, rim rgb, rgb, tint, weight) and Outline_Shell entry (os_tab:
+    phase, rgb, alpha, width, weight), each (index, values) or None; the two tables' counts"""
+    def find(tab, n, ent):
+        for i in range(n):
+            if e.w(tab + ent * i) == vacc:
+                return i, tab + ent * i
+        return None, None
+    i, a = find(C.OL_TAB, C.OL_N, C.OL_ENT)
+    rf = lambda x, n: tuple(round(v, 4) for v in struct.unpack('>%df' % n, bytes(e.mu.mem_read(x, 4 * n))))   # noqa: E731
+    ol = (i, e.w(a + 4), e.w(a + 8), rf(a + 0xC, 1), rf(a + 0x1C, 3), rf(a + 0x28, 3), rf(a + 0x34, 1), rf(a + 0x40, 1)) if a \
+        else None
+    j, b = find(C.OS_TAB, C.OS_N, C.OS_ENT)
+    os_ = (j, e.w(b + 4), e.w(b + 8), rf(b + 0x1C, 3), rf(b + 0x28, 1), rf(b + 0x2C, 1), rf(b + 0x40, 1)) if b else None
+    return ol, os_, e.w(C.OL_TAB - 0x20), e.w(0x04BE5D10)
+
+
+def fx3_countdown_checks(e, A, N, fl, seen, ents, vmi, diag, ifl=()):
+    """ice3 (parabeetle v2; the user's log: slot 1 on, priority 1000, nothing seen): each countdown frame the victim's
+    Outline_Set entry (the body tint: FB1 blinkColor at its model's draw) and Outline_Shell entry (the band) hold the flash's
+    colour; the outline cave's own FB1 write (0x04BE3674, the base exe's code, run here) then makes blinkColor the flash"""
+    r4 = lambda c: tuple(round(x, 4) for x in c)   # noqa: E731
+    want_ol = [(0, vmi, 2, (1.0,), r4(tuple(x * C.ICE3_RIM for x in c[:3])), r4(c[:3]), (round(c[3], 4),), (1.0,))
+               for c in fl]
+    got_ol = [x[0] for x in ents[:N]]
+    check('ice3: frames 1 - %d the victim\'s Outline_Set entry (table 0x%08X, entry 0: free before): its model instance, held '
+          '(phase 2, w 1, weight 1), the colour (rim x %g at its edges), the tint = the flash\'s alpha (0.35 / 0.6 / 0.8): '
+          'yellow / black in turn' % (N, C.OL_TAB, C.ICE3_RIM), [i for i, (g_, w_) in enumerate(zip(got_ol, want_ol)) if g_ != w_][:3],
+          [])
+    want_os = [(0, vmi, 2, r4(c[:3]), (round(c[3] * C.ICE3_SHELL_ALPHA, 4),), (C.ICE3_SHELL_W,), (1.0,)) for c in fl]
+    got_os = [x[1] for x in ents[:N]]
+    check('ice3: ... and its Outline_Shell entry (table 0x%08X: the band round it, as the burn tint\'s outline that shows in '
+          'game): the colour, alpha x %g, width %g px, held' % (C.OS_TAB, C.ICE3_SHELL_ALPHA, C.ICE3_SHELL_W),
+          [i for i, (g_, w_) in enumerate(zip(got_os, want_os)) if g_ != w_][:3], [])
+    check('ice3: the tables\' counts kept by their own count routines (ol_count / os_count: 1 entry in use each)',
+          sorted({x[2:] for x in ents[:N]}), [(1, 1)])
+    check('ice3: frame %d (the blast out): both entries let go (free, counts 0), %d nothing' % (N + 1, N + 2),
+          [x[:2] for x in ents[N:]] + [x[2:] for x in ents[N:]], [(None, None)] * 2 + [(0, 0)] * 2)
+    # the outline cave's FB1 write on a model instance's buffer, with the entry of frame 1 / 4 (yellow / black at 0.8)
+    for t in (4, 7):
+        c = fl[t - 1]
+        ol = ents[t - 1][0]
+        a = C.OL_TAB
+        e.setw(a, 0x7FFF0000)                         # (any accessor: the write matches by model instance)
+        e.setw(a + 4, vmi)
+        e.setw(a + 8, 2)
+        e.mu.mem_write(a + 0xC, struct.pack('>f', 1.0))
+        e.mu.mem_write(a + 0x1C, struct.pack('>3f', *ol[4]))
+        e.mu.mem_write(a + 0x28, struct.pack('>3f', *ol[5]))
+        e.mu.mem_write(a + 0x34, struct.pack('>f', ol[6][0]))
+        e.mu.mem_write(a + 0x40, struct.pack('>f', 1.0))
+        e.setw(C.OL_TAB - 0x20, 1)
+        fb = e.alloc(0x2A0, b'\0')
+        e.mu.mem_write(fb + 0x40, struct.pack('>4f', 0.3, 0.3, 0.3, 0.0))   # the game's own blink: none (alpha 0)
+        e.call(0x04BE3674, 0, vmi, fb)
+        blink = tuple(round(x, 3) for x in struct.unpack('>4f', bytes(e.mu.mem_read(fb + 0x40, 16))))
+        rim = tuple(round(x, 3) for x in struct.unpack('>3f', bytes(e.mu.mem_read(fb + 0x1D0, 12))))
+        check('ice3: the outline cave\'s own FB1 write (0x04BE3674, the base exe\'s) with frame %d\'s entry: the model\'s '
+              'blinkColor = the flash (%s at alpha %.2f: the shader draws lit x (1 - a) + rgb x a), its edges + the colour'
+              % (t, 'yellow' if c[0] > 0.5 else 'black', c[3]), (blink, rim),
+              (tuple(round(x, 3) for x in c[:3]) + (round(c[3], 3),), tuple(round(x * C.ICE3_RIM, 3) for x in c[:3])))
+        e.setw(a, 0)
+        e.setw(a + 8, 0)
+        e.setw(C.OL_TAB - 0x20, 0)
+    if diag:
+        lines = list(ifl)
+        f32 = lambda v: struct.unpack('>f', struct.pack('>f', v))[0]   # noqa: E731
+        x100 = lambda v: int(f32(f32(v) * 100.0))                        # noqa: E731  (fmuls, fctiwz)
+        check('ice3 diag: S4IF every 8th frame with every channel x100 (r, g, b, alpha) and the entries (body tint x 100 + '
+              'band: 0)', [tuple(x[1:8]) for x in lines][:3],
+              [(4, t, x100(fl[t - 1][0]), x100(fl[t - 1][1]), x100(fl[t - 1][2]), x100(fl[t - 1][3]), 0) for t in (1, 9, 17)])
+
+
+def fx3_end_checks(e, A, put, hit, frame, vacc, vst):
+    """ice3: a KO or a reset mid-countdown lets both entries go (the victim's own colour back); an entry a command took over
+    (another accessor) is left alone"""
+    put([(100, 15, 0.25, 2)])
+    hit(4)
+    for _ in range(5):
+        frame()
+    mid = fx3_entries(e, vacc)
+    e.setw(vst + C.ST_KIND, C.ST_DEAD)
+    frame()
+    ko = fx3_entries(e, vacc)
+    e.setw(vst + C.ST_KIND, 0)
+    check('ice3: mid-countdown both entries on; the victim KO\'d: both let go at once', (mid[0] is not None,
+                                                                                       mid[1] is not None, ko), (True, True, (None, None, 0, 0)))
+    put([(100, 15, 0.25, 2)])
+    hit(4)
+    for _ in range(3):
+        frame()
+    a = C.OL_TAB
+    rec0 = e.w(A['ice_fx'] + 16 * 4)
+    e.setw(a, 0x7EEE0000)                             # an Outline_Set command took its entry over (another object's)
+    frame()
+    rec1 = e.w(A['ice_fx'] + 16 * 4)
+    e.setw(vst + C.ST_KIND, C.ST_DEAD)
+    frame()
+    e.setw(vst + C.ST_KIND, 0)
+    check('ice3: its entry taken over by a command (another accessor): the flash takes a free one the next frame, and its '
+          'end lets go only its own (the command\'s left alone)', (rec0 == a, rec1 == a + C.OL_ENT, e.w(a), e.w(a + C.OL_ENT)),
+          (True, True, 0x7EEE0000, 0))
+    e.setw(a, 0)
+    e.setw(a + 8, 0)
+
+
 def ice_checks(e, info, diag):
     """ice detonation v1 (feature ice): the victim hit handler's hook (ICE_HOOK -> ice_hit, back at ICE_BACK with the game's
     word done), the trigger (an ice hit on a burning fighter: its burns cleared, recorded, armed; not ice / not burning /
@@ -3001,11 +3205,14 @@ def ice_checks(e, info, diag):
         check('ice off: the victim hit handler\'s word is the game\'s', '%08X' % e.w(C.ICE_HOOK), '%08X' % C.ICE_ORIG)
         return
     snd = 'ice2' in F
+    fx3 = 'ice3' in F                                   # parabeetle v2: the flash through the outline caves
+    IV, SV = C.ice_vars(F)                              # (ice3: the request in New_Var 60 - 63, the sound TIMER_13 / 14)
+    SNDV = C.ICE3_SND_VALUE if fx3 else 1.0
     N = C.ice_frames(F)                                 # ice2: 156 (the user: "please triple the delay"), v1 52
-    P_ = [('prio', C.ICE_PRIO, C.BTINT_SLOT)] if snd else []          # ice2: the slot's priority raised each frame
-    P0 = [('prio', 0x32, C.BTINT_SLOT)] if snd else []               # ... and put back when it ends
+    P_ = [('prio', C.ICE_PRIO, C.BTINT_SLOT)] if snd and not fx3 else []   # ice2: the slot's priority raised each frame
+    P0 = [('prio', 0x32, C.BTINT_SLOT)] if snd and not fx3 else []        # ... and put back when it ends
     check('ice2 %s: ice_snd %s' % ('on' if snd else 'off', 'in the cave' if snd else 'not built'), 'ice_snd' in lab, snd)
-    SP, SS = C.ICE_SND_VAR, C.ICE_SND_VAR + 1
+    SP, SS = SV, SV + 1
 
     def sndv():                                         # (play, stop) written, the victim's +0x1C (its sound's Greninja)
         return (e.vars.get(SP), e.vars.get(SS), e.w(A['ice_st'] + C.ICE_ST * 4 + 0x1C))
@@ -3043,6 +3250,10 @@ def ice_checks(e, info, diag):
     e.setw(vacc + C.W_POSTURE, vpost)
     vst = e.alloc(0x60, b'\0')
     e.setw(vacc + C.F_STATUS, vst)
+    vmm = e.alloc(0x20, b'\0')                          # ice3: its ModelModule -> its model instance (the outlines')
+    vmi = e.alloc(0x40, b'\0')
+    e.setw(vacc + 0x3C, vmm)
+    e.setw(vmm + 0xC, vmi)
     cvt = e.alloc(0x100, b'\0')
     cset, cclr, cpri = e.alloc(4), e.alloc(4), e.alloc(4)
     e.setw(cvt + 0x4C, cset)
@@ -3146,7 +3357,7 @@ def ice_checks(e, info, diag):
               [x[1:6] for x in e.osr_full if x[0] == A['gk_fia']], [(4, int(ref[3] * 100), 4, 2, 1)])
     if snd:
         check('ice2: on the arming hit the detonation\'s sound asked of the owner (Greninja slot 2: his VAR 0x%08X = 1, '
-              'played by his MSC), recorded at the victim\'s +0x1C (slot + 1 = 3); no stop' % SP, arm_snd, (1.0, None, 3))
+              'played by his MSC), recorded at the victim\'s +0x1C (slot + 1 = 3); no stop' % SP, arm_snd, (SNDV, None, 3))
         if diag:
             check('ice2 diag: S4ID (victim 4, cmd 1 play, Greninja slot 2)',
                   [x[1:4] for x in e.osr_full if x[0] == A['gk_fid']], [(4, 1, 2)])
@@ -3168,26 +3379,40 @@ def ice_checks(e, info, diag):
     check('ice: a burn landing on an armed victim (burn_add): not taken', insts(), 0)
     # the countdown
     e.vars = {}
-    seen, asked = [], None
+    seen, asked, ents, ifl = [], None, [], []
+    if fx3:
+        for tab, n, ent, cnt in ((C.OL_TAB, C.OL_N, C.OL_ENT, C.OL_TAB - 0x20), (C.OS_TAB, C.OS_N, C.OS_ENT, 0x04BE5D10)):
+            e.mu.mem_write(tab, bytes(n * ent))        # (the outline tables as a match starts: the earlier checks' gone)
+            e.setw(cnt, 0)
     for t in range(1, N + 3):
         got_ = frame()
         seen.append(got_)
-        if asked is None and any(k in e.vars for k in range(C.ICE_VAR, C.ICE_VAR + 4)):
+        if fx3:
+            ents.append(fx3_entries(e, vacc))
+            if diag:
+                ifl += [x for x in e.osr_full if x[0] == A['gk_fif']]
+        if asked is None and any(k in e.vars for k in range(IV, IV + 4)):
             asked = t
     if snd:
         check('ice2: the countdown run out (the blast made): its sound neither played again nor stopped (the boom plays '
               'on), the record kept', sndv(), (None, None, 3))
+    if fx3:
+        fx3_countdown_checks(e, A, N, fl, seen, ents, vmi, diag, ifl)
     want_set = [P_ + [('set', tuple(round(x, 4) for x in fl[t - 1]), C.BTINT_SLOT, 0)] for t in range(1, N + 1)]
     check('ice: the countdown: frames 1 - %d the flash colour in the tint\'s slot %d (once a frame%s; the burn tint\'s reset '
           'clears it first on frame 1), frame %d the colour off%s, %d nothing' % (
               N, C.BTINT_SLOT, ', its priority raised to %d first' % C.ICE_PRIO if snd else '', N + 1,
               ' and its priority back to 0x32' if snd else '', N + 2),
           [seen[0][-1 - len(P_):]] + seen[1:N] + seen[N:],
-          want_set + [[('clear', C.BTINT_SLOT)] + P0, []])
+          want_set + [[('clear', C.BTINT_SLOT)] + P0, []]) if not fx3 else \
+        check('ice3: the countdown: frames 1 - %d no ColorBlendModule call of its own (slot 1 never drew: the user\'s log), '
+              'only the burn tint\'s reset clear on frame 1; frame %d its slot cleared (no priority to put back: never '
+              'changed), %d nothing' % (N, N + 1, N + 2), [seen[0][1:]] + seen[1:N] + seen[N:],
+              [[]] * N + [[('clear', C.BTINT_SLOT)], []])
     t_ = 4 + ref[3] / 100.0
     check('ice: the blast asked at frame %d of Greninja slot 2 (the owner): his VAR 0x%08X - +3 = type 4 + b / 100 = %.4f, '
-          'the victim\'s x 30, y 12 + %g, way +1; the state free again' % (N - C.ICE_LEAD, C.ICE_VAR, t_, C.ICE_Y),
-          (asked, [round(e.vars.get(C.ICE_VAR + i, -99.0), 3) for i in range(4)], st()[0], st()[6]),
+          'the victim\'s x 30, y 12 + %g, way +1; the state free again' % (N - C.ICE_LEAD, IV, t_, C.ICE_Y),
+          (asked, [round(e.vars.get(IV + i, -99.0), 3) for i in range(4)], st()[0], st()[6]),
           (N - C.ICE_LEAD, [round(t_, 3), 30.0, round(12.0 + C.ICE_Y, 3), 1.0], 0, 2))
     # the way: an attacker right of it; the owner not there: another Greninja; none
     gk5 = e.fighter(5, x=0.0)
@@ -3198,7 +3423,7 @@ def ice_checks(e, info, diag):
     check('ice: an attacker right of the victim (a projectile at x 50): way -1; owner slot 6', (st()[4], st()[3]), (-1.0, 6))
     for _ in range(N):
         frame()
-    check('ice: the owner gone: the first live Greninja (slot 2) asked', (st()[6], round(e.vars.get(C.ICE_VAR + 3, 0), 3)),
+    check('ice: the owner gone: the first live Greninja (slot 2) asked', (st()[6], round(e.vars.get(IV + 3, 0), 3)),
           (2, -1.0))
     for _ in range(3):
         frame()
@@ -3210,7 +3435,7 @@ def ice_checks(e, info, diag):
         frame()
     check('ice: the owner (slot 2) KO\'d (Dead): Greninja slot 5 asked', st()[6], 5)
     if snd:
-        check('ice2: ... and its sound from him too (the blast\'s choice: +0x1C slot 5 + 1)', sndv(), (1.0, None, 6))
+        check('ice2: ... and its sound from him too (the blast\'s choice: +0x1C slot 5 + 1)', sndv(), (SNDV, None, 6))
     for _ in range(3):
         frame()
     e.mu.mem_write(gk5['f'] + 0x1E, b'\x00')
@@ -3220,7 +3445,7 @@ def ice_checks(e, info, diag):
     for _ in range(N):
         frame()
     check('ice: no Greninja who can: no blast asked (none of his VARs written), the Greninja asked -1',
-          (sorted(k for k in e.vars if C.ICE_VAR <= k < C.ICE_VAR + 4), st()[6]), ([], -1))
+          (sorted(k for k in e.vars if IV <= k < IV + 4), st()[6]), ([], -1))
     if snd:
         check('ice2: no Greninja who can: no sound played, none to stop (no blast: no boom)', sndv(), (None, None, 0))
     for _ in range(3):
@@ -3239,7 +3464,7 @@ def ice_checks(e, info, diag):
         ' (its priority back)' if snd else ''), (got[-1 - len(P0):], st()[0]), ([('clear', C.BTINT_SLOT)] + P0, 0))
     if snd:
         check('ice2: ... its sound stopped (Greninja slot 2: his VAR 0x%08X = 1, his MSC SoundModule 0x2714), the '
-              'record cleared' % SS, sndv(), (None, 1.0, 0))
+              'record cleared' % SS, sndv(), (None, SNDV, 0))
         if diag:
             check('ice2 diag: S4ID (victim 4, cmd 2 stop, Greninja slot 2)',
                   [x[1:4] for x in e.osr_full if x[0] == A['gk_fid']], [(4, 2, 2)])
@@ -3248,9 +3473,9 @@ def ice_checks(e, info, diag):
               [(4, C.ST_DEAD, 11)])
     for _ in range(N):
         frame()
-    check('ice: ... and no blast asked afterwards', sorted(k for k in e.vars if C.ICE_VAR <= k < C.ICE_VAR + 4), [])
+    check('ice: ... and no blast asked afterwards', sorted(k for k in e.vars if IV <= k < IV + 4), [])
     if snd:
-        check('ice2: ... nor any sound again', (e.vars.get(SP), e.vars.get(SS)), (None, 1.0))
+        check('ice2: ... nor any sound again', (e.vars.get(SP), e.vars.get(SS)), (None, SNDV))
     e.setw(vst + C.ST_KIND, 0)
     # a reset cancels it
     put([(100, 15, 0.25, 2)])
@@ -3261,12 +3486,14 @@ def ice_checks(e, info, diag):
     e.vars = {}
     got = frame()
     if snd:
-        check('ice2: ... the next frame its sound stopped (his MSC\'s own reset stops it too)', sndv(), (None, 1.0, 0))
+        check('ice2: ... the next frame its sound stopped (his MSC\'s own reset stops it too)', sndv(), (None, SNDV, 0))
     check('ice: ... the next frame the colour off, free again (the burn tint\'s own reset clears the slot too: twice)',
           (got, st()[0]), ([('clear', C.BTINT_SLOT)] * 2 + P0, 0))
     check('ice: ... nothing after', frame(), [])
-    if snd:                                             # ice2 (the user: "the opponent flashing doesn't occur")
+    if snd and not fx3:                                 # ice2 (the user: "the opponent flashing doesn't occur")
         render_checks(e, lab, A, N, fl, put, hit, frame, st, vacc)
+    if fx3:
+        fx3_end_checks(e, A, put, hit, frame, vacc, vst)
     # the claim: the blast's request first, no burn context
     svt = e.alloc(0x100, b'\0')
     g, s_ = e.alloc(4), e.alloc(4)
@@ -3282,12 +3509,12 @@ def ice_checks(e, info, diag):
     e.setw(acc + C.W_WORK, wm)
     e.setw(w + C.W_ACC, acc)
     V = C.GK_VAR_TR
-    e.vars = {V: 1.0, V + 1: 5.0, V + 2: 0.0, V + 3: 1.0, C.ICE_VAR: 4.25, C.ICE_VAR + 1: 30.0, C.ICE_VAR + 2: 21.0,
-              C.ICE_VAR + 3: -1.0}
+    e.vars = {V: 1.0, V + 1: 5.0, V + 2: 0.0, V + 3: 1.0, IV: 4.25, IV + 1: 30.0, IV + 2: 21.0,
+              IV + 3: -1.0}
     e.call(lab['tr_frame'], w)
     check('ice: tr_claim: a blast request and a trail request: the blast\'s first (type 4.25, x 30, y 21, way -1), no burn '
           'context (VAR_5 0), his blast request cleared, the trail\'s kept',
-          ([sv.get(0x0F000300 + i, 0.0) for i in range(6)], e.vars.get(C.ICE_VAR), e.vars.get(V)),
+          ([sv.get(0x0F000300 + i, 0.0) for i in range(6)], e.vars.get(IV), e.vars.get(V)),
           ([3.0, 4.25, 30.0, 21.0, -1.0, 0.0], 0.0, 1.0))
     e.vars = {}
     put([])
@@ -3604,6 +3831,7 @@ def main():
     info['img'] = img
     skeleton_checks(e, info, diag)
     pb_checks(patched, info, diag)
+    ccol_checks(patched, info, diag)
     burn2_checks(e, info, diag)
     if 'skeleton' in feats:
         col_on_checks(patched)

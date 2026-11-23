@@ -12,6 +12,15 @@ rendered from the written files (tools/nud_preview.py: model.nud / .nut / .vbn a
          it (the bob), 30 fps
       -> OUT_DIR/parabeetle_path.png: its path (weapons/parabeetle.c: forward 0.75 a frame, the swoop, the rise; the
          ground start), 240 frames
+  python3 tools/gekkouga_parabeetle_preview.py --v2 FIGHTER_DIR SRC_DIR OUT_DIR   (parabeetle v2, README "Parabeetle v2")
+      its compiled MSC (FIGHTER_DIR/script/msc/parabeetle/parabeetle.mscsb) run as the game would (a motion played once
+      and held on its last frame; the clones test's pb_make / pb_run):
+      -> OUT_DIR/parabeetle_path.png: its line's path for each stick direction (neutral, up-right / up-left 22 and 45
+         degrees, right / left; down is clamped: neutral / its side), the hold, the 240 frames, the leaving; 1 unit = 1
+         pixel x 2, the rise / sideways ratios
+      -> OUT_DIR/parabeetle_wings.gif: the beetle over its whole life (hold, swoop, rise, leaving; ridden from flight
+         nobody on it once it flies; ridden is the tests') posed by the motion / frame its MSC plays each frame, every 2nd frame; and parabeetle_wings.png: the
+         motion frame against the life frame (v1's held from 80 frames into the rise; v2's never)
 """
 import math
 import os
@@ -133,5 +142,84 @@ def main():
           os.path.join(out, 'parabeetle_path.png'), len(frames), 'frames')
 
 
+def v2(fighter, src, out):
+    from PIL import Image
+    import gekkouga_clone_cave as C
+    sys.argv = [sys.argv[0]]
+    import gekkouga_clones_test as T
+    import gekkouga_build as GB
+    mscsb = os.path.join(fighter, 'script', 'msc', 'parabeetle', 'parabeetle.mscsb')
+    os.makedirs(out, exist_ok=True)
+    # ---- the paths
+    W, H, k = 560, 720, 2.0
+    img = np.zeros((H, W, 3), np.uint8) + 30
+    ox, oy = W // 2, H - 70
+    img[oy, :] = (80, 80, 90)
+    img[:, ox] = (60, 60, 70)
+    cols = {'neutral (toward his facing: right)': (90, 230, 120), 'up-right 22': (120, 200, 255),
+            'up-right 45 / right': (255, 200, 90), 'up-left 22': (200, 120, 255), 'up-left 45 / left': (255, 110, 110)}
+    lines = []
+    for nm, code in (('neutral (toward his facing: right)', 1.0), ('up-right 22', 1.0 + 8 * 22),
+                     ('up-right 45 / right', 1.0 + 8 * 90), ('up-left 22', -(1.0 + 8 * 22)), ('up-left 45 / left', -(1.0 + 8 * 90))):
+        m, g = T.pb_make(mscsb, GB.PARABEETLE_MSC, code=code, his=(0.0, 0.0))
+        T.pb_run(m, 2)
+        g.vars[0x0F000029] = 500.0
+        pts = []
+        while not [x for x in g.log if x[0] == 'remove'] and len(pts) < 400:
+            T.pb_run(m)
+            pts.append((m.gf('pb_x'), m.gf('pb_y') + C.PB_TOP - m.gf('pb_y0') - C.PB_TOP, m.g('pb_phase')))
+        for i, (x, y, ph) in enumerate(pts):
+            px, py = int(ox + x * k), int(oy - y * k)
+            if 0 <= px < W and 0 <= py < H:
+                c = cols[nm] if ph == 1 else tuple(v // 2 for v in cols[nm])
+                img[max(0, py - 1):py + 2, max(0, px - 1):px + 2] = c
+                if i % 60 == 59 and ph == 1:
+                    img[max(0, py - 4):py + 5, max(0, px - 4):px + 5] = c
+        fl = [p for p in pts if p[2] == 1]
+        lines.append('%s: %+.0f sideways, %+.0f up (x %.1f)' % (nm, fl[-1][0], fl[-1][1], fl[-1][1] / max(abs(fl[-1][0]), 1e-6)))
+    img = N.label(img, 'v2 path: its line from his feet, x 2 px a unit; squares each 1 s; dim: leaving')
+    caps = []
+    for t in lines + ['swoop 6 down over 16 frames, then up to 0.7 a frame over 20; down held: clamped level']:
+        c = np.zeros((22, W, 3), np.uint8) + 30
+        caps.append(N.label(c, t))
+    Image.fromarray(np.concatenate([img] + caps, 0)).save(os.path.join(out, 'parabeetle_path.png'))
+    # ---- the wings over its life
+    md = os.path.join(fighter, 'model', 'parabeetle', 'c00')
+    items, bones, bind = N.load(md)
+    pac = dict(omo.pac_read(os.path.join(fighter, 'motion', 'parabeetle', 'main.pac')))
+    oms = {i: omo.Omo(pac[n + '.omo']) for i, n in enumerate(C.PB_MOTIONS)}
+    bob = held_bob(src)
+    m, g = T.pb_make(mscsb, GB.PARABEETLE_MSC, his=(0.0, 0.0))
+    life, gif = [], []
+    n = 0
+    while not [x for x in g.log if x[0] == 'remove'] and n < 400:
+        if m.g('pb_t') > 0:
+            g.vars[0x0F000028], g.vars[0x0F000029] = 500.0, 500.0   # (he jumps off once it flies: nobody on it)
+        mo, fr = g.motion, int(g.frame)               # (what it shows this frame)
+        T.pb_run(m)
+        life.append((n, mo, fr))
+        if n % 2 == 0:
+            o = oms[mo]
+            f = min(fr, o.frames - 1)
+            dy = bob[C.PB_MOTIONS[mo]][f]
+            p = turned(shifted(N.pose(items, bones, bind, o, f), dy), 90)
+            im = N.draw(p, 200, (0.0, 8.0, 50.0), 0.0, floor=(C.PB_TOP + dy, -C.PB_HALF, C.PB_HALF))
+            gif.append(Image.fromarray(N.label(im, 'life %d: %s %d' % (n, ('wait', 'rise', 'ridden')[mo], f))))
+        n += 1
+    gif[0].save(os.path.join(out, 'parabeetle_wings.gif'), save_all=True, append_images=gif[1:], duration=33, loop=0)
+    Wg, Hg = 2 * len(life) + 40, 200
+    pl = np.zeros((Hg, Wg, 3), np.uint8) + 30
+    for i, mo, fr in life:
+        x, y = 20 + 2 * i, Hg - 20 - int(fr * 2)
+        pl[max(0, y - 1):y + 2, x:x + 2] = ((90, 230, 120), (255, 200, 90), (255, 110, 110))[mo]
+    pl = N.label(pl, 'v2: motion frame (up) over its %d frames of life: wait green, rise gold - never held (v1: rise held from 80 in)' % len(life))
+    Image.fromarray(pl).save(os.path.join(out, 'parabeetle_wings.png'))
+    print(os.path.join(out, 'parabeetle_path.png'), os.path.join(out, 'parabeetle_wings.gif'),
+          os.path.join(out, 'parabeetle_wings.png'), len(gif), 'frames')
+
+
 if __name__ == '__main__':
-    main()
+    if sys.argv[1:2] == ['--v2']:
+        v2(*sys.argv[2:5])
+    else:
+        main()

@@ -2249,3 +2249,88 @@ wii-model-conversion.md):
 **Not confirmed in game**: everything; in particular the new kind loading its model / motions, the drop-through line,
 riders carried, the hop / boost speeds through the status change, the clones' ride (and whether their line test sees
 an article's ground).
+
+## Parabeetle v2 (`greninja_parabeetle_v2.zip`, over parabeetle v1; exe_v46z_gkb18)
+
+The user (v1 tested in game): clones don't wear his alternate costumes; a ground up special bounces him over the
+beetle; "make the beetle's travel arc far more vertical than horizontal"; its wings stop part way; "spawn in whatever
+direction the player was holding"; "make Greninja snap to the beetle immediately after spawning it". Then: the ice
+detonation's flash still not seen (two logs). Nothing here is confirmed in game.
+
+**Clone costumes** (exe feature `ccol`, `gekkouga_clone_cave.py` `cc_src`; docs/native-notes.md "Weapon costumes"):
+- The game picks a weapon's model in its set-up (`0x02B63268`, the weapon class's vt +0x24): +8 (its owner's entry)
+  -> +0x4A = that entry's costume (the resource manager `[[0x102F9028] + 0x58 + 4 entry] + 0x2B`, the colour his body
+  and his category-2 weapons were loaded with), for u16 flag 0x20 kinds (the clone's 0x87C); the model set-up
+  (`0x02B62F14`) then asks for the resource keyed by (bank +0x4A, kind) and passes +8 (flag 0x10).
+- model/clone/c00 - c07 were always shipped (his body's, own texture ids 0x40300000 + 0x400 x costume): the data was
+  right; which bank the clone took is the runtime's.
+- `CC_HOOK` `0x02B63420` (that set-up's call for kinds past 0x165) -> `CC_TRAMP` `0x037EE520` -> `cc_model`: for the
+  clone (0x1A1) +8 = the making Greninja's +8 (not an entry: his player slot - 1) and +0x4A = his entry's costume, then the
+  game's set-up. The maker: the live Greninja whose TIMER_15 is set (his MSC: 3 right before `ArticleModule(0x2710, 6 /
+  7)`, it counts itself down), else the first live one. Diag **S4CK** (owner, entry / was, costume / was, found by).
+- Every clone body (formation, aligned kick, split, the clone articles' copies) is this one kind. The burnout grey /
+  tints are overlays, costume-independent.
+
+**The snap / ground up special** (`clones.c` `gk_pb_end`, `gk_pb_heartbeat`, `gk_pb_snap`; `weapons/parabeetle.c`
+`pb_hold_step`):
+- v1's ground hop (2.4 up onto a beetle 11.5 over his feet) is gone; in the air v1 left a 0.3 gap.
+- The beetle's line starts exactly at its rider's feet and stays there (following him) until the exe has made it (its
+  VAR_6 1); it then puts bit 16 in his VAR_30 each frame and flies 2 frames later (12 at most whatever happens).
+- He: held still in Fall while pending (his TIMER_12 = 12; gravity energy 0 each frame); on bit 16 the game's own ground
+  switch (`func_101`: KineticModule(0, 6), situation ground, GroundModule(0x2710, 1): the ground correction takes the line
+  under his feet) and Wait (actionable: jump, attacks, drop through). An action first (not Fall) drops the snap.
+- On the ground: `func_102` (air) and set_pos 9.5 up (`gk_pb_lift`: its swoop's lowest then over the floor), the same snap.
+- His clones copy his vertical movement while the snap is pending and after (their beetles hold at their feet too).
+
+**Path and direction** (`pb_hspeed`, `pb_curve`, `gk_pb_dir`):
+- Swoop 6 down over 16 frames; rise to 0.7 a frame over 20, steady: about +144 over 4 s (v1 +74).
+- Sideways 0.05 a frame straight up / neutral (12 units: rise 12 x), 0.17 from 45 degrees off up (41: rise 3.5 x),
+  linear between (22 degrees: 0.11); v1 0.75 a frame forward.
+- The direction is vanilla's: the stance reads the stick at its own frame, turns / leans him and keeps the unit vector
+  in 0x1000006 / 7 (neutral (0, 1)); `gk_pb_dir`: down clamped to level (straight down neutral), within 0.2 of up: his
+  facing. The request's code: travel side x (which + 4 ground + 8 x the angle); the beetle faces its travel side.
+- His clones' beetles: the same code (they copy his up special; `gk_pb_q` keeps it).
+- Leaving: sideways its speed x 3 + 0.3, up 1.2 + 0.1 a frame.
+
+**The wings** (`pb_loop`): the game plays a weapon's motion once and holds its last frame (v1 started rise once: frozen
+80 frames into the climb). Wait / rise restarted at frame 79 (their CHR0s loop) in every phase; ridden plays frames 0 - 5
+and goes straight into rise (its 7th, the rest pose, was held a frame).
+
+**The slot map** (the clash found in v1): the ice request / sound were New_Var 48 - 53 on his body's 49 - 56. Now: ice
+request 60 - 63 (`ICE3_VAR`), its sound TIMER_13 / 14 (`ICE3_SND_VAR`, written 4.0), the kick armed 60 -> 23, the ledge
+kick 63 -> 39 (the clones' unused k 7), the clone fix v3 diag flags 61 / 62 -> bits of 48 (`gk_dg`); TIMER_15 the
+clone's costume, TIMER_12 the snap. `slot_map` checks (`parabeetle_v2_tests`) that no two features share one (and that
+it flags v1's layout).
+
+**The ice detonation flash** (exe feature `ice3`, `ice_fx_on` / `ice_fx_off`):
+- The user's second log (gkb16): ColorBlendModule slot 1 on, priority 1000 over slot 0's 100, the flash's colours, for
+  all 153 frames: nothing drawn. That overlay slot isn't what draws a fighter's colour (vanilla FLASH writes the same
+  slot through the same vt +0x4C: why it shows for vanilla is not found). Abandoned: no ColorBlend writes, no priority
+  change (nothing to restore).
+- Now each countdown frame the victim gets an Outline_Set entry (`OL_TAB` 0x04BE3828: the model's FB1 blinkColor =
+  the colour at the flash's alpha, written by the outline cave at its draw; the colour x `ICE3_RIM` at its edges) and an
+  Outline_Shell band (`OS_TAB`, width 3): the outline caves shown in game. Its own entry or a free one; let go at the
+  end, a KO, a reset (only if still the victim's).
+- Diag: S4IF every 8th frame with r, g, b, alpha x 100 and the entries; S4BR names the build (`BUILD_TAG`); S4TR says
+  its slot is 1-8.
+- The log's S4BT "stacks=0 ... 1200" after the arming: that second's 4 ticks before it; no burn damage after the clear.
+  The blast's trail "owner slot=1": Greninja (1-based); his article: its damage his.
+
+**Tests**:
+- `gekkouga_clone_cave_test` 364 / 405 (release / A_release), 0 failures (`ccol_checks`: the hook / trampoline, other
+  kinds untouched, the maker by TIMER_15 among two Greninjas, the fallback, a bad entry, no record / manager / Greninja,
+  S4CK; `fx3_*`: both entries every frame with the flash's colours, the outline cave's own FB1 write run on them, the
+  counts, the end / KO / a taken-over entry, S4IF); gkb17 = RELEASE - ice3 - ccol byte for byte (349 / 0).
+- `gekkouga_clones_test ... --vpb=greninja_parabeetle_v1.zip`: `parabeetle_v2_tests` (directions: neutral / up / left /
+  right / up-left / up-right / down / down-left / down-right / 22 degrees, the clones' codes; the snap in the air / on
+  the ground / dropped / reset, the clones still; the slot map; the costumes' texture ids c00 - c07), `parabeetle_tests`
+  (the hold and its report, the paths and their rise / sideways ratios, the wings moving every frame of the life with a
+  non-looping motion module, riders), the ice / kick tests on the new slots.
+- msc_stack_check 0 (his globals 126 <= 128, parabeetle 46); the opcode guard OK; import_call_check 0 on both exes;
+  `supamario_ui_cave_test` 0 failures.
+- Previews (`tools/gekkouga_parabeetle_preview.py --v2`): `$S/pb2/preview/parabeetle_path.png`, `parabeetle_wings.gif`,
+  `parabeetle_wings.png`.
+
+**Not confirmed in game**: everything; in particular that the clone's model follows +0x4A set there (the cause of v1's
+wrong costume isn't proven: S4CK shows what the clone had), the snap's ground switch attaching him to an article's line,
+the flash through the outline caves on a hit victim, the clones' ride.

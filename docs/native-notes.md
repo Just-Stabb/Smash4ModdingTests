@@ -4110,3 +4110,30 @@ MSC on a bunshin-based kind, the 4-shape group.
   r5's priority to r4 (both start at 0x32: `0x02C1A0C4`), so a slot 1 overlay is hidden whenever slot 0 is on unless its
   priority is raised (Greninja's ice detonation flash, fighters/gekkouga/README.md "Usmash spike v2 / trail dim v1"). Outline_Shell's table in exe_v46z_ui10:
   os_tab `0x04BE5F5C`, os_g `0x04BE5D10` (+0 entries in use: os_frame skips everything at 0), os_count `0x04BE5388`.
+
+## Weapon costumes (Greninja parabeetle v2, read from exe_v46z_ui10)
+
+- **A weapon's model costume** is picked in its set-up: the weapon class (constructor `0x02B6246C`, vtable `0x100F78F8`)
+  vt +0x24 = `0x02B63268`: +8 (a battle object's +8: its owner's entry; bit 30 / 29 other encodings, then bits 16-23 /
+  16-27) is cut to its low 16 bits and, for kinds with u16 flag 0x20 (`0x0320E6D4`), +0x4A = the resource entry's costume
+  (`0x030C3368(mgr, entry)` = `[[0x102F9028] + 0x58 + 4 entry]`, its +0x2B: the low byte of +0x28, the colour the entry's
+  fighter body was loaded with, c00 when that body file is missing: `0x030C0AC8` - `0x030C0AEC`). Then the model set-up
+  (`0x02B62F14`, called at `0x02B63380` / `0x02B633B0` / `0x02B633E8` / `0x02B63420` by kind range) asks the resource
+  for (bank `0x030C3A40(kind, +0x4A)` << 28 | kind x 0x29) and, with u16 flag 0x10 (`0x0320E670`), passes +8 as the entry
+  (`0x030C4128` -> `0x030BE760`).
+- **The loads**: a fighter's articles of category 2 (u16 flags without 0x80 / 0x1 / 0x100) are loaded with him
+  (`0x030C0C00`: `0x030C3E7C(mgr, article list, 2, colour = entry +0x28)`), each kind's model from model/<folder>/c<bank>
+  (`0x030C3C58`: bank = `0x030C3A40(kind, colour)`, the colour for flag 0x20 kinds, else 0).
+- The fighter set-up uses the same +8 as the resource entry (`0x02E130B4`: `lwz r4, 8(r30)` -> `0x030C3368`); the
+  fighter table entries (gekkouga_clone_cave `gk_entry`) carry it at +8 too.
+- Greninja's clone (0x1A1, flags 0x87C) has both; v1's clones showed c00 on alternate costumes in game. `ccol` sets +8 /
+  +0x4A from the Greninja making it before `0x02B62F14` (fighters/gekkouga/README.md "Parabeetle v2"); unconfirmed.
+
+## ColorBlendModule slot 1 not drawn on a hit fighter (Greninja parabeetle v2)
+
+- The user's gkb16 log: slot 1 on (+0x9C), priority 1000 (+0x98) over slot 0's 100 (+0x4C), the colour written every
+  frame (vt +0x4C, as ACMD FLASH's handler `0x02BE3858` does with the slot vt +0xCC returns, +0xD5, 1 from the init),
+  for 150 frames: nothing seen. The pick (vt +0xAC) would return slot 1. The reader of the picked slot (a method at
+  `0x02C55FFC`, vtable entry `0x101099D4`) and how it reaches the model's FB1 blinkColor (MI +0x40 / +0x60) were not
+  traced. The flash now goes through the outline caves' FB1 write (Outline_Set's tint, shown in game) and an
+  Outline_Shell band instead.
