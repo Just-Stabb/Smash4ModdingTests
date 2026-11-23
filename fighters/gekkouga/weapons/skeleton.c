@@ -647,6 +647,11 @@ int sk_boom_frames() { return 120; }      // the explosion: removed after this (
                                           // skeleton v1.7 (v1 - v1.6: 1 - 4): tools/gekkouga_build.py SK_BOOM_FRAMES;
                                           // skeleton v1.5: 40 -> 120, its explosion sound's 114 frames: kept hidden so
                                           // the sound isn't cut with it)
+int sk_boom_hit_frames() { return 101; }  // skeleton v1.7 (the user: "more active (until right before all of the orange is
+                                          // gone in the explosion)"): its hitbox's frames (tools/gekkouga_build.py
+                                          // SK_BOOM_FRAMES: set at its motion's frame 0, the effect's 1; off here, the
+                                          // effect's 102: inside explosion_simple_24's cell 25, the last with orange >= 2 %
+                                          // of its peak; all gone at cell 28, frame 112)
 int sk_smoke_frames() { return 36; }      // the smoke: removed after this (no hitbox; v1.5: 3 -> 36, its death sound's 34)
 int sk_wait_max() { return 30; }          // never claimed (nobody asked): removed
 
@@ -866,6 +871,14 @@ void sk_frame()
         if (sk_phase == 0x2 && sk_end_t == 0x1)
         {
             MotionModule(0x1, 0x1, 0, 1.0f);   // explode (motion 1): its game script's hitbox
+        }
+        if (sk_phase == 0x2 && sk_end_t == 0x2)
+        {
+            MotionModule(0x4, 0 + 0);     // skeleton v1.7: held (its motion, the hydrant's, is 30 / 48 frames: looping
+        }                                 // would run its script again: the hitbox set again, a second hit on everyone)
+        if (sk_phase == 0x2 && sk_end_t == 0x1 + sk_boom_hit_frames())
+        {
+            AttackModule(0x2719);         // skeleton v1.7: the hitbox off (its records kept: one hit an opponent)
         }
         if (sk_phase == 0x2 && sk_end_t >= sk_boom_frames() || sk_phase == 0x3 && sk_end_t >= sk_smoke_frames())
         {

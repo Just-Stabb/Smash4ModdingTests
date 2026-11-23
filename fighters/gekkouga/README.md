@@ -1374,3 +1374,44 @@ The user: "based on burn amount and strength, please tint the opponent into an o
   the same entry then off (count 0), a command's entry left alone, a taken-over entry not written / not freed, KO at
   once, the reset, an earlier Greninja's burn_tick doing it; gk_clear's state; gkb8 = RELEASE - btint byte for byte);
   supamario_ui_cave_test 0; import_call_check 0. Not confirmed in game: everything here.
+
+## Skeleton v1.7 (`greninja_skeleton_v1_7.zip`, over burn tint v1; exe_v46z_gkb10)
+
+The user: "make the explosion hitbox from the skeleton more active (until right before all of the orange is gone in the
+explosion.) and fix the skeleton's ability to multihit, it seems inconsistent now", "please make the skeleton slightly
+slower", "The skeleton sounds don't play. I made sure I had the correct files."
+- **The explosion's window** (`gekkouga_build.py SK_BOOM_FRAMES` = `weapons/skeleton.c sk_boom_hit_frames()` = 101):
+  explosion_simple_24's orange (`gekkouga_clones_test.boom_orange`: pixels with alpha > 0.3, R > 0.45, saturation > 0.35,
+  R > B + 0.25, per cell; 4 game frames a cell) peaks in cells 14 - 16 (~4560 px), is 5 % of that in cell 24, 2 % in 25
+  (frames 100 - 103), 1 % in 26, none from 28 (frame 112). The hitbox: set at the explode motion's frame 0 (the effect's
+  frame 1) and turned off by its MSC (`AttackModule(0x2719)`: its hit records kept) at the effect's frame 102. The
+  explode motion (the hydrant's, 30 / 48 frames) would loop and run its script again (the hitbox set again: a second
+  hit on everyone), so the MSC holds it (rate 0) from the frame after. One hit an opponent (Rehit 0); 15 %, hitstun x 1.6,
+  shield damage, burn, size 27 unchanged (no shrink: Change_Hitbox_Size's effect on the records isn't known).
+- **The contact burn's misses (exe feature `mark`)**: burn_scan counted each hit log's records; every new Hitbox command
+  frees the Part's records and the next hit is appended in the same frame, so a victim standing in the on 2 / off 1
+  hitbox showed "1 record, as before" at every re-set (docs/native-notes.md "Hit records are freed by every new
+  hitbox"). Now the append's three callers go through `MARK_TRAMP` (0x037EE580: clears the new record's +0x2E padding,
+  then `b 0x02C10F40`) and burn_scan burns every record not marked (0xA5 at +0x2E) and marks it (all his burns: his moves,
+  the clones', the skeleton's, the trails'). SkeletonRun is now one capsule set once a loop with the game's rehit rate
+  3 (`SK_TOUCH_REHIT`; Hitbox.csv field 31); TEST_ONLY_DATA/skeleton_toggle has v1.6's on 2 / off 1 (with v1.7's
+  explosion). Unicorn: a victim standing in it 60 frames, a hit every 3 frames, re-set before each hit in the same frame
+  or a growing log: 20 burns (70 %); gkb9's counting route: fewer.
+- **The sounds (exe feature `sksnd`)**: the skeleton's module row (the clone's: bunshin's with the pump's empty slots
+  filled) had no SoundModule (slot 11, accessor +0xA4): the weapon set-up put the null SoundModule there, whose MSC handler
+  returns 0: every SoundModule call of its MSC was dropped without an error (docs/native-notes.md "An article with no
+  SoundModule plays nothing"). The bank and table were built by fighter_own_bank's route (Supamario's, working); his 110
+  tones / labels 91 - 96 are as tested in v1.5. Its slot 11 is now `0x02BCC844` (the hydrant's / the shuriken's weapon
+  SoundModule). Diag: its MSC notes each play (`sk_play`: VAR_13 the count, VAR_14 the label, VAR_15 the answer) and the
+  TEST_ONLY exe logs **S4SN** (owner, count, label, answer, its SoundModule) on each. TEST_ONLY_DATA/sound_via_greninja:
+  his installed MSC (tilt chain v1's, git bc7e3ea) + `SoundModule(0x2710, 0x0768005B)` in `gk_sk_spawn`
+  (`gekkouga_build.sound_test_msc`): separates "the sound" from "the article".
+- **Speed** 0.7 -> **0.58** (`sk_speed`); its run flipbook slowed as much (`gekkouga_fx.SK_RUN_RATE`, `flip_seq`: 55 cells
+  in 66 entries, every 5th cell twice, 132 frames a cycle; 3 emitters of 22) so the stride keeps to the ground as before.
+- Exes: exe_v46z_gkb10 = RELEASE (+ mark, sksnd); gkb9 = RELEASE - mark - sksnd byte for byte. The diag build's cave
+  ends at 0x04BF3BBC (limit 0x04BF4000).
+- Tests: cave 265 / 296 (`mark_checks`: 20 burns both ways, every record marked, the trampoline, the three sites; the
+  row's slot 11 and the null module; S4SN; gkb9 260 / 290 with "the counts miss"); `gekkouga_fx_test` 52 / 0 (the slowed
+  sequence as eft plays it); `gekkouga_clones_test ... --vbt` 365 / 0 (the explosion's window against the measured orange,
+  the held motion and the 0x2719 at 102, the contact's rehit, the toggle data, 0.58, the sound notes, the package);
+  supamario_ui_cave_test 0; import_call_check 0. Not confirmed in game: everything here.

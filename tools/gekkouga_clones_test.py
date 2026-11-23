@@ -1743,21 +1743,26 @@ def skeleton_tests(mscsb, src):
     run(m, 1)
     check('skeleton v1.2: running, the carrier model (the hydrant) stays hidden (v1 / v1.1: shown x 2 as its stand-in body)',
           [x for x in g.log if x[0] == 'visible' and x[1] != 0], [])
-    check('skeleton run: 2 steps 0.7 left (38.6, 10)', (g.x, g.y), (38.6, 10.0))
+    spd = fv(m('sk_speed'))
+    check('skeleton v1.7: its speed 0.58 a frame (the user: "slightly slower"; v1 - v1.6 0.7)', spd, 0.58)
+    check('skeleton run: 2 steps %g left (%g, 10)' % (spd, 40 - 2 * spd), (g.x, g.y), (round(40 - 2 * spd, 3), 10.0))
     run(m, 8)
-    check('skeleton run: 10 frames: 7 units (33, 10), straight on', (round(g.x, 2), g.y), (33.0, 10.0))
+    check('skeleton run: 10 frames: %g units (%g, 10), straight on' % (10 * spd, 40 - 10 * spd), (round(g.x, 2), g.y),
+          (round(40 - 10 * spd, 2), 10.0))
     m, g = make(walls=[(30.0, 0.0, 50.0)])
     claim(g)
     run(m, 30)
+    wall_x = next(round(40 - spd * k, 1) for k in range(100) if 40 - spd * k < 30 + 2 + spd)
     check('skeleton run: a wall (x 30) stops it short (its test reaches 2 past its step), it stays there running',
-          (round(g.x, 1), g.y), (32.3, 10.0))
+          (round(g.x, 1), g.y), (wall_x, 10.0))
     # off a ledge: running right from 95 on a floor that ends at 100, a lower floor at -20 from 100 on
     m, g = make(floors=[(-1000.0, 100.0, 10.0), (100.0, 1000.0, -20.0)])
     claim(g, 95.0, 10.0, 1.0)
-    run(m, 8)
+    run(m, 9)
     check('skeleton v1.2: way +1: the body as shot (PtcGekkougaSkeletonR 0x3300016), once',
           [x[:3] for x in g.log if x[0] == 'effect' and x[1] == 0x2717], [('effect', 0x2717, 0x3300016)])
-    check('skeleton ledge: it doesn\'t stop at the ledge (x 95 -> 100.6), off it it falls', (round(g.x, 1), g.y < 10.0), (100.6, True))
+    check('skeleton ledge: it doesn\'t stop at the ledge (x 95 -> %g in 9 frames), off it it falls' % round(95 + 9 * spd, 1),
+          (round(g.x, 1), g.y < 10.0), (round(95 + 9 * spd, 1), True))
     ys = []
     for _ in range(30):
         run(m, 1)
@@ -1784,17 +1789,34 @@ def skeleton_tests(mscsb, src):
           (g.vars.get(0x0F000305), [x for x in g.log if x[0] == 'motion'], [x[:3] for x in g.log if x[0] == 'effect' and x[1] == 0x2723],
            [x[:5] for x in g.log if x[0] == 'effect' and x[1] != 0x2723]),
           (2.0, [], [('effect', 0x2723, 0x3300016), ('effect', 0x2723, 0x3300017)],
-           [('effect', 3, 0x3300019, round(40.0 - 0.7 * 179, 3), 10.0)]))
+           [('effect', 3, 0x3300019, round(40.0 - spd * 179, 3), 10.0)]))
     g.log = []
     run(m, 1)
     check('skeleton explosion: the next frame (its scale back to 1) the explode motion (1: its hitbox), its body hidden',
           ([x for x in g.log if x[0] == 'motion'], [x for x in g.log if x[0] == 'visible']), ([('motion', 1, 0.0, 1.0)], [('visible', 0)]))
+    atk = []
+
+    def sys_atk(sid, a, old=g.sys):
+        if sid == 0x2E:
+            atk.append((g.t_boom, a[0]))
+        return old(sid, a)
+    g.sys = sys_atk
+    g.t_boom = 2
+    g.log = []
+    run(m, 1)
+    rate = [x for x in g.log if x[0] == 'rate']
     g.vars[0x0F000356] = 0.0
-    run(m, 3)
+    for t in range(3, m('sk_boom_frames') - 1):
+        g.t_boom = t
+        run(m, 1)
+    check('skeleton v1.7: the explode motion held the frame after (rate 0: its 30 / 48 frames would loop it, its script '
+          'again); its hitbox off (AttackModule 0x2719, its records kept) %d frames after it was set, nothing else' %
+          m('sk_boom_hit_frames'), (rate, atk, m('sk_boom_hit_frames') == GB.SK_BOOM_FRAMES),
+          ([('rate', 0.0)], [(1 + m('sk_boom_hit_frames'), 0x2719)], True))
     check('skeleton v1.6: exploded (phase 2): no heartbeat (his side special is free again; not at its removal, '
           'sk_boom_frames later)', g.vars.get(0x0F000356), 0.0)
     x0 = g.x
-    run(m, m('sk_boom_frames') - 5)
+    run(m, 1)
     check('skeleton explosion: it stays put; removed %d frames after (BattleObject 9; v1.5: 40 -> 120, its sound\'s '
           'length)' % m('sk_boom_frames'),
           (g.x == x0, [x for x in g.log if x[0] == 'remove']), (True, []))
@@ -1891,6 +1913,9 @@ def skeleton_sound_tests(mscsb, src, out=None):
     check('skeleton v1.5 sounds: its start plays the picked spawn sound (randi 0 / 2 -> the 2nd); its first voice the '
           '15th frame (10 + 5, its start frame the 1st), voice1, the next %d after (its %d frames - 30), voice2' % (l1 - 30, l1),
           seq[:3], [(0, 'spawn2'), (14, 'voice1'), (14 + l1 - 30, 'voice2')])
+    check('skeleton v1.7 sounds: every play noted for the TEST_ONLY exe\'s S4SN (VAR_13 the count, VAR_14 the last label, '
+          'VAR_15 the answer)', [g.vars.get(0x0F00030D), g.vars.get(0x0F00030E), g.vars.get(0x0F00030F)],
+          [float(len(plays)), float(plays[-1][1] & 0xFFFF), 0.0])
     m2, g2 = make([0, 30, 1, 90] + [0, 0] * 20)
     sid2 = {k: m2(v) & 0xFFFFFFFF for k, v in ids.items()}
     inv2 = {v: k for k, v in sid2.items()}
@@ -1928,6 +1953,29 @@ def skeleton_sound_tests(mscsb, src, out=None):
     check('skeleton v1.5 sounds: the gap to the next voice -30 ... +60 frames after the last one\'s end (overlap at most 0.5 s), '
           'the first voice 10 - 40 frames in', gaps, (-30, 60, 10, 40))
 
+FX_PKG = None                             # skeleton v1.7: the flipbooks' folder (--fx=...), for the explosion's orange
+
+
+def boom_orange(folder):
+    """skeleton v1.7: explosion_simple_24's orange pixels a cell (R > 0.45, saturation > 0.35, R > B + 0.25, alpha > 0.3)"""
+    import json as _json
+    import numpy as np
+    from PIL import Image
+    d = _json.load(open(os.path.join(folder, 'explosion_simple_24.json')))
+    im = np.asarray(Image.open(os.path.join(folder, 'explosion_simple_24_atlas.png')).convert('RGBA')).astype(float) / 255
+    nx = d['columns']
+    cw, ch = d['cell_size']
+    out = []
+    for i in range(d['frames']):
+        c, r = i % nx, i // nx
+        cell = im[int(round(r * ch)):int(round(r * ch + ch)), int(round(c * cw)):int(round(c * cw + cw))]
+        R, G, B, A = (cell[..., k] for k in range(4))
+        mx, mn = np.maximum(np.maximum(R, G), B), np.minimum(np.minimum(R, G), B)
+        sat = (mx - mn) / (mx + 1e-6)
+        out.append(int(((A > 0.3) & (R > 0.45) & (sat > 0.35) & (R > B + 0.25)).sum()))
+    return out
+
+
 def skeleton_data_tests(out):
     """skeleton v1: its built files: the explosion's hitbox, the scripts' names, its collision, its carrier"""
     import acmd
@@ -1942,13 +1990,27 @@ def skeleton_data_tests(out):
     boom = [c for c in game.script('SkeletonExplode') if c.name in ('Special_Hitbox', 'Extra_Special_Hitbox')]
     syn = boom[0].info['syntax'] if boom else []
     hb = dict(zip(syn, boom[0].params)) if boom else {}
+    ex = game.script('SkeletonExplode')
     check('skeleton explosion: one hitbox, 15 %, 50 degrees, KBG 50 / BKB 40, size 27 at its middle (bone 0, Y 14; v1 - v1.4: '
-          '22), flame, launched from its middle (FacingRestrict 5), then off after 4 frames; v1.5: shield damage +40 (55 '
-          'against a fresh shield\'s 50: it breaks)',
+          '22), flame, launched from its middle (FacingRestrict 5), one hit an opponent (Rehit 0); v1.5: shield damage +40 '
+          '(55 against a fresh shield\'s 50: it breaks); skeleton v1.7: set at the explode motion\'s frame 0, no WAIT / '
+          'Remove (its MSC holds the motion and ends the hitbox: v1 - v1.6 WAIT 4)',
           (len(boom), [round(hb.get(k, -1), 3) for k in ('Damage', 'Angle', 'KBG', 'BKB', 'Size', 'Y', 'Effect', 'FacingRestrict', 'Bone',
-                                                          'ShieldDamage')],
-           [c.name for c in game.script('SkeletonExplode')][1:3]),
-          (1, [15.0, 50, 50, 40, 27.0, 14.0, 5, 5, 0, 40], ['WAIT', 'Remove_All_Hitboxes']))
+                                                          'ShieldDamage', 'Rehit')],
+           [c.name for c in ex[1:]]),
+          (1, [15.0, 50, 50, 40, 27.0, 14.0, 5, 5, 0, 40, 0], ['Script_End']))
+    if FX_PKG:
+        import json as _json
+        k = _json.load(open(os.path.join(FX_PKG, 'explosion_simple_24', 'explosion_simple_24.json')))['frames_per_cell_at_60fps']
+        oc = boom_orange(os.path.join(FX_PKG, 'explosion_simple_24'))
+        peak = max(oc)
+        last2 = max(i for i, v in enumerate(oc) if v >= 0.02 * peak)
+        gone = min(i for i, v in enumerate(oc) if i > oc.index(peak) and v == 0)
+        end = 1 + GB.SK_BOOM_FRAMES            # the effect's frame (the hitbox starts a frame after it)
+        check('skeleton v1.7: the explosion\'s hitbox ends (effect frame %d) inside the last cell with orange >= 2 %% of its '
+              'peak (cell %d: frames %d - %d), before it is all gone (cell %d, frame %d)' % (
+                  end, last2, last2 * k, last2 * k + k - 1, gone, gone * k),
+              (last2 * k <= end < (last2 + 1) * k, end < gone * k), (True, True))
     p = 145.0
     kb = ((p / 10 + p * 15 / 20) * 200 / 200 * 1.4 + 18) * 0.5 + 40
     check('skeleton explosion: Smash 4\'s knockback on Mario (weight 100) at 130 %% (+ 15): %.1f (a mid-stage KO ~130-140)' % kb,
@@ -1967,14 +2029,29 @@ def skeleton_data_tests(out):
             t = dict(zip(c.info['syntax'], c.params))
         elif c.name == 'Remove_All_Hitboxes':
             on.append(-fr)
-    starts = [x for x in on if x >= 0]
-    check('skeleton v1.5 contact: SkeletonRun puts its body capsule (joint 0, radius 3.5, Y 3.5 - 20.5: x +- 3.5, y 0 - 24) '
-          'on at frames 0, 3, 6 ... 45 and off 2 frames later (a touch every 3 frames, as up air\'s multi-hit); no '
-          'knockback (KBG / FKB / BKB 0), no hitlag, no flinch, 0.1 %%, fire',
-          (starts[:3], len(starts), all(-on[2 * k + 1] == starts[k] + 2 for k in range(len(starts))),
-           [t.get(k) for k in ('Bone', 'Size', 'Y', 'Y2', 'KBG', 'FKB', 'BKB', 'DisableHitlag', 'Flinchless', 'Effect')],
-           round(t.get('Damage', 0), 3)),
-          ([0.0, 3.0, 6.0], 16, True, [0, 3.5, 3.5, 20.5, 0, 0, 0, 1, 1, 5], 0.1))
+    check('skeleton v1.7 contact: SkeletonRun puts its body capsule (joint 0, radius 3.5, Y 3.5 - 20.5: x +- 3.5, y 0 - 24) '
+          'on once (each loop of its motion), rehit rate 3 (a touch every 3 frames; v1.5 / v1.6: on 2 / off 1); no '
+          'knockback (KBG / FKB / BKB 0), no hitlag, no flinch, 0.1 %, fire',
+          ([c.name for c in run], [t.get(k) for k in ('Bone', 'Size', 'Y', 'Y2', 'KBG', 'FKB', 'BKB', 'DisableHitlag', 'Flinchless',
+                                                      'Effect', 'Rehit')], round(t.get('Damage', 0), 3)),
+          (['Extended_Special_Hitbox', 'Script_End'], [0, 3.5, 3.5, 20.5, 0, 0, 0, 1, 1, 5, 3], 0.1))
+    tog = os.path.join(out, 'TEST_ONLY_DATA', 'skeleton_toggle', 'fighter', 'gekkouga', 'script', 'animcmd', 'weapon',
+                       'skeleton', 'game.bin')
+    if os.path.exists(tog):
+        tg = acmd.ACMDFile.load(tog)
+        fr, on = 0.0, []
+        for c in tg.script('SkeletonRun'):
+            if c.name == 'FRAME':
+                fr = float(c.params[0])
+            elif c.name == 'Extended_Special_Hitbox':
+                on.append(fr)
+            elif c.name == 'Remove_All_Hitboxes':
+                on.append(-fr)
+        starts = [x for x in on if x >= 0]
+        check('skeleton v1.7 TEST_ONLY_DATA skeleton_toggle: v1.6\'s contact (on at 0, 3 ... 45, off 2 frames later), '
+              'v1.7\'s explosion', (starts[:3], len(starts), all(-on[2 * k + 1] == starts[k] + 2 for k in range(len(starts))),
+                                    acmd.fmt_script(tg.script('SkeletonExplode')) == acmd.fmt_script(ex)),
+              ([0.0, 3.0, 6.0], 16, True, True))
     check('skeleton scripts: smoke without a hitbox; effect / sound empty', [c.name for c in game.script('SkeletonSmoke')],
           ['Script_End'])
     lv = lvd.LVD(os.path.join(fg, 'model', 'skeleton', 'c00', 'skeleton.lvd'))
@@ -2417,6 +2494,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 33:   # burn tint v1: the exes only
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
+    if len(earlier) == 34:   # skeleton v1.7: the exes, the skeleton's data and his bank, test data
+        want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (20, 21, 26, 30, 31):   # skeleton v1.2 / burn v2 / skeleton v1.3 / v1.5 / v1.6: the exes, the data, test exes
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (23, 24, 25, 27, 28, 32):   # burn v2.2 / v2.3 / aerial chain v1 / clone fixes v1 / trail fix / tilt
@@ -2453,7 +2532,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: nothing in INSTALL_TO_data but the built files',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want and
                      n not in again), [])
-        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33):
+        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -2515,6 +2594,32 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               'places delayed) and the clone\'s MSC (its playback delayed)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               ['fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
+    if z1 and len(earlier) == 34:
+        check('skeleton v1.7: INSTALL_TO_data: the skeleton\'s game.bin (the explosion\'s window, the contact hitbox with '
+              'rehit 3) and MSC (0.58 a frame, the explosion held / ended, its sounds noted), his effect bank (the run '
+              'flipbook slowed as much); TEST_ONLY_DATA skeleton_toggle (v1.6\'s contact) and sound_via_greninja (his MSC '
+              '= tilt chain v1\'s + the spawn sound from him); TEST_ONLY: A_release',
+              (sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+               sorted(n for n in names if n.startswith('TEST_ONLY_DATA/') and not n.endswith('/')),
+               sorted({n.split('/')[1] for n in names if n.startswith('TEST_ONLY_INSTALL_TO_code/') and n.count('/') > 1})),
+              (['fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.ptcl',
+                'fighter/gekkouga/script/animcmd/weapon/skeleton/game.bin',
+                'fighter/gekkouga/script/msc/skeleton/skeleton.mscsb'],
+               ['TEST_ONLY_DATA/skeleton_toggle/fighter/gekkouga/script/animcmd/weapon/skeleton/game.bin',
+                'TEST_ONLY_DATA/sound_via_greninja/fighter/gekkouga/script/msc/gekkouga.mscsb'], ['A_release']))
+        snd = z.read('TEST_ONLY_DATA/sound_via_greninja/fighter/gekkouga/script/msc/gekkouga.mscsb')
+        inst = z1.read('INSTALL_TO_data/fighter/gekkouga/script/msc/gekkouga.mscsb')
+        with tempfile.TemporaryDirectory() as td:
+            src = os.path.join(td, 'g.c')
+            repo = ROOT if os.path.exists(os.path.join(ROOT, '.git')) else os.environ.get('GK_REPO', ROOT)
+            subprocess.run(['git', '-C', repo, 'show', 'bc7e3ea:fighters/gekkouga/gekkouga.c'], stdout=open(src, 'w'), check=True)
+            o1, o2 = os.path.join(td, 'a.mscsb'), os.path.join(td, 'b.mscsb')
+            GB.compile_msc(src, o1)
+            open(src + '2.c', 'w').write(GB.sound_test_msc(open(src).read()))
+            GB.compile_msc(src + '2.c', o2)
+            check('skeleton v1.7 sound_via_greninja: his installed MSC (tilt chain v1\'s) rebuilt from git bc7e3ea byte for '
+                  'byte; the test MSC is it + one line (SoundModule 0x2710 0x0768005B in gk_sk_spawn)',
+                  (open(o1, 'rb').read() == inst, open(o2, 'rb').read() == snd), (True, True))
     if z1 and len(earlier) == 32:
         check('tilt chain v1: INSTALL_TO_data: his MSC only (the exe is skeleton v1.6\'s)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
@@ -2744,7 +2849,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 34)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 35)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -2775,6 +2880,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'unconfirmed', 'exe_v46z_gkb8') if len(earlier) == 32 else \
         ('greninja_tilt_chain_v1', 'exe_v46z_gkb9', 'orange', 'hot red', 'outline', 'tier', 'fade', 'KO', 'reset',
          'Supamario', 'burn_tint.png', 'A_release', 'unconfirmed') if len(earlier) == 33 else \
+        ('greninja_burn_tint_v1', 'exe_v46z_gkb10', 'explosion', 'orange', '102', 'once', 'contact', 'rehit', '3', '20',
+         'hit record', 'skeleton_toggle', 'SoundModule', 'null', 'S4SN', 'sound_via_greninja', '0.58', 'flipbook',
+         'A_release', 'unconfirmed') if len(earlier) == 34 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -2787,7 +2895,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
 
 
 def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False, gkb5=False, gkb6=False,
-                gkb7=False, gkb8=False):
+                gkb7=False, gkb8=False, gkb9=False):
     """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
     release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
@@ -2805,6 +2913,7 @@ def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=
         drop |= {'skbody', 'sktouch'} if sk12 or b2 or gkb5 or gkb6 else set()   # (skeleton v1.5's gkb7)
         drop |= {'skdist'} if sk12 or b2 or gkb5 or gkb6 or gkb7 else set()      # (skeleton v1.6's gkb8)
         drop |= {'btint'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 else set()   # (burn tint v1's gkb9)
+        drop |= {'mark', 'sksnd'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 else set()   # (skeleton v1.7's gkb10)
         variants = C.VARIANTS if not (sk12 or b2 or gkb5 or gkb6 or gkb7) else \
             C.VARIANTS + (('G_pose', (C.RELEASE - {'sway'}) | {'pose'}),)       # (up to v1.5: + G_pose)
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE - drop)] + \
@@ -2838,7 +2947,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
         for member, b, dg, feats in exe_members(base, base_diag, v4, len(earlier) == 17, len(earlier) == 18,
                                                 len(earlier) >= 19, len(earlier) in (19, 20), len(earlier) == 21,
                                                 len(earlier) in (22, 23, 24, 25), len(earlier) in (26, 27, 28, 29),
-                                                len(earlier) == 30, len(earlier) in (31, 32)):
+                                                len(earlier) == 30, len(earlier) in (31, 32), len(earlier) == 33):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
@@ -2858,9 +2967,11 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 
 
 def main():
-    a = [x for x in sys.argv[1:] if not x.startswith('--v')]
+    global FX_PKG
+    FX_PKG = next((x[5:] for x in sys.argv[1:] if x.startswith('--fx=')), None)
+    a = [x for x in sys.argv[1:] if not x.startswith('--v') and not x.startswith('--fx=')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]

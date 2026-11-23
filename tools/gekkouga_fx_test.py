@@ -232,7 +232,8 @@ def timing_checks(p, sets, names):
     check('the v1.2 placement in the same model: both runs from frame 0 (two cells drawn at once, frames 0 - 54), nothing '
           'from frame 57 to 109 (the user\'s clip: the skeleton seen ~58 frames, gone ~48, back)',
           (both[:1], both[-1:], old_gap[:1], old_gap[-1:] if old_gap and old_gap[-1] < 110 else [x for x in old_gap if x < 110][-1:]),
-          ([0], [both[-1]] if both else [], [57], [109]))
+          ([0], [both[-1]] if both else [], [p.field(ems[0], 'ptcl_life')], [109]))   # (skeleton v1.7's slowed run: its
+                                                   # first run lives 45, v1.2 - v1.6's 57)
     for n in loops:
         si = 20 + names.index(n)
         lives = [p.field(x['data'], 'ptcl_life') for x in p.sets[si]['emitters']]
@@ -387,7 +388,7 @@ def main():
         handovers = sum(1 for fr in frames if len(got[fr]) > 1)
         check('%s: the flipbook as eft plays it (latte_exec): each of %d frames shows entry (frame / %d) mod %d of its %s%s' %
               (name, len(frames), k, m, 'cells' if m == n else 'slowed sequence (%d cells, every %dth twice: rate %.3f)' % (
-                  n, round(m / (m - n)) if m > n else 0, spec.get('rate', 1.0)), ', the hand-overs (%d) also the cell before' % handovers if len(plan) > 1 else ''),
+                  n, n // (m - n) if m > n else 0, spec.get('rate', 1.0)), ', the hand-overs (%d) also the cell before' % handovers if len(plan) > 1 else ''),
               bad[:5], [])
         if not loop:
             check('%s: a one-shot: nothing drawn after its %d frames' % (name, n * k),

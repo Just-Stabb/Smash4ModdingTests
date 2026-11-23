@@ -3241,6 +3241,7 @@ def build(rpx, diag=False, feats=None):
                             'context=%d\n')]
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
+    A.setdefault('gk_fsn', 0)
     A['sk_dist'] = alloc(4, 4) if 'skdist' in feats else 0   # skeleton v1.6: SK_DIST (its hold's cap)
     btint = 'btint' in feats
     assert not btint or 'tiers' in feats, 'btint needs tiers'

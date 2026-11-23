@@ -1751,6 +1751,8 @@ def skeleton_checks(e, info, diag):
     check('skeleton burn: the same hits not again', (len(inst(vic)), len(inst(vic - 1))), (1, 1))
     for kk in range(C.SLOTS * C.BURN_CAP):
         e.setw(A['btab'] + 16 * kk, 0)
+    if 'sktouch' in F:
+        mark_checks(e, info, frame, log_hit, inst, sv, slog, vic, diag, logs, sacc, row)
     # a missing .lvd: no collision, failed (3); the handles still released
     st['file'] = 0
     e.setw(gm + 0xF0, 0)
@@ -1807,6 +1809,84 @@ def skeleton_checks(e, info, diag):
     for i in range(8):
         e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
     e.hs_ret = 7
+
+
+def mark_checks(e, info, frame, log_hit, inst, sv, slog, vic, diag, logs, sacc, row):
+    """skeleton v1.7: the contact burn from every new hit record (feature mark: the append's trampoline clears a new
+    record's +0x2E, burn_scan burns and marks every unmarked one; v1.5 / v1.6 counted records), its SoundModule (sksnd),
+    its sound diag (S4SN)"""
+    lab, A, F = info['labels'], info['A'], info['feats']
+    sv[C.SK_VAR_PHASE] = 1.0                       # running: the contact row
+
+    def clear():
+        e.setw(slog + 4, slog)
+        e.setw(slog + 8, 0)
+
+    def standing(frames, how):
+        for kk in range(C.SLOTS * C.BURN_CAP):
+            e.setw(A['btab'] + 16 * kk, 0)
+        clear()
+        frame()
+        for t in range(frames):
+            if t % 3 == 0:
+                if how == 'reset':
+                    clear()                       # a new Hitbox command: the round's records freed ...
+                log_hit(vic, 1)                   # ... and its next hit appended, the same frame (1 -> 0 -> 1)
+            frame()
+        return len(inst(vic))
+    want = 20 if 'mark' in F else None
+    got_reset = standing(60, 'reset')
+    got_rehit = standing(60, 'rehit')
+    if 'mark' in F:
+        check('skeleton v1.7 (mark): a victim standing in the contact hitbox 60 frames, a hit every 3 frames: 20 contact '
+              'burns, the hitbox set again before each hit in the same frame (the log 1 -> 0 -> 1: v1.6 counted 1) and '
+              'a constant one with rehit 3 (the log growing)', (got_reset, got_rehit), (want, want))
+        tot = sum(C.burn_total(C.SK_TOUCH_ROW) for _ in range(got_reset))
+        check('skeleton v1.7: ... 20 x %.2f %% = %.0f %% a second (the user\'s ~70 %%)' % (C.burn_total(C.SK_TOUCH_ROW), tot),
+              round(tot), 70)
+        nodes = []
+        n = e.w(slog + 4)
+        while n != slog:
+            nodes.append(e.mu.mem_read(n + C.MARK_OFF, 1)[0])
+            n = e.w(n + 4)
+        check('skeleton v1.7: every record scanned is marked (+0x2E = 0x%X)' % C.MARK, set(nodes), {C.MARK})
+        # the trampoline: +0x2E cleared, then the game's append with r3 / r4 as they were, back to the caller
+        seen = []
+        e.stub(C.MARK_APPEND, lambda e_: seen.append((e_.r(3), e_.r(4), e_.mu.mem_read(e_.r(4) + C.MARK_OFF, 1)[0])))
+        nd = e.alloc(0x30, b'\0')
+        e.mu.mem_write(nd + C.MARK_OFF, bytes([C.MARK]))
+        e.call(C.MARK_TRAMP, 0x1234, nd)
+        check('skeleton v1.7: the mark trampoline (0x%08X): a reused record\'s +0x2E cleared, then the append (r3, r4 '
+              'kept)' % C.MARK_TRAMP, seen, [(0x1234, nd, 0)])
+        check('skeleton v1.7: the three record creators\' appends go through it (bl 0x%08X)' % C.MARK_TRAMP,
+              [K.branch_target(a, e.w(a)) for a in C.MARK_SITES], [C.MARK_TRAMP] * 3)
+    else:
+        check('without "mark": the counts\' route (a re-set\'s hit in the frame of its clear is missed)', got_reset < 20, True)
+    for kk in range(C.SLOTS * C.BURN_CAP):
+        e.setw(A['btab'] + 16 * kk, 0)
+    clear()
+    if 'sksnd' in F:
+        img = info['img']
+        check('skeleton v1.7 (sksnd): row slot 11 (SoundModule, accessor +0xA4) the hydrant\'s / shuriken\'s constructor '
+              '0x%08X; empty in bunshin\'s / the pump\'s rows (the setter 0x02BF682C then stores the null module 0x%08X, '
+              'whose MSC handler is li r3, 0)' % (C.SND_CTOR, C.NULL_SOUND),
+              (row[C.SND_SLOT], [bool(C.NULL_CTOR_OF(img, img.w(W.MODULE_TABLE + 0x70 * k + 4 * C.SND_SLOT)))
+                                 for k in (C.CLONE_BASE, C.ATTACK_BASE, C.HYDRANT)],
+               img.w(img.w(0x10100E64 + 0x18C) + 4)),
+              (C.SND_CTOR, [True, True, False], 0x38600000))
+        if diag:
+            sv.update({C.SK_VAR_SNDN: 1.0, C.SK_VAR_SNDID: 91.0, C.SK_VAR_SNDR: 7.0})
+            e.setw(sacc + 0xA4, 0xABCD00)
+            frame()
+            first = [x[:5] for x in logs('gk_fsn')]
+            frame()
+            again = [x[:5] for x in logs('gk_fsn')]
+            sv.update({C.SK_VAR_SNDN: 2.0, C.SK_VAR_SNDID: 93.0, C.SK_VAR_SNDR: 0.0})
+            frame()
+            check('skeleton v1.7 diag: S4SN on each sound request (owner 3, #1, label 91, answer 7, its SoundModule), not '
+                  'again, then #2 (93)', (first, again, [x[:5] for x in logs('gk_fsn')]),
+                  ([(3, 1, 91, 7, 0xABCD00)], [], [(3, 2, 93, 0, 0xABCD00)]))
+    sv[C.SK_VAR_PHASE] = 2.0
 
 
 def pose_checks(e, info, diag):

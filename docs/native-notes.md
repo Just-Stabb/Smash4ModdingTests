@@ -4002,6 +4002,24 @@ MSC on a bunshin-based kind, the 4-shape group.
   `0x35` x `0x36` on the ground (line tests: it stops at a ledge). So in `0x153` the shadow follows him at a fixed
   distance; nothing else moves `0x35`. Feature `skdist` replaces the three cap loads with a cave constant
   (`SK_DIST_PATCH`, 6 words: `lwz rX, 4(r10)` / `lfs fY, 0x30(rX)` -> `lis` / `lfs` of SK_DIST).
+- **Hit records are freed by every new hitbox (skeleton v1.7, read from exe_v46z_ui10)**: AttackModule's set_attack
+  (`0x02C08848`, every Hitbox command) frees the Part's records of the current round (`0x02C10660` on [entry +0x130] and
+  +0x124) before the slot is live again, and the collision pass appends the next hit (`0x02C10F40`, from the record
+  creators `0x02C0F6AC` / `0x02C0FAF0` / `0x02C0FBC4`, its only callers) in the same frame: a log seen once a frame can
+  go 1 -> 0 -> 1 between two looks. Counting records misses those hits (the skeleton's on 2 / off 1 contact hitbox on a
+  victim standing in it). A record is 0x30 bytes from a pool (`[mgr+0xB4]` / `+0xB8` / `+0xBC`, LIFO: a freed record's
+  address comes back at once); its creators write +0x00 - +0x2D (+0x29 is read by the record mover `0x02C10C1C`), and
+  +0x2E / +0x2F are padding no code in 0x02C00000 - 0x02C50000 touches. `gekkouga_clone_cave.py` feature `mark`: the three
+  calls of the append go through a trampoline (0x037EE580) that clears +0x2E, and burn_scan burns each record without its
+  mark and marks it. `0x02C10D7C(entry, id)` points an entry's +0x130 / +0x134 / +0x138 at a shared group's lists
+  ([mgr+0xD4] + id x 0x2C; +0x168 the id, +0x16A the round), `0x02C10E1C` back at its own.
+- **An article with no SoundModule plays nothing, silently (skeleton v1.7)**: the weapon set-up's setters (`0x02BF682C` for
+  accessor +0xA4, module row slot 11) store a static null module when the slot's constructor returns 0 (`li r3, 0`):
+  the null SoundModule `0x1049688C` (vtable `0x10100E64`, its MSC handler vt +0x18C `0x02BF9440`: returns 0). Slot 11 is
+  empty in bunshin's (0xFE), Mario's pump's (0x2) and the moon's (0xFC) rows, set (`0x02BCC844`) in the hydrant's (0x12D)
+  and the shuriken's (0xF9). So Greninja's skeleton (bunshin's row + the pump's slots) dropped every SoundModule(0x2710,
+  id) of its MSC; v1.7's row has `0x02BCC844` there (feature `sksnd`). The same holds for every module slot (each setter
+  `0x02BF6xxx` has its null object).
 - **ColorBlendModule's two overlay slots (burn tint v1)**: vt +0x4C(&rgba, slot, flag) (`0x02C1A12C`, returns when +0xD9
   is 0) writes slot n's colour at +0x18 + 0x4C n (scaled by +0x34 - +0x3C into +8 - +0xC) and its on byte +0x50 + 0x4C n;
   vt +0x44(slot) clears the on bytes; vt +0xAC (`0x02C1A288`) picks the slot shown: 1 when its on byte (+0x9C) is set and

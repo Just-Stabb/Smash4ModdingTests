@@ -887,7 +887,11 @@ SK_BOOM_FRAMES = 101               # skeleton v1.7 (the user: "make the explosio
                                    # alpha > 0.3, per cell; 4 game frames a cell) peaks in cells 14 - 16 (~4560 px), is 5 % of
                                    # that in cell 24, 2 % in 25 (frames 100 - 103), 1 % in 26, gone from 28 (frame 112): the
                                    # hitbox from its script's frame 0 (the effect's 1) to 101 (the effect's 102, inside cell
-                                   # 25). One Extra_Special_Hitbox, never set again: its hit records hold, one hit an opponent
+                                   # 25). One Extra_Special_Hitbox at the explode motion's frame 0, no WAIT / Remove: its motion
+                                   # (the hydrant's: 30 / 48 frames) can't hold 101 frames and would loop (the script again: the
+                                   # hitbox set again, a second hit); weapons/skeleton.c holds the motion (rate 0) the next frame
+                                   # and turns the hitbox off (AttackModule 0x2719) at sk_boom_hit_frames() = this. Never set
+                                   # again: its hit records hold, one hit an opponent
                                    # (Rehit 0) for the whole window. Its size stays 27 (the fireball's widest; a smaller one as
                                    # it fades would need Change_Hitbox_Size, whose effect on the records isn't known here)
 SK_BOOM_HITSTUN = 1.6             # skeleton v1.5 (the user: "make the explosion have 1.6x hitstun"): Extra_Special_Hitbox's
@@ -965,8 +969,7 @@ def sk_scripts(toggle=False):
     import acmd
     by = {v['name']: k for k, v in acmd.INFO.items()}
     end = acmd.Command(by['Script_End'], [])
-    boom = [sk_boom_hitbox(), acmd.Command(by['WAIT'], [float(SK_BOOM_FRAMES)]),
-            acmd.Command(by['Remove_All_Hitboxes'], []), end]
+    boom = [sk_boom_hitbox(), end]        # skeleton v1.7: its MSC holds the motion and ends it (SK_BOOM_FRAMES)
     game = {acmd.crc(n): [acmd.Command(by['Script_End'], [])] for n in SK_SCRIPTS}
     game[acmd.crc('SkeletonExplode')] = boom
     game[acmd.crc('SkeletonRun')] = sk_run_script(toggle=toggle)
