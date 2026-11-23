@@ -1445,8 +1445,8 @@ def skeleton_checks(e, info, diag):
     ground = e.alloc(0x200, b'\0')                   # its handle: +0 the ground (+0x34 its vertex count), +0x160 id
     gobj = e.alloc(0x100, b'\0')
     e.setw(ground, gobj)
-    e.setw(gobj + 0x34, 4)
-    vnodes = [e.alloc(0x20, b'\0') for _ in range(4)]   # skeleton v1.4: its vertex list (+0x3C: +4 next, +8 / +0xC x / y)
+    e.setw(gobj + 0x34, len(C.sk_verts(F)))   # (tuning v1, skbot: 5)
+    vnodes = [e.alloc(0x20, b"\0") for _ in range(len(C.sk_verts(F)))]   # skeleton v1.4: its vertex list (+0x3C: +4 next, +8 / +0xC x / y)
     e.setw(gobj + 0x3C, vnodes[0])
     for a_, b_ in zip(vnodes, vnodes[1:]):
         e.setw(a_ + 4, b_)
@@ -1593,7 +1593,10 @@ def skeleton_checks(e, info, diag):
         got4 = [x[2:6] for x in logs('gk_fsd')][-1:] + [x[3:7] for x in logs('gk_fsv')][-1:]
         check('skeleton v1.4 diag: S4SD v0 / v1 and S4SV its place (507, 100) and v2 / v3 (x10): all 4 vertices as moved '
               '(the walls\' ends too)', ([list(g_) for g_ in got4], [x[1:3] for x in logs('gk_fsv')][-1:]),
-              ([want4[:4], want4[4:]], [(507, 100)]))
+              ([want4[:4], want4[4:8]], [(507, 100)]))
+        if 'skbot' in F:
+            check('tuning v1 diag (skbot): S4SB its bottom\'s end, vertex 4 (x10: its left wall\'s foot again), its ground',
+                  [x[0:3] for x in logs('gk_fsb')][-1:], [(want4[8], want4[9], logs('gk_fsv')[-1][0])])
     e.setw(ground + 0x160, 0xFFFF0000)
     check('skeleton v1.1: its ground gone (id -1: something removed it): nothing moved; made again next frame (VAR_6 0, '
           'VAR_12 1)', (frame(), sv[C.SK_VAR_COL], sv[C.SK_VAR_REMADE]), ([], 0.0, 1.0))
@@ -1618,7 +1621,7 @@ def skeleton_checks(e, info, diag):
     check('skeleton v1.1: a floor-only skeleton.lvd (2 vertices, as the hydrant\'s): only its top line moved (x +- 6, y + 28)',
           frame(), gmf + [('movev', gm, i, 50.0 + vx, 10.0 + vy) for i, (vx, vy) in enumerate(C.sk_verts(F)[1:3])] +
           [('commit', gm), ('enable', gm)])
-    e.setw(gobj + 0x34, 4)
+    e.setw(gobj + 0x34, len(C.sk_verts(F)))   # (tuning v1, skbot: 5)
     frame()
     # ---- hits: attackers over its box (x 44 - 56, y 10 - 38)
     stopvt = e.alloc(0x100, b'\0')

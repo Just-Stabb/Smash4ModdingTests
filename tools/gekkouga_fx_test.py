@@ -271,6 +271,7 @@ def soft_checks(p, sets, names):
     for n in ('PtcGekkougaFireBody', 'PtcGekkougaFireTip', 'PtcGekkougaFireTrail', 'PtcGekkougaFireBody1',
               'PtcGekkougaFireBody3'):
         sp = dict(sets)[n]
+        sp = sp['layers'][0] if 'layers' in sp else sp   # (tuning v1: the trail's first layer)
         d = G.sidecar(sp['atlas'])
         em = p.sets[20 + names.index(n)]['emitters'][0]['data']
         got[n] = round(base_step(p.decode_texture(em, 0), d), 1)
@@ -419,6 +420,8 @@ def main():
                ids['PtcGekkougaFireRingL']])
         for nm, base in (('PtcGekkougaFireBody', 'fire_small_4'), ('PtcGekkougaFireTrail', 'fire_ground_10')):
             spec = dict(sets)[nm]
+            if 'layers' in spec:          # tuning v1: the trail's first layer (its wide fire_ground_10)
+                spec = spec['layers'][0]
             si = 20 + names.index(nm)
             t = p.field(p.sets[si]['emitters'][0]['data'], 'emitter_translation')
             h = spec['size'][1]
@@ -430,6 +433,17 @@ def main():
         check('PtcGekkougaFireTip: centred on the call (the sword\'s tip), additive, %.0f tall at size 1' % G.FIRE_TIP_H,
               (p.field(p.sets[si]['emitters'][0]['data'], 'emitter_translation'), dict(sets)['PtcGekkougaFireTip']['blend']),
               ([0.0, 0.0, 0.0], 1))
+    if burn2 and G.TRAIL_FULL:
+        si = 20 + names.index('PtcGekkougaFireTrail')
+        ly = dict(sets)['PtcGekkougaFireTrail']['layers']
+        ems = p.sets[si]['emitters']
+        sc = [p.field(em['data'], 'scale') for em in ems]
+        w0 = G.FIRE_TRAIL_H * G.cell_aspect('fire_ground_10')
+        check('tuning v1 (the user: "make the trail fire more full"): PtcGekkougaFireTrail two layers: fire_ground_10 %.2f wide '
+              '(x%.1f), %g tall; fire_small_5 mirrored, %g tall (x%.1f wide), slower (0.8)' % (
+                  w0 * G.TRAIL_WIDE, G.TRAIL_WIDE, G.FIRE_TRAIL_H, G.FIRE_TRAIL_H * G.TRAIL_SECOND, G.TRAIL_WIDE),
+              ([l_['atlas'] for l_ in ly], [round(x, 3) for x in sc[0][:2]], ly[1].get('mirror'), ly[1].get('rate')),
+              (['fire_ground_10', 'fire_small_5'], [round(w0 * G.TRAIL_WIDE, 3), G.FIRE_TRAIL_H], True, 0.8))
     timing_checks(p, sets, names)
     if burn2:
         tier_blade_checks(p, sets, names)

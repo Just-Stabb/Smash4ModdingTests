@@ -1735,3 +1735,54 @@ grabs and throws", "And pummels", "the water shuriken effect doesn't appear for 
 - the grab scripts' values against his scripts.
 
 Not confirmed in game (Hitbox_Hold on an article in particular).
+
+## Tuning v1 (`greninja_tuning_v1.zip`, over clone moves v1; exe_v46z_gkb13)
+
+The user: forward smash "longer (not bigger) so it reaches Donkey Kong", "the trail fire more full ... match them
+better", "remove the shield break effect from neutral air and make it 25% larger", "remove the forward tilt teleporting
+code", the gauge "more clear ... when ... charged", "clones can act when the main body is at ledge", "skeletons have
+solid collision from the bottom", "the smash attack charging star effect normal sized".
+
+- **Forward smash** (`gekkouga_build.py` `tune`, `FSMASH_EXTRA` 30): a second water sword (0x3300007, size 5) at Y -30
+  on the hand (the blade 55 -> 85, its width the same), the tip flame and the Sword_Glow end at -85, hitbox ID 3 (ID
+  0's size 87.5 / 17.5) at Y -62.5: reach 80 from the hand. The user's screenshot (`$S/gk_in/clone_fx/fsmash_reach.png`,
+  the old blade as the ruler: 3.1 px a unit): DK at 72 - 82. The clones' copies follow (their scripts are his).
+  Preview `$S/gk_preview/fsmash_reach_tuning.png`.
+- **Trails:**
+  - `weapons/firetrail.c`: forward 12 flames 8 - 85; up 8 (4 - 22 each side); down 16 (6 - 55 each side); sizes 0.85 -
+    1.15 (`tr_fx_size(k)`).
+  - `TR_BOXES`: forward 7, up 6, down 8 boxes covering every flame.
+  - `gekkouga_fx.py` `TRAIL_FULL`: PtcGekkougaFireTrail two layers (fire_ground_10 x1.9 wide; fire_small_5 0.7 tall,
+    mirrored, rate 0.8).
+  - Preview `$S/gk_preview/tuning_trails.png` (continuous bands).
+- **Neutral air:**
+  - the "shield break" was his own script's second hit's `SET_FLOAT(89, LASTHIT_STATUS 0x0F0000B2)` (status 0x59): removed
+    (`remove_cmds` keeps the True block's offset right);
+  - hitboxes x1.25 (7.5 / 10 -> 9.375 / 12.5);
+  - burst 0x330000B and ring 0x330001D / 1E 1.45 -> 1.8125;
+  - preview `$S/gk_preview/nair_tuning.png`.
+- **Forward tilt:** his attacks3's `SET_FLOAT(12, 0x0F00000C)` at its hit ("put the opponent 12 in front of self",
+  docs/position-variables.md, from the user's own data): removed.
+- **READY gauge** (exe feature `gready`): mode 1 at 100 reads READY:
+  - `READY_COLOURS` (gold, alpha 70 -> 98 %, lit up to white-hot), 8 steps up and down, 4 frames each (a 64-frame
+    pulse), per slot (`gk_pulse`);
+  - the rings stepped `READY_SPIN` 3 times a frame;
+  - charging / ability / burnout as before;
+  - preview `$S/gk_preview/round_gauge_ready.gif` (the pulse; the rings' spin isn't in it).
+- **Clones at ledge** (`gk_ledge_mode`): his ledge statuses 0x72 - 0x7A:
+  - formation -> split (`gk_ledge_split`: their own place, standing / falling, slot 63); his ledge no longer zeroes
+    their inputs (`gk_free_frame`);
+  - when he leaves the ledge -> the regroup (eased) -> formation;
+  - a kick from it drops slot 63.
+- **Skeleton bottom** (exe feature `skbot`): `sk_verts` 5 (the box closed: v3 -> v4 its bottom, right to left at y 2, a
+  ceiling, normal (0, -1)); skeleton.lvd 5 vertices / 4 lines, not drop-through (flag 4 0); the exe moves all 5; diag
+  S4SB (vertex 4). The exe and the .lvd go together.
+- **Smash star** (`SMASH_STAR` 0x100000F): kept at its size in `scale_smash` (was x5); the release effects and swords
+  still x5. The charge dust / sparkle were 1 already (his MSC and the clones' `cl_sm_fx`).
+- **Tests:**
+  - `tuning_tests` (each change; the trails' flames inside their boxes; the ledge: walk / jab while he hangs, the regroup
+    after);
+  - the cave test's READY pulse / spin / colours and S4SB;
+  - `gekkouga_fx_test` (the trail's layers);
+  - the earlier checks moved to the new values.
+- Not confirmed in game.

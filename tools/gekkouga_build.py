@@ -257,6 +257,11 @@ def spans(cmds):
     return inside
 
 
+SMASH_STAR = 0x100000F           # tuning v1 (the user: "please make the smash attack charging star effect normal sized"):
+                                  # the smashes' charge-start star flash (their frame 4 / 6) stays at its size (v3 - clone
+                                  # moves v1: x EFFECT_GROW, a screen-wide burst); the release effects and the sword grow
+
+
 def scale_smash(game, effect):
     """his smash scripts: hitbox sizes x GROW (game), effect sizes x EFFECT_GROW (effect; a trail's two points too:
     its length); v3: the hold scripts' effects at size 0 (his MSC draws them by the charge)"""
@@ -268,7 +273,8 @@ def scale_smash(game, effect):
                 continue
             for c in s:
                 syn = c.info['syntax']
-                if 'Size' in syn and (c.name in HITBOXES or f is effect):
+                if 'Size' in syn and (c.name in HITBOXES or f is effect) and not \
+                        (f is effect and int(c.params[0]) == SMASH_STAR):
                     k = syn.index('Size')
                     c.params[k] = round(float(c.params[k]) * (GROW if f is game else EFFECT_GROW), 4)
                     n += 1
@@ -1159,8 +1165,9 @@ def skeleton_lvd(hydrant_lvd):
     c = lv.collisions[0]
     c.name, c.subname = 'COL_Skeleton', 'Skeleton'
     c.verts = [list(map(float, v)) for v in C.sk_verts(C.RELEASE)]   # (skeleton v1.5: its body's box)
-    c.normals = [[-1.0, 0.0], [0.0, 1.0], [1.0, 0.0]]          # left wall, top (a floor), right wall: out of the solid
-    c.mats = [bytearray(c.mats[0]) for _ in range(3)]
+    c.normals = [[-1.0, 0.0], [0.0, 1.0], [1.0, 0.0], [0.0, -1.0]][:len(c.verts) - 1]   # left wall, top (a floor), right
+    c.mats = [bytearray(c.mats[0]) for _ in range(len(c.verts) - 1)]   # wall, tuning v1 (skbot): its bottom (a ceiling,
+    # right to left, 2 over its feet: the walls' foot): out of the solid. The collision isn't drop-through (flag 4 0)
     c.cliffs = []
     return lv.write()
 

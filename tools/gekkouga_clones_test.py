@@ -377,7 +377,10 @@ def msc_tests(mscsb, src):
     g.lr = 1.0
     m.vm.g[4] = 0x74
     m('gekkouga_frame')
-    check('on a ledge (0x74, CliffWait): the clones play Wait1 / Fall', g.vars.get(0x0F00031C) // 1024, 0.0)
+    check('on a ledge (0x74, CliffWait): tuning v1: the clones act (split: free mode, flags 128; tuning_tests); back in '
+          'formation after his ledge (the regroup)', int(g.vars.get(0x0F00031F)) - 4747000 & 0x80, 0x80)
+    frames(m, 1)
+    frames(m, 80)
     g.situation = 2
     m.vm.g[4] = 0x46
     m('gekkouga_frame')
@@ -1564,6 +1567,107 @@ def clone_moves_tests(mscsb, src, cl_mscsb, out):
         got[n] = (int(fr2), val(t, 'Damage'), val(t, 'Angle'), val(t, 'KBG'), val(t, 'FKB'), val(t, 'BKB'))
     check('throws: at his release frame (Throw_Applier) a hitbox with his throw\'s values (Throw_Specifier kind 0: damage, '
           'angle, KBG, WBKB as FKB, BKB), the hold before it', got, want)
+
+
+def tuning_tests(mscsb, src, out, user, tr_mscsb):
+    """tuning v1 (README "Tuning v1"): forward tilt's teleport gone, neutral air's shield break gone and x1.25, forward
+    smash 30 longer (its width the same), the charge-start star at its size, denser trails covered by their hitboxes,
+    the clones acting while he hangs on a ledge"""
+    import acmd
+    B = os.path.join(out, 'fighter', 'gekkouga', 'script', 'animcmd')
+    g = acmd.ACMDFile.load(os.path.join(B, 'body', 'game.bin'))
+    e = acmd.ACMDFile.load(os.path.join(B, 'body', 'effect.bin'))
+    ug = acmd.ACMDFile.load(os.path.join(user, 'body', 'game.bin'))
+    ue = acmd.ACMDFile.load(os.path.join(user, 'body', 'effect.bin'))
+    cg = acmd.ACMDFile.load(os.path.join(B, 'weapon', 'clone', 'game.bin'))
+    ce = acmd.ACMDFile.load(os.path.join(B, 'weapon', 'clone', 'effect.bin'))
+    v = lambda c, n: c.params[c.info['syntax'].index(n)]
+    sf = lambda f, n, var: [c for c in f.scripts[acmd.crc(n)] if c.name == 'SET_FLOAT' and int(c.params[1]) == var]
+    check('tuning: forward tilt\'s teleport (his attacks3\'s SET_FLOAT 12 to 0x0F00000C: "put the opponent 12 in front of '
+          'self") gone; the rest of the script his', (len(sf(ug, 'attacks3', 0x0F00000C)), len(sf(g, 'attacks3', 0x0F00000C)),
+                                                   len(g.scripts[acmd.crc('attacks3')]) + 1 == len(ug.scripts[acmd.crc('attacks3')])),
+          (1, 0, True))
+    un = ug.scripts[acmd.crc('attackairn')]
+    gn = g.scripts[acmd.crc('attackairn')]
+    tr = next(c for c in gn if c.name == 'True')
+    inner = gn[gn.index(tr) + 1:]
+    w = 0
+    for c in inner:
+        if w >= int(tr.params[0]) - 2:
+            break
+        w += 1 + len(c.params)
+    check('tuning: neutral air\'s shield break (its second hit\'s SET_FLOAT 89 to LASTHIT_STATUS 0x0F0000B2) gone (its '
+          'True block one command shorter, its second hit kept); its hitboxes x1.25',
+          (len(sf(ug, 'attackairn', 0x0F0000B2)), len(sf(g, 'attackairn', 0x0F0000B2)), w == int(tr.params[0]) - 2,
+           [v(c, 'Size') for c in gn if c.name in GB.HITBOXES]),
+          (1, 0, True, [round(v(c, 'Size') * 1.25, 4) for c in un if c.name in GB.HITBOXES]))
+    check('... its water burst (0x330000B) and fire ring (0x330001D / 1E) x1.25 (1.45 -> 1.8125)',
+          [round(v(c, 'Size'), 4) for c in e.scripts[acmd.crc('attackairn')] if 'Size' in c.info['syntax']], [1.8125, 1.8125])
+    hb = {int(v(c, 'ID')): (v(c, 'Y'), v(c, 'Size')) for c in g.scripts[acmd.crc('attacks4')] if c.name in GB.HITBOXES}
+    sw = [round(v(c, 'Y'), 3) for c in e.scripts[acmd.crc('attacks4')] if c.name == 'External_Graphic' and c.params[0] == GB.SWORD]
+    tip = [v(c, 'Y') for c in e.scripts[acmd.crc('attacks4')] if c.name == 'External_Graphic' and c.params[0] == GB.FIRE_TIP]
+    glow = [v(c, 'Y2') for c in e.scripts[acmd.crc('attacks4')] if c.name == 'Sword_Glow']
+    check('tuning: forward smash 30 longer, not bigger: a second water sword (the same size 5) from 30 along the blade, its '
+          'trail and tip flame at 85 (was 55), a hitbox ID 3 at 62.5 (ID 0\'s size): it reaches 80 from his hand (DK in the '
+          'user\'s screenshot: ~72 - 82)', (sw, tip, glow, hb[3], hb[3][1] == hb[0][1], round(-hb[3][0] + hb[3][1], 1)),
+          ([0.0, -30.0], [-85.0], [-85.0], (-62.5, hb[0][1]), True, 80.0))
+    csw = [c for c in ce.scripts[acmd.crc('attacks4')] if c.name == 'External_Graphic' and c.params[0] == GB.SWORD]
+    chb = [c for c in cg.scripts[acmd.crc('attacks4')] if c.name in GB.HITBOXES]
+    check('... the clones\' copies the same (2 swords, 4 hitboxes)', (len(csw), len(chb)), (2, 4))
+    star = {n: [round(v(c, 'Size'), 3) for c in e.scripts[acmd.crc(n)] if 'Size' in c.info['syntax'] and c.params[0] == GB.SMASH_STAR]
+            for n in GB.SMASH_SCRIPTS if acmd.crc(n) in e.scripts}
+    rel = [round(v(c, 'Size'), 3) for c in e.scripts[acmd.crc('attacks4')] if c.name == 'Graphic_Effect3']
+    check('tuning: the smashes\' charge-start star (0x100000F) at its own size 1 (was x5), his and the clones\'; the '
+          'release effects still x5 (forward smash\'s 0.9 -> 4.5)',
+          (star, [round(v(c, 'Size'), 3) for n in ('attacks4', 'attackhi4', 'attacklw4') for c in ce.scripts[acmd.crc(n)]
+                  if 'Size' in c.info['syntax'] and c.params[0] == GB.SMASH_STAR], rel),
+          ({'attacks4': [1.0], 'attackhi4': [1.0], 'attacklw4': [1.0]}, [1.0, 1.0, 1.0], [4.5]))
+    # ---- the trails (firetrail.mscsb) and their hitboxes
+    t = MSC(tr_mscsb, GB.TRAIL_MSC)
+    fl = {}
+    for ty in (1, 2, 3):
+        t.setg('tr_type', ty)
+        n = t('tr_fx_count')
+        fl[ty] = [(round(fv(t('tr_fx_dz', k)), 2), round(fv(t('tr_fx_size', k)), 2)) for k in range(n)]
+    check('tuning: denser trails: forward 12 flames 8 - 85 (7 apart), up 8 (4 - 22 each side, 6 apart), down 16 (6 - 55 '
+          'each side, 7 apart), sizes 0.85 - 1.15',
+          ({k: (len(x), min(z for z, _ in x), max(z for z, _ in x)) for k, x in fl.items()},
+           sorted({sz for x in fl.values() for _, sz in x})),
+          ({1: (12, 8.0, 85.0), 2: (8, -22.0, 22.0), 3: (16, -55.0, 55.0)}, [0.85, 0.95, 1.05, 1.15]))
+    unc = []
+    for ty, nm in ((1, 'FireTrailS4'), (2, 'FireTrailHi4'), (3, 'FireTrailLw4')):
+        for z, _sz in fl[ty]:
+            if not any(abs(z - bz) <= bs for bz, _by, bs in GB.TR_BOXES[nm]):
+                unc.append((nm, z))
+    check('... every flame inside one of its trail\'s hitboxes (forward 7, up 6, down 8 boxes)',
+          (unc, [len(GB.TR_BOXES[n]) for n in GB.TR_SCRIPTS]), ([], [7, 6, 8]))
+    # ---- the ledge: they act
+    m = fresh(mscsb, src)
+    g_ = m.game
+    g_.x, g_.y = 0.0, 10.0
+    m.setg('gk_lw_charge', 300)
+    m('gk_lw_press')
+    frames(m, 14)
+    lx0 = m.gf('gk_lx')
+    ak_frame(m, g_, st=0x73)
+    mode1 = (int(g_.vars.get(0x0F000388)), int(g_.vars.get(0x0F0003BF, 0)))
+    for _ in range(5):
+        ak_frame(m, g_, st=0x74, stick=(-0.5, 0.0))
+    walked = round(m.gf('gk_lx') - lx0, 3)
+    ak_frame(m, g_, st=0x74, cmd=0x1)
+    jab = ak_cmd(g_, 1)[0]
+    for _ in range(30):
+        ak_frame(m, g_, st=0x74)
+    ak_frame(m, g_, st=0x75)
+    ak_frame(m, g_, st=0)
+    mode2 = int(g_.vars.get(0x0F000388))
+    for _ in range(80):
+        ak_frame(m, g_, st=0)
+    check('tuning: he hangs on a ledge (0x73 CliffCatch): the clones in formation go split (mode 2, slot 63 1); his stick '
+          '(half left) walks them (WalkMiddle: -0.953 a frame, 5 frames), his attack press a jab (0x50); he gets up: they '
+          'regroup (mode 3), then formation at -14 / +14',
+          (mode1, walked, jab, mode2, int(g_.vars.get(0x0F000388)), (m.gf('gk_lx'), m.gf('gk_rx'))),
+          ((2, 1), round(-0.953 * 5, 3), 0x50, 3, 0, (-14.0, 14.0)))
 
 
 def invuln_tests(mscsb, src, out, vanilla_vl):
@@ -3102,7 +3206,13 @@ def skeleton_data_tests(out):
     check('skeleton.lvd: one collision, the 4 vertices the executable moves (v1.5: x +- 3.5, y 2 / 24: its body), a wall each side and a '
           'floor on top (normals out), the hydrant\'s flags',
           (len(lv.collisions), [tuple(round(x, 2) for x in v) for v in c.verts], [tuple(n) for n in c.normals], c.flags),
-          (1, [tuple(v) for v in C.sk_verts(C.RELEASE)], [(-1.0, 0.0), (0.0, 1.0), (1.0, 0.0)], [0, 1, 0, 0]))
+          (1, [tuple(v) for v in C.sk_verts(C.RELEASE)], [(-1.0, 0.0), (0.0, 1.0), (1.0, 0.0), (0.0, -1.0)][:len(c.verts) - 1],
+           [0, 1, 0, 0]))
+    check('tuning v1 (the user: "make it so skeletons have solid collision from the bottom"): the box closed: 5 vertices, '
+          'the last line its bottom (3.5 -> -3.5 at y 2: a ceiling, normal down: solid from below); not drop-through (flag 4 '
+          '0: the top a solid floor); the executable moves all 5 (sk_verts with skbot)',
+          ([tuple(v) for v in c.verts[3:]], tuple(c.normals[-1]), c.flags[3], len(C.sk_verts(C.RELEASE))),
+          ([(3.5, 2.0), (-3.5, 2.0)], (0.0, -1.0), 0, 5))
     check('skeleton: its main.pac and carrier model files are present (Pac-Man\'s hydrant\'s)',
           [f for f in GB.SK_CARRIER if not os.path.exists(os.path.join(fg, 'model', 'skeleton', 'c00', f))] +
           [f for f in ('main.pac',) if not os.path.exists(os.path.join(fg, 'motion', 'skeleton', f))], [])
@@ -3207,19 +3317,21 @@ def firetrail_tests(mscsb, src):
     run(m, 1)
     check('trail start (forward smash at (40, 10), way -1): facing -1 (its model turned: PostureModule 0, 2), there, its '
           'effects unhooked from its hidden model (0x26 (0), 0x1C (1)), motion 0 held (rate 0: its hitboxes), the first flame '
-          '10 ahead (fire trail fix v1: on joint 0\'s local Z, forward in its turned frame: X 0, Y 0, Z 10)',
+          '8 ahead (fire trail fix v1: on joint 0\'s local Z, forward in its turned frame: X 0, Y 0, Z 8; tuning v1: 8, '
+          'size 0.85)',
           ([x for x in g.log if x[0] in ('lr', 'motion')], g.posture_sets[:1], [x for x in g.log if x[0] == 'fx'],
            [x for x in g.log if x[0] == 'visible' and x[1] != 0]),
           ([('lr', -1.0), ('motion', 0, 0.0, 0.0)], [(40.0, 10.0)],
-           [('fx', 0x26, 0), ('fx', 0x1C, 1), ('fx', 0x2717, 0x330001C, 0, 0.0, 0.0, 10.0)], []))
+           [('fx', 0x26, 0), ('fx', 0x1C, 1), ('fx', 0x2717, 0x330001C, 0, 0.0, 0.0, 8.0)], []))
     g.log = []
     run(m, 5)
-    check('trail: a flame a frame along its way (local Z 18 ... 42, X / Y 0: on the ground ahead), five in all',
-          [x[4:7] for x in g.log if x[0] == 'fx'], [(0.0, 0.0, 18.0), (0.0, 0.0, 26.0), (0.0, 0.0, 34.0), (0.0, 0.0, 42.0)])
+    check('trail: a flame a frame along its way (local Z 15 ... 43, X / Y 0: on the ground ahead; tuning v1: 7 apart)',
+          [x[4:7] for x in g.log if x[0] == 'fx'], [(0.0, 0.0, 8.0 + 7.0 * k) for k in range(1, 6)])
     g.log = []
     run(m, 158)
-    check('trail: frames 7 - 164: nothing more; it stays put', ([x for x in g.log if x[0] in ('fx', 'remove')], g.posture_sets[-1]),
-          ([], (40.0, 10.0)))
+    check('trail: frames 7 - 164: its last 6 flames (50 ... 85: tuning v1, 12 in all), then nothing; it stays put',
+          ([x[6] for x in g.log if x[0] == 'fx'], [x for x in g.log if x[0] == 'remove'], g.posture_sets[-1]),
+          ([8.0 + 7.0 * k for k in range(6, 12)], [], (40.0, 10.0)))
     g.log = []
     run(m, 1)
     check('trail: frame 165: its fire fades (0x2723 (id, 0, 0): its set\'s 15-frame fade)', [x for x in g.log if x[0] == 'fx'],
@@ -3231,12 +3343,12 @@ def firetrail_tests(mscsb, src):
     check('trail: frame 180 (3 s): its fire ended, removed', [x for x in g.log if x[0] in ('fx', 'remove')],
           [('fx', 0x2723, 0x330001C, 1, 1), ('remove',)])
     for typ, way, want in [(t, w, ws) for t, ws in (
-            (1, [10.0, 18.0, 26.0, 34.0, 42.0]),
-            (2, [6.0, -6.0, 14.0, -14.0]),
-            (3, [10.0, -10.0, 19.0, -19.0, 28.0, -28.0, 37.0, -37.0])) for w in (1.0, -1.0)]:
+            (1, [8.0 + 7.0 * k for k in range(12)]),                 # (tuning v1: denser)
+            (2, [(4.0 + 6.0 * (k // 2)) * (1 - 2 * (k % 2)) for k in range(8)]),
+            (3, [(6.0 + 7.0 * (k // 2)) * (1 - 2 * (k % 2)) for k in range(16)])) for w in (1.0, -1.0)]:
         m, g = make()
         g.vars.update({0x0F000300: 3.0, 0x0F000301: float(typ), 0x0F000302: 0.0, 0x0F000303: 0.0, 0x0F000304: way})
-        run(m, 12)
+        run(m, 20)
         check('fire trail fix v1: %s smash facing %s: motion %d, its flames on the ground (Y 0) along its way (local Z: '
               'X 0, never into the screen) %s; its model turned by its way (the same Z either way)' % (
                   ('forward', 'up', 'down')[typ - 1], 'right' if way > 0 else 'left', typ - 1,
@@ -3311,10 +3423,11 @@ def script_tests(out, user):
               'two side flames gone' % (GB.FIRE_RING, GB.FIRE_RING_L),
               (ring, [c.name for c in pe.script('AttackAirN') if c.params and isinstance(c.params[0], int) and
                       int(c.params[0]) in (GB.FIRE_RING, GB.FIRE_TIP)]),
-              ([(GB.FIRE_RING, GB.FIRE_RING_L, 0, 8.5, 0.0, 1.45)], ['EFFECT_FOLLOW_FLIP']))
+              ([(GB.FIRE_RING, GB.FIRE_RING_L, 0, 8.5, 0.0, round(1.45 * getattr(GB, 'NAIR_SCALE', 1.0), 2))],
+               ['EFFECT_FOLLOW_FLIP']))       # (tuning v1: x1.25)
         check('burn v2: a flame (0x%X) at each water sword\'s tip (its hand joint, Y -11 x its size: -55 in the smashes), '
               'ended with the sword' % GB.FIRE_TIP, tips,
-              [('AttackS4', [(25, -55.0, 0.0, 2.0)], 1), ('AttackHi4', [(25, -55.0, 0.0, 2.0), (24, -55.0, 0.0, 2.0)], 1),
+              [('AttackS4', [(25, -55.0 - getattr(GB, 'FSMASH_EXTRA', 0.0), 0.0, 2.0)], 1), ('AttackHi4', [(25, -55.0, 0.0, 2.0), (24, -55.0, 0.0, 2.0)], 1),
                ('AttackLw4', [(25, -55.0, 0.0, 2.0), (24, -55.0, 0.0, 2.0)], 1), ('AttackAirF', [], 0),
                ('AttackAirN', [], 0)])
         blade = [(int(c.params[1]), round(float(c.params[2]), 2), round(float(c.params[3]), 2), round(float(c.params[8]), 2))
@@ -3332,7 +3445,10 @@ def script_tests(out, user):
     bad, n, got = [], 0, {}
     for f0, f1, kind in ((ug, pg, 'game'), (ue, pe, 'effect')):
         check('%s.bin: the same scripts' % kind, sorted(f0.scripts), sorted(f1.scripts))
+        tuned = {zlib.crc32(x.encode()) for x in ('attacks3', 'attackairn', 'attacks4')} if hasattr(GB, 'tune') else set()
         for crc in f0.scripts:
+            if crc in tuned:
+                continue                  # (tuning v1: tuning_tests)
             a, b = f0.scripts[crc], f1.scripts[crc]
             for c0, c1 in zip(a, b):
                 if c0.ident != c1.ident:
@@ -3346,6 +3462,9 @@ def script_tests(out, user):
                     elif (crc in smash and kind == 'game' and c0.name in GB.HITBOXES and nm in ('X', 'Y', 'Z', 'X2', 'Y2', 'Z2')
                           and int(c0.params[c0.info['syntax'].index('Bone')]) in GB.SWORD_BONES):
                         k = 5.0
+                    elif crc in smash and kind == 'effect' and nm == 'Size' and \
+                            int(c0.params[0]) == getattr(GB, 'SMASH_STAR', -1):
+                        k = 1.0               # (tuning v1: the charge-start star at its size)
                     elif crc in smash and kind == 'effect' and (nm == 'Size' or (c0.name == 'Sword_Glow' and nm in
                                                                                  ('X1', 'Y1', 'Z1', 'X2', 'Y2', 'Z2'))):
                         k = 5.0
@@ -3412,7 +3531,8 @@ def script_tests(out, user):
           'joint 25, ThrowN by model.jtb, on the clone\'s %s, 0x7D0 + %d; v1.5: the right hand, confirmed in game)' % (
               GB.CLONE_JOINT_FIX.get(25), lh),
           sorted({(int(c.params[c.info['syntax'].index('Bone2')]), round(float(c.params[c.info['syntax'].index('Y2')]), 2))
-                  for c in sw}), sorted({(0x7D0 + lh, -55.0), (0x7D0 + 24, -55.0)}))
+                  for c in sw}), sorted({(0x7D0 + lh, -55.0), (0x7D0 + 24, -55.0)} |
+                                        ({(0x7D0 + lh, -55.0 - GB.FSMASH_EXTRA)} if hasattr(GB, 'FSMASH_EXTRA') else set())))
     j25 = sorted({(n, c.name, int(c.params[c.info['syntax'].index('Bone')])) for n in ('attackairf', 'attackhi4', 'specialnhold')
                   for c in ce.scripts.get(zlib.crc32(n.encode()), []) if 'Bone' in c.info['syntax'] and
                   c.name in ('External_Graphic', 'Graphic_Effect2')})
@@ -3544,6 +3664,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (37, 38):   # round gauge v1: the damage panel's files; clone fix v3: his MSC
         want_top = ['INSTALL_TO_data', 'README.txt']
+    if len(earlier) == 42:   # tuning v1: the exes (the gauge's ready state, the skeleton's bottom) and data
+        want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 41:   # clone moves v1: data only
         want_top = ['INSTALL_TO_data', 'README.txt']
     if len(earlier) == 40:   # round gauge v1.1: the panel file and the exes
@@ -3594,7 +3716,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want and
                      n not in again and not (len(earlier) in (37, 40) and n.startswith('INSTALL_TO_data/ui/info/dmg/')) and
                      not (len(earlier) == 40 and n == 'INSTALL_TO_data/param/fighter/fighter_param_vl_gekkouga.bin')), [])
-        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41):
+        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -3663,6 +3785,17 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               ['ui/info/dmg/dmg.flx', 'ui/info/dmg/img-00135.nut', 'ui/info/dmg/texlist.lst'])
         if GAUGE_SRC and GAUGE_JPG:
             gauge_tests(z)
+    if z1 and len(earlier) == 42:
+        check('tuning v1: INSTALL_TO_data: his scripts (game / effect: forward smash, neutral air, forward tilt, the star), '
+              'the clone\'s copies, his MSC (the ledge), the fire trail\'s hitboxes and MSC, his effect bank (the trails\' '
+              'flames), the skeleton\'s collision (its bottom); INSTALL_TO_code exe_v46z_gkb13; TEST_ONLY A_release',
+              (sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+               sorted({n.split('/')[1] for n in names if n.startswith('TEST_ONLY_INSTALL_TO_code/') and n.count('/') > 1})),
+              (sorted('fighter/gekkouga/' + x for x in (
+                  'effect/gekkouga/gekkouga.010d0000.ptcl', 'model/skeleton/c00/skeleton.lvd', 'script/animcmd/body/effect.bin',
+                  'script/animcmd/body/game.bin', 'script/animcmd/weapon/clone/effect.bin', 'script/animcmd/weapon/clone/game.bin',
+                  'script/animcmd/weapon/firetrail/game.bin', 'script/msc/firetrail/firetrail.mscsb',
+                  'script/msc/gekkouga.mscsb')), ['A_release']))
     if z1 and len(earlier) == 41:
         check('clone moves v1: INSTALL_TO_data: his MSC (the mirroring, the shield\'s block), the clone\'s MSC (dodges, the '
               'shield\'s re-arm, the charge orb, the run\'s dust) and game scripts (grab / pummel / throws); the exe is '
@@ -3935,7 +4068,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                                                                len(earlier) == 21, len(earlier) in (22, 23, 24, 25),
                                                                len(earlier) in (26, 27, 28, 29), len(earlier) == 30,
                                                                len(earlier) in (31, 32), len(earlier) == 33,
-                                                               len(earlier) in (34, 35), len(earlier) in (36, 37, 38, 39))):
+                                                               len(earlier) in (34, 35), len(earlier) in (36, 37, 38, 39),
+                                                               len(earlier) in (40, 41))):
             if not b:
                 continue
             p = os.path.join(td, '%d.rpx' % i)
@@ -3974,7 +4108,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 42)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 43)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -4025,6 +4159,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'preview', 'invulnerab', 'intangible', '8 - 19', 'fighter_param_vl_gekkouga', 'unconfirmed') if len(earlier) == 40 else \
         ('greninja_round_gauge_v1_1', 'shield', 'dodge', 'grab', 'pummel', 'throw', 'neutral special', 'side special',
          'up special', 'down special', 'ledge', 'dust', 'water shuriken', 'Hitbox_Hold', 'unconfirmed') if len(earlier) == 41 else \
+        ('greninja_clone_moves_v1', 'exe_v46z_gkb13', 'forward smash', 'Donkey Kong', 'fire trail', 'neutral air', 'shield break',
+         '25%', 'forward tilt', 'teleport', 'READY', 'ledge', 'skeleton', 'bottom', 'star', 'S4SB', 'unconfirmed') if len(earlier) == 42 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -4037,7 +4173,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
 
 
 def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False, gkb5=False, gkb6=False,
-                gkb7=False, gkb8=False, gkb9=False, gkb10=False, gkb11=False):
+                gkb7=False, gkb8=False, gkb9=False, gkb10=False, gkb11=False, gkb12=False):
     """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
     release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
@@ -4059,6 +4195,8 @@ def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=
         drop |= {'cart'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 else set()   # (clone articles v1's gkb11)
         drop |= {'gauge2'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 or gkb11 else set()   # (round
         # gauge v1.1's gkb12)
+        drop |= {'gready', 'skbot'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 or gkb11 or gkb12 \
+            else set()   # (tuning v1's gkb13)
         variants = C.VARIANTS if not (sk12 or b2 or gkb5 or gkb6 or gkb7) else \
             C.VARIANTS + (('G_pose', (C.RELEASE - {'sway'}) | {'pose'}),)       # (up to v1.5: + G_pose)
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE - drop)] + \
@@ -4094,7 +4232,8 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
                                                 len(earlier) >= 19, len(earlier) in (19, 20), len(earlier) == 21,
                                                 len(earlier) in (22, 23, 24, 25), len(earlier) in (26, 27, 28, 29),
                                                 len(earlier) == 30, len(earlier) in (31, 32), len(earlier) == 33,
-                                                len(earlier) in (34, 35), len(earlier) in (36, 37, 38, 39)):
+                                                len(earlier) in (34, 35), len(earlier) in (36, 37, 38, 39),
+                                                len(earlier) in (40, 41)):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
@@ -4122,7 +4261,7 @@ def main():
     GAUGE_VL = next((x[5:] for x in sys.argv[1:] if x.startswith('--vl=')), None)
     a = [x for x in sys.argv[1:] if not x.startswith('--v') and not x.startswith('--fx=') and not x.startswith('--gauge-')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff', 'rg11') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff', 'rg11', 'cm') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -4148,6 +4287,9 @@ def main():
         trail_data_tests(out)
     script_tests(out, user)
     msc_ops_tests(out)
+    if len(earlier) >= 42:
+        tuning_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'), out, user,
+                     os.path.join(msc, 'firetrail', 'firetrail.mscsb'))
     if len(earlier) >= 41:
         clone_moves_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'),
                           os.path.join(msc, 'clone', 'clone.mscsb'), out)
