@@ -38,7 +38,7 @@ sys.path.insert(0, HERE)
 import gekkouga_clone_cave as C  # noqa: E402
 import kind_expand as K  # noqa: E402
 import weapon_expand as W  # noqa: E402
-from kind_expand_test import Emu, REGS  # noqa: E402
+from kind_expand_test import Emu, REGS, decode  # noqa: E402
 from unicorn.ppc_const import UC_PPC_REG_1, UC_PPC_REG_MSR, UC_PPC_REG_FPR1, UC_PPC_REG_FPR2, UC_PPC_REG_LR  # noqa: E402
 
 fails = 0
@@ -3403,7 +3403,20 @@ def ice_checks(e, info, diag):
         return (e.vars.get(SP), e.vars.get(SS), e.w(A['ice_st'] + C.ICE_ST * 4 + 0x1C))
     check('ice: the victim hit handler (0x%08X, lwz r3, 0x20(r27)) -> b ice_hit' % C.ICE_HOOK,
           K.branch_target(C.ICE_HOOK, e.w(C.ICE_HOOK)), lab['ice_hit'])
-    fl = C.ice_flash(N)
+    fl = C.ice_flash(N, C.ice_yellow(F))
+    if 'ice4' in F:
+        old = C.ice_flash(N)
+        check('ice4 (beetle safety / radar v2): the flash\'s yellow %s = ice detonation v1 - UI v1\'s %s at 80 %% (RGB %s -> %s), '
+              'black / alpha / the frames it shows unchanged' % (C.ICE_YELLOW4, C.ICE_YELLOW,
+                                                                  tuple(int(round(255 * x)) for x in C.ICE_YELLOW),
+                                                                  tuple(int(round(255 * x)) for x in C.ICE_YELLOW4)),
+              (tuple(round(0.8 * x, 4) for x in C.ICE_YELLOW) == tuple(round(x, 4) for x in C.ICE_YELLOW4),
+               [i for i, (a_, b_) in enumerate(zip(fl, old)) if (a_[0] > 0.5) != (b_[0] > 0.5) or a_[3] != b_[3]],
+               [c[:3] for c in fl if c[0] < 0.5] == [c[:3] for c in old if c[0] < 0.5],
+               sorted({c[:3] for c in fl if c[0] > 0.5})), (True, [], True, [C.ICE_YELLOW4]))
+    else:
+        check('without ice4: the flash\'s yellow ice detonation v1\'s %s' % (C.ICE_YELLOW,),
+              sorted({c[:3] for c in fl if c[0] > 0.5}), [C.ICE_YELLOW])
     check('ice: the flash table: %d frames, yellow / black in turn, 3 frames each to %d then 2, fading in over frames 1 - 2'
           % (N, 90 if snd else 30), (len(fl), [round(c[3], 2) for c in fl[:3]],
                                      ''.join('Y' if c[0] > 0.5 else 'K' for c in fl)),
@@ -3987,6 +4000,74 @@ def col_on_checks(patched):
           '%08X' % e.w(g + 0x68), '12345678')
 
 
+def bs_checks(patched):
+    """beetle safety v1 (fighters/gekkouga/README.md "Beetle safety / radar v2"): the blast zone the Parabeetle's MSC reads
+    (StageData(2), sys 0x2C) is the one the game KOs fighters (and removes weapons) with, run here on the game's own code:
+    the StageData syscall (0x030B4F58 -> 0x030B314C) op 0 - 3 = 0x02C40D38(GroundModule)'s rect +0 / +4 / +8 / +0xC; 0x02C40D38
+    = the camera manager's (0x02D29634) vt +0x10C (0x02D2AD9C: +0x48C + 16 x i) for i = the stage manager's
+    ([0x102F7020] +0x111C vt +0xA4) map of the object's area (GroundModule vt +0x614: its +0x18 object's +0x244); the dead
+    check 0x02C41068(pos, area) reads the same rect (0 top past +8, 1 bottom, 2 / 3 sides, -1 inside); the fighters' KO
+    check (0x02E1C174) passes its own area, a weapon's removal (0x02B80C5C) its GroundModule's"""
+    from unicorn.ppc_const import UC_PPC_REG_FPR1 as F1, UC_PPC_REG_FPR2 as F2
+    e = Run(patched)
+    dec = lambda a: decode(e.w(a), a)   # noqa: E731
+    check('beetle safety: the MSC syscall table\'s word 0x2C (StageData) -> 0x030B4F58, which calls the dispatcher 0x030B314C',
+          (e.w(0x104187A0 + 4 * 0x2C), dec(0x030B4FBC), dec(0x030B500C)), (0x030B4F58, 'bl 0x30b314c', 'bl 0x30b314c'))
+    check('beetle safety: StageData ops 0 - 3: the accessor\'s GroundModule (+0x2C) -> 0x02C40D38 -> its rect\'s +0 / +4 / +8 '
+          '/ +0xC (left, right, top, bottom)',
+          [(dec(a + 0x18), dec(a + 0x1C), dec(a + 0x20), dec(a + 0x28)) for a in (0x030B32B0, 0x030B3358, 0x030B3400,
+                                                                                  0x030B34A8)],
+          [('lwz %s, 4(r27)' % r, 'lwz r3, 0x2c(%s)' % r, 'bl 0x2c40d38', 'lfs f1, %s(r3)' % o) for r, o in
+           (('r10', '0'), ('r12', '4'), ('r7', '8'), ('r8', '0xc'))])
+    check('beetle safety: the fighters\' KO check passes its own area ([[+0x74A0] +0x18] +0x244) to 0x02C41068 (no status '
+          'test on the way); a weapon\'s removal its GroundModule\'s (vt +0x614)',
+          (dec(0x02E1C16C), dec(0x02E1C174), dec(0x02B80C38), dec(0x02B80C5C)),
+          ('lwz r4, 0x244(r10)', 'bl 0x2c41068', 'lwz r10, 0x614(r6)', 'bl 0x2c41068'))
+    cam = e.alloc(0x800, b'\0')
+    vt = e.alloc(0x200, b'\0')
+    e.setw(cam, vt)
+    e.setw(vt + 0x10C, 0x02D2AD9C)
+    rects = ((-224.0, 224.0, 200.0, -108.0), (-246.0, 246.0, 188.0, -140.0))
+    for i, rc in enumerate(rects):
+        e.mu.mem_write(cam + 0x48C + 16 * i, struct.pack('>4f', *rc))
+    e.stub(0x02D29634, lambda e_: cam)
+    sm, tbl, fnp = e.alloc(0x2000, b'\0'), e.alloc(0x200, b'\0'), e.alloc(8)
+    e.setw(sm + 0x111C, tbl)
+    e.setw(tbl + 0xA4, fnp)
+    e.stub(fnp, lambda e_: e_.r(4))
+    hold = e.alloc(0x10, b'\0')
+    e.setw(hold, sm)
+    e.setw(0x102F7020, hold)
+    gm, gvt, obj = e.alloc(0x100, b'\0'), e.alloc(0x800, b'\0'), e.alloc(0x400, b'\0')
+    e.setw(gm, gvt)
+    e.setw(gvt + 0x614, e.w(0x100ED868 + 0x614))       # the hydrant's GroundModule vtable (its ctor 0x02B387FC)
+    e.setw(gm + 0x18, obj)
+    got = []
+    for area in (0, 1):
+        e.setw(obj + 0x244, area)
+        p = e.call(0x02C40D38, gm)
+        got.append((p - cam, tuple(round(x, 2) for x in struct.unpack('>4f', bytes(e.mu.mem_read(p, 16))))))
+    check('beetle safety: 0x02C40D38 on a weapon\'s GroundModule (the hydrant\'s, the Parabeetle\'s: vt 0x100ED868 +0x614 = '
+          '0x02B38EB0, its +0x18 object\'s +0x244): the camera manager\'s blast zone rect of its area (+0x48C / +0x49C)',
+          (e.w(0x100ED868 + 0x614), got), (0x02B38EB0, [(0x48C, rects[0]), (0x49C, rects[1])]))
+    rw = e.alloc(0x40, b'\0')
+    e.mu.mem_write(rw + 0x35, b'\x01')                 # (not the round world: no Mario Galaxy transform)
+    e.setw(0x102F6C48, rw)
+    for a in range(0x02C40ECC, 0x02C41114, 4):          # (paired-single saves / restores of f30 / f31's second halves)
+        if e.w(a) >> 26 == 4:
+            e.setw(a, 0x60000000)
+    pos = e.alloc(0x10, b'\0')
+    res = []
+    for area, y in ((0, 150.0), (0, 199.9), (0, 200.1), (0, -108.5), (1, 187.9), (1, 188.1)):
+        e.mu.mem_write(pos, struct.pack('>3f', 0.0, y, 0.0))
+        e.mu.reg_write(F1, 0)
+        e.mu.reg_write(F2, 0)
+        r = e.call(0x02C41068, pos, area)
+        res.append(r - (1 << 32) if r >= 0x80000000 else r)
+    check('beetle safety: the dead check 0x02C41068 on that rect: inside -1, past the top line (StageData(2): 200 / 188) 0 '
+          '(the KO up), under the bottom 1', res, [-1, -1, 0, 1, -1, 0])
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     diag = '--diag' in sys.argv
@@ -4033,6 +4114,7 @@ def main():
     hud_checks(e, info)
     plyc_checks(e, info, diag)
     panel_checks(e, info, diag)
+    bs_checks(patched)
     print('%d checks, %d failures' % (checks, fails))
     sys.exit(1 if fails else 0)
 

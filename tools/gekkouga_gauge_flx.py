@@ -60,13 +60,20 @@ RADAR_FACE = 0.48                            # the radar's diameter: this x the 
 RADAR_GAP = 2.0                              # its left edge this far right of the hexagon's right side
 RADAR_UP = 0.43                              # its centre this x the hexagon's height above the hexagon's centre: in the
                                              # notch over the hexagon's upper-right edge, above the percent's top
+RADAR_V2 = 2.0                               # beetle safety / radar v2 (the user: "double the size of the parabeetle
+                                             # radar and move it very slightly upwards"): RADAR_FACE x this across (panel
+                                             # 3: 117.2), about v1's centre (its left edge then over the hexagon's upper-
+                                             # right corner, under the percent digits' top-left) ...
+RADAR_RAISE = 4.0                            # ... raised this far (x the panel's scale: panel 3 4.0, panels 1 / 2 2.9 / 2.3)
 WAVE_FACE = 0.86                             # the waveform's width: this x the hexagon's width (panel 3: 99.8 x 18.7)
 WAVE_GAP = 2.0                               # its top this far under the hexagon's bottom point
 WAVE_ROW = 256                               # the waveform's cells start under the radar's row
 
 
-def ui_places(f):
-    """panel sprite -> {'radar': (x, y, scale), 'wave': (x, y, scale)} from its face_bg_mc (the hexagon)"""
+def ui_places(f, radar=2):
+    """panel sprite -> {'radar': (x, y, scale), 'wave': (x, y, scale)} from its face_bg_mc (the hexagon). radar 1: UI v1's
+    radar (RADAR_FACE of the hexagon's height, its left edge RADAR_GAP right of the hexagon); 2 (beetle safety / radar v2):
+    RADAR_V2 x that size about v1's centre, RADAR_RAISE higher"""
     out = {}
     for panel in (1, 2, 3, 4):
         k = f.frame_key(panel, 0)
@@ -77,6 +84,9 @@ def ui_places(f):
         d = RADAR_FACE * FACE_H * fs
         rx = fx + FACE_W / 2 * fs + RADAR_GAP * fs + d / 2
         ry = fy - RADAR_UP * FACE_H * fs
+        if radar == 2:
+            d *= RADAR_V2
+            ry -= RADAR_RAISE * fs
         ww = WAVE_FACE * FACE_W * fs
         wh = ww * U.WAVE_H / U.WAVE_W
         wy = fy + FACE_H / 2 * fs + WAVE_GAP * fs + wh / 2
@@ -107,8 +117,8 @@ def ui_sheet(ui):
     return sheet, cells_
 
 
-def add_ui(f, tl, ui, preview=False):
-    """the radar and waveform clips (UI_NAMES) on a new texture slot: returns (slot, sheet, info)"""
+def add_ui(f, tl, ui, preview=False, rv=2):
+    """the radar and waveform clips (UI_NAMES) on a new texture slot: returns (slot, sheet, info). rv: ui_places' radar"""
     slot = len(tl.slots)
     tl.slots.append(0)
     sheet, cells_ = ui_sheet(ui)
@@ -119,7 +129,7 @@ def add_ui(f, tl, ui, preview=False):
     radar = f.add_sprite([parts])
     wave = f.add_sprite([[f.image_place('inf_dmg_gk_wave_%02d' % i, U.WAVE_W, U.WAVE_H)] for i in range(U.WAVE_FRAMES)],
                         labels={'w%02d' % i: i for i in range(U.WAVE_FRAMES)})
-    places = ui_places(f)
+    places = ui_places(f, rv)
     col = flx.Color((100 if preview else 0, 100, 100, 100), (0, 0, 0, 0))
     for name, sprite, above in (('radar', radar, 'lv_mc'), ('wave', wave, 'name_col_mc')):
         ds = {depth_of(f, panel, above) for panel in (1, 2, 3, 4)}
@@ -182,9 +192,10 @@ def cells(art):
     return out
 
 
-def build(src, art, out, v11=True, preview=False, ui=None):
+def build(src, art, out, v11=True, preview=False, ui=None, radar=2):
     """v11: round gauge v1.1 (on the emblem, hidden until shown); False: v1. preview: the gauge drawn visible (alpha 100),
-    for flx_render only. ui: UI radar / waveform v1's art (tools/gekkouga_ui_art.py extract): its clips on the next slot"""
+    for flx_render only. ui: UI radar / waveform v1's art (tools/gekkouga_ui_art.py extract): its clips on the next slot.
+    radar: 1 UI v1's radar place / size, 2 beetle safety / radar v2's (ui_places)"""
     f = flx.read(open(os.path.join(src, 'dmg.flx'), 'rb').read())
     tl = flx.Tlst(open(os.path.join(src, 'texlist.lst'), 'rb').read())
     slot = len(tl.slots)
@@ -225,7 +236,7 @@ def build(src, art, out, v11=True, preview=False, ui=None):
             f.insert_place(panel, pl)
     uinfo = None
     if ui:
-        uslot, usheet, uinfo = add_ui(f, tl, ui, preview)
+        uslot, usheet, uinfo = add_ui(f, tl, ui, preview, radar)
     os.makedirs(out, exist_ok=True)
     for fn in os.listdir(src):
         if fn.endswith('.nut'):

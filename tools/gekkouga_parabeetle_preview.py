@@ -21,6 +21,11 @@ rendered from the written files (tools/nud_preview.py: model.nud / .nut / .vbn a
       -> OUT_DIR/parabeetle_wings.gif: the beetle over its whole life (hold, swoop, rise, leaving; ridden from flight
          nobody on it once it flies; ridden is the tests') posed by the motion / frame its MSC plays each frame, every 2nd frame; and parabeetle_wings.png: the
          motion frame against the life frame (v1's held from 80 frames into the rise; v2's never)
+  python3 tools/gekkouga_parabeetle_preview.py --safety FIGHTER_DIR OUT_DIR   (beetle safety v1, README "Beetle safety /
+      radar v2"): its compiled MSC flown on three stages' blast lines (the clones test's bs_ride: test values about the
+      community's numbers; the game's own are read from it): -> OUT_DIR/beetle_safety.png: its line over its life ridden
+      from low / top - 120 / top - 35 (made over the safe line: it comes down), nobody on it (its v2 path) and a rider
+      jumping off at flight frame 150; the blast line (red) and the safe line top - 50 (amber)
 """
 import math
 import os
@@ -218,8 +223,57 @@ def v2(fighter, src, out):
           os.path.join(out, 'parabeetle_wings.png'), len(gif), 'frames')
 
 
+def safety(fighter, out):
+    from PIL import Image, ImageDraw
+    sys.argv = [sys.argv[0]]
+    import gekkouga_clones_test as T
+    import gekkouga_build as GB
+    mscsb = os.path.join(fighter, 'script', 'msc', 'parabeetle', 'parabeetle.mscsb')
+    os.makedirs(out, exist_ok=True)
+    pw, ph, k = 330, 300, 0.75
+    panels = []
+    for name, top, bottom in T.BS_STAGES:
+        im = Image.new('RGB', (pw, ph), (28, 28, 34))
+        d = ImageDraw.Draw(im)
+        y0 = ph - 20
+
+        def Y(v):
+            return y0 - (v - (top - 360.0)) * k
+        d.line([(30, Y(top)), (pw, Y(top))], fill=(230, 70, 70))
+        d.line([(30, Y(top - T.BS_SAFE)), (pw, Y(top - T.BS_SAFE))], fill=(240, 180, 60))
+        runs = [('nobody on it', dict(rider=1, ride_from=10 ** 6), top - 120.0, (120, 120, 130)),
+                ('ridden from low (top - 250)', {}, top - 250.0, (120, 200, 255)),
+                ('made at top - 35, ridden', {}, top - 35.0, (220, 130, 255)),
+                ('rider jumps off at 150', dict(leave_at=150), top - 120.0, (255, 255, 255)),
+                ('ridden from top - 120', {}, top - 120.0, (90, 230, 120))]
+        for lab, kw, start, col in runs:
+            tr, _m = T.bs_ride(mscsb, GB.PARABEETLE_MSC, top, bottom, start, **kw)
+            pts = [(30 + x[0] * 1.2, Y(x[2])) for x in tr]
+            d.line(pts, fill=col, width=3 if 'top - 120' in lab else 2 if 'nobody' not in lab else 1)
+        d.text((34, 4), '%s: blast line %d (red), top - %d (amber)' % (name, top, T.BS_SAFE), fill=(230, 230, 230))
+        panels.append(im)
+    leg = Image.new('RGB', (3 * pw + 8, 36), (28, 28, 34))
+    d = ImageDraw.Draw(leg)
+    x = 6
+    for lab, col in (('nobody on it (v2 path)', (120, 120, 130)), ('ridden from top - 120', (90, 230, 120)),
+                     ('ridden from low', (120, 200, 255)), ('made at top - 35, ridden', (220, 130, 255)),
+                     ('rider jumps off at flight frame 150', (255, 255, 255))):
+        d.rectangle([x, 8, x + 14, 18], fill=col)
+        d.text((x + 18, 7), lab, fill=(230, 230, 230))
+        x += 30 + 6 * len(lab)
+    d.text((6, 22), 'its line (y) over its flight frames 1 - 239 (x); 0.75 px a unit', fill=(200, 200, 200))
+    sh = Image.new('RGB', (3 * pw + 8, ph + 36), (18, 18, 22))
+    for i, im in enumerate(panels):
+        sh.paste(im, (i * (pw + 4), 0))
+    sh.paste(leg, (0, ph))
+    sh.save(os.path.join(out, 'beetle_safety.png'))
+    print(os.path.join(out, 'beetle_safety.png'))
+
+
 if __name__ == '__main__':
-    if sys.argv[1:2] == ['--v2']:
+    if sys.argv[1:2] == ['--safety']:
+        safety(*sys.argv[2:4])
+    elif sys.argv[1:2] == ['--v2']:
         v2(*sys.argv[2:5])
     else:
         main()

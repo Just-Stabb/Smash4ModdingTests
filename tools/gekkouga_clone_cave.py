@@ -105,7 +105,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
                       'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2',
-                      'gready', 'skbot', 'shalf', 'ice', 'ice2', 'bgrav', 'pbeetle', 'ice3', 'ccol', 'gkui'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'gready', 'skbot', 'shalf', 'ice', 'ice2', 'bgrav', 'pbeetle', 'ice3', 'ccol', 'gkui', 'ice4'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -2622,6 +2622,9 @@ ICE_ST = 32                       # bytes a victim: +0 t (0 off, -1 off asked, 1
                                   # stacks, +0xC owner slot, +0x10 way, +0x14 b, +0x18 the Greninja asked (slot 0-7, -1),
                                   # +0x1C (ice2) the Greninja playing its sound (slot 1-8, 0 none)
 ICE_YELLOW = (1.0, 0.85, 0.05)
+ICE_YELLOW4 = (0.8, 0.68, 0.04)   # beetle safety / radar v2 (feature ice4; the user: "make the yellow tint slightly darker on
+                                  # an opponent who is going to be exploded from the ice"): ICE_YELLOW at 80 % (255, 217, 13 ->
+                                  # 204, 173, 10), a deeper gold-yellow; black, alpha and timing unchanged
 ICE_BLACK = (0.02, 0.02, 0.02)
 ICE_ALPHA = 0.8
 
@@ -2631,7 +2634,12 @@ def ice_frames(feats):
     return ICE2_FRAMES if 'ice2' in feats else ICE_FRAMES
 
 
-def ice_flash(frames=ICE_FRAMES):
+def ice_yellow(feats):
+    """the flash's yellow: ICE_YELLOW4 with feature ice4 (beetle safety / radar v2), else ICE_YELLOW"""
+    return ICE_YELLOW4 if 'ice4' in feats else ICE_YELLOW
+
+
+def ice_flash(frames=ICE_FRAMES, yellow=ICE_YELLOW):
     """[(r, g, b, a)] for frames 1 ... frames: yellow / black in turn, 3 frames each to frame 30 (ice2's 156: to 90, the
     same share of it), then 2 each (a quickening flash); frames 1 / 2 at alpha 0.35 / 0.6 (it shifts in quickly)"""
     slow = 30 if frames == ICE_FRAMES else int(round(30.0 * frames / ICE_FRAMES))
@@ -2642,7 +2650,7 @@ def ice_flash(frames=ICE_FRAMES):
             if f > frames:
                 break
             a = 0.35 if f == 1 else 0.6 if f == 2 else ICE_ALPHA
-            out.append((ICE_YELLOW if c == 0 else ICE_BLACK) + (a,))
+            out.append((yellow if c == 0 else ICE_BLACK) + (a,))
             f += 1
         c ^= 1
     return out
@@ -2686,11 +2694,14 @@ RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 
 RELEASE = RELEASE | {'ice3', 'ccol'}   # parabeetle v2: + ice3, ccol (exe_v46z_gkb18; gkb17 is RELEASE - ice3 - ccol)
 BUILD_TAG = 'exe_v46z_gkb18'      # parabeetle v2 (ice3): named in the diag build's S4BR line (which exe ran)
 RELEASE = RELEASE | {'gkui'}       # UI radar / waveform v1: + gkui (exe_v46z_gkb19; gkb18 is RELEASE - gkui)
+RELEASE = RELEASE | {'ice4'}       # beetle safety / radar v2: + ice4 (exe_v46z_gkb20: the ice flash's darker yellow; gkb19 is
+                                   # RELEASE - ice4)
 
 
 def build_tag(feats):
-    """the build named in the diag lines (UI radar / waveform v1: gkb19 with gkui; gkb18's own lines unchanged)"""
-    return 'exe_v46z_gkb19' if 'gkui' in feats else BUILD_TAG
+    """the build named in the diag lines (UI radar / waveform v1: gkb19 with gkui; beetle safety / radar v2: gkb20 with
+    ice4; the earlier builds' own lines unchanged)"""
+    return 'exe_v46z_gkb20' if 'ice4' in feats else 'exe_v46z_gkb19' if 'gkui' in feats else BUILD_TAG
 VARIANTS = (('A_release', RELEASE),)
 # skeleton v1.6 (the user: "Please stop packaging G_pose. It has no use anymore."): A_release only. The pose feature
 # stays (the exes shipped with it up to v1.5 still rebuild from this script); v1.5 and before: + ('G_pose', (RELEASE -
@@ -8008,7 +8019,7 @@ w_dcase:
         assert all(img.w(OS_TAB + 4 * i) == 0 for i in range(OS_N * OS_ENT // 4)), 'os_tab'
     if ice:
         out.blob(A['ice_k'], ice_k(), 'ice detonation constants')
-        out.blob(A['ice_flash'], b''.join(struct.pack('>4f', *c) for c in ice_flash(ice_frames(feats))), 'ice detonation flash colours')
+        out.blob(A['ice_flash'], b''.join(struct.pack('>4f', *c) for c in ice_flash(ice_frames(feats), ice_yellow(feats))), 'ice detonation flash colours')
         out.blob(A['ice_st'], bytes(ICE_ST * SLOTS), 'ice detonation per victim')
         out.blob(A['ice_reqofs'], struct.pack('>4I', ice_vars(feats)[0] - GK_VAR_TR, 0, 4, 8),
                  'fire trail request offsets (the blast first)')

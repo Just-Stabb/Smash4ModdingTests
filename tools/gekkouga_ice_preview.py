@@ -11,6 +11,9 @@
   disc of its hitbox's radius 5), in the shuriken's frame (the particles follow it: follow type 0).
 
   python3 -I tools/gekkouga_ice_preview.py VANILLA_FIGHTER BUILT_FIGHTER OUT_DIR
+  python3 -I tools/gekkouga_ice_preview.py VANILLA_FIGHTER - OUT_DIR --v2     # ice_flash_v2.png only: the flash's yellow
+                                                                              # before / after feature ice4 (beetle safety /
+                                                                              # radar v2: 80 %), the same frames
 
 VANILLA_FIGHTER: his vanilla fighter/gekkouga (model/body/c00, motion/body/main.pac); BUILT_FIGHTER: the package's
 fighter/gekkouga (effect/gekkouga). Side view, no bloom / HDR, the model without its NU_ shaders.
@@ -59,17 +62,56 @@ def effect_on(canvases, ems, frames, xyz, size, fr0=0):
                     F.draw(canvases[fr], em, sim[fr], cm)
 
 
+def flash_v2(out, posed):
+    """ice_flash_v2.png: the armed victim at the same countdown frames with ice detonation v1 - UI v1's yellow (top) and
+    feature ice4's (bottom: 80 %), with swatches"""
+    from PIL import Image, ImageDraw
+    view, ppu = (-26.0, 26.0, -4.0, 40.0), 8.0
+    base = F.Canvas(*view, ppu)
+    base.rgb[:] = NP.BG
+    NP.draw_model(base, posed)
+    body = np.any(np.abs(base.rgb - NP.BG) > 1e-4, axis=2)
+    n = C.ice_frames(C.RELEASE)
+    rows = []
+    for name, feats in (('before (UI v1: %s = RGB %s)', C.RELEASE - {'ice4'}), ('now (ice4: %s = RGB %s, 80 %%)', C.RELEASE)):
+        y = C.ice_yellow(feats)
+        fl = C.ice_flash(n, y)
+        ims = []
+        for t in (1, 2, 4, 7, 100, 103):
+            col = fl[t - 1]
+            rgb = base.rgb.copy()
+            rgb[body] = rgb[body] * (1 - col[3]) + np.array(col[:3]) * col[3]
+            im = Image.fromarray((np.clip(rgb, 0, 1) * 255).astype(np.uint8))
+            ImageDraw.Draw(im).text((5, 4), 'frame %d' % t, fill=(235, 235, 235))
+            ims.append(im)
+        sw = Image.new('RGB', (90, ims[0].height), tuple(int(round(255 * v)) for v in y))
+        rows.append((name % (y, tuple(int(round(255 * v)) for v in y)), ims + [sw]))
+    w, h = rows[0][1][0].size
+    sh = Image.new('RGB', (6 * (w + 4) + 94, 2 * (h + 22) + 4), (18, 18, 22))
+    for k, (lab, ims) in enumerate(rows):
+        y0 = k * (h + 22)
+        ImageDraw.Draw(sh).text((6, y0 + 5), 'Ice flash yellow ' + lab + '; black, alpha 0.35 / 0.6 / 0.8 and the timing '
+                                'unchanged (%d frames); offline render' % n, fill=(220, 220, 220))
+        for i, im in enumerate(ims):
+            sh.paste(im, (i * (w + 4), y0 + 22))
+    sh.save(os.path.join(out, 'ice_flash_v2.png'))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('vanilla')
     ap.add_argument('built')
     ap.add_argument('out')
+    ap.add_argument('--v2', action='store_true')
     a = ap.parse_args()
     from PIL import Image, ImageDraw
     os.makedirs(a.out, exist_ok=True)
     items, bones, bind = NP.model_items(a.vanilla)
     o = omo.Omo(dict(omo.pac_read(os.path.join(a.vanilla, 'motion', 'body', 'main.pac')))['FitGekkougaBodyMainA00Wait1.omo'])
     posed = NP.pose(items, bones, bind, o, 0)
+    if a.v2:
+        flash_v2(a.out, posed)
+        return
     fx = bank(a.built)
     # ---- the flashing victim, then the blast
     view, ppu = (-26.0, 26.0, -4.0, 40.0), 8.0

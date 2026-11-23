@@ -373,6 +373,76 @@ def mockup_shot(art, shot, places, angle=40.0, beetle=True, charge=70, t=0):
     return c.crop((0, 0, 640, c.height))
 
 
+# beetle safety / radar v2: the user's in-game screenshot of the v1 panel (radar_ingame.png, 233 x 161: Greninja's 1 - 4
+# player panel): units -> pixels measured on its v1 radar (the bright ring's outer edge, 121 / 256 of the radar's 58.6 units:
+# 36.5 px across, centred at (100.0, 48.5): 0.66 px a unit)
+SHOT2_RADAR = (100.0, 48.5)       # the v1 radar's centre in the shot (px)
+SHOT2_RING = 36.5                 # its bright ring's outer diameter (px)
+
+
+def _fill_disc(a, cx, cy, r, keep):
+    """the pixels in the disc (cx, cy, r) not in keep painted from their surroundings (repeated 4-neighbour averaging)"""
+    h, w = a.shape[:2]
+    yy, xx = np.mgrid[0:h, 0:w]
+    hole = ((xx - cx) ** 2 + (yy - cy) ** 2 <= r * r) & ~keep
+    out = a.astype(np.float32).copy()
+    out[hole] = 0
+    known = ~hole
+    for _ in range(400):
+        acc = np.zeros_like(out)
+        n = np.zeros(out.shape[:2], np.float32)
+        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            sh = np.roll(np.roll(out, dy, 0), dx, 1)
+            kn = np.roll(np.roll(known, dy, 0), dx, 1)
+            acc += sh * kn[..., None]
+            n += kn
+        upd = hole & (n > 0)
+        out[upd] = acc[upd] / n[upd][:, None]
+        known = known | upd
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
+def digits_mask(a):
+    """the percent digits in the shot (white / grey fill, low saturation, bright) and their black outline (2 px round them):
+    the panel draws them over the radar"""
+    f = a[..., :3].astype(int)
+    sat = f.max(axis=2) - f.min(axis=2)
+    m = (f.mean(axis=2) > 125) & (sat < 40)
+    m[:, :95] = False                              # (the portrait's highlights left of the digits)
+    out = m.copy()
+    for dy in range(-2, 3):
+        for dx in range(-2, 3):
+            out |= np.roll(np.roll(m, dy, 0), dx, 1)
+    return out
+
+
+def mockup_v2(art, shot, place1, place2, angle=40.0, beetle=True, charge=70, t=0, k=4):
+    """the radar at its v2 place (place2) drawn over the user's in-game shot of the v1 panel (its v1 radar at place1 painted
+    out), under the percent digits as the panel draws it; the waveform as v1. k: upscale. -> image"""
+    L = load(art)
+    im = np.asarray(Image.open(shot).convert('RGBA'))
+    s = SHOT2_RING / (RSIZE * place1['radar'][2] * 242.0 / 256.0)     # px a unit
+    x1, y1, sc1 = place1['radar']
+    dig = digits_mask(im)
+    clean = _fill_disc(im, SHOT2_RADAR[0], SHOT2_RADAR[1], SHOT2_RING / 2 + 2.5, dig)
+    base = Image.fromarray(clean, 'RGBA').resize((im.shape[1] * k, im.shape[0] * k), Image.BICUBIC)
+    layer = Image.new('RGBA', base.size, (0, 0, 0, 0))
+    x2, y2, sc2 = place2['radar']
+    cx = (SHOT2_RADAR[0] + (x2 - x1) * s) * k
+    cy = (SHOT2_RADAR[1] + (y2 - y1) * s) * k
+    size = RSIZE * sc2 * s * k
+    _put(layer, L['ring'], cx, cy, (size, size))
+    if beetle:
+        _put(layer, L['beetle'], cx, cy, (size, size))
+    _put(layer, L['sweep'], cx, cy, (size, size), angle)
+    over = np.asarray(Image.fromarray(dig.astype(np.uint8) * 255).resize(base.size, Image.BILINEAR)).astype(np.float32) / 255
+    la = np.asarray(layer).astype(np.float32)
+    la[..., 3] *= 1.0 - over                       # under the digits
+    out = base.copy()
+    out.alpha_composite(Image.fromarray(la.astype(np.uint8), 'RGBA'))
+    return out, dict(scale=s, centre=(cx / k, cy / k), diameter_px=size / k)
+
+
 if __name__ == '__main__':
     a = sys.argv[1:]
     if a and a[0] == 'extract' and len(a) == 4:

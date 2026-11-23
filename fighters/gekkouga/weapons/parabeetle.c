@@ -644,6 +644,8 @@ float pb_x;
 float pb_y;
 float pb_vx;           // leaving: its speed
 float pb_vy;
+float pb_low;          // beetle safety v1: how far under its path it flies (levelled off under the top blast line while
+                       // ridden: pb_keep_safe)
 
 // parabeetle v2 (the user: "make the beetle's travel arc far more vertical than horizontal", "spawn in whatever direction
 // the player was holding"): up 144 over its 4 s, sideways 12 (neutral / straight up: toward his facing) to 41 (held 45
@@ -673,6 +675,9 @@ float pb_ride_above() { return 1.5f; }    // ... or this over it ...
 float pb_ride_side() { return 1.5f; }     // ... and its X within the line's ends +- this: on it
 int pb_ridden_frames() { return 7; }      // the ridden motion (the user's ridden.chr0, 7 frames: the press)
 int pb_wait_max() { return 30; }          // never claimed (nobody asked): removed
+float pb_safe() { return 50.0f; }         // beetle safety v1: while ridden its line stays this far under the stage's top
+                                          // blast line (StageData(2)): a rider's KO point (its hip joint, ModelModule
+                                          // joint 3) about 8 - 30 over its feet (a giant fighter), the bob 2
 int pb_fx_puff() { return 0x1000021; }    // its arrival: the common smoke puff (an item's), small
 float pb_fx_puff_size() { return 0.8f; }
 
@@ -891,6 +896,7 @@ void pb_start()
     pb_set(5, 1.0f);                      // the executable: its collision made, moved with it
     pb_rode = 0;
     pb_free = 0;
+    pb_low = 0;
     EffectModule(0x3, pb_fx_puff(), pb_x, pb_y + pb_top() * 0.5f, 0, 0, 0, 0, pb_fx_puff_size(), 0, 0xffffffff);
 }
 
@@ -1039,6 +1045,48 @@ void pb_anim(int ride)
     }
 }
 
+// beetle safety v1 (the user: "make it so Greninja / opponents riding parabeetle can't be KO'd by riding it upwards
+// unless they're in knockback"): the game KOs a fighter whose hip (ModelModule joint 3) is past the stage's top blast line
+// whatever its status (the fighter's dead check 0x02E1C084 -> 0x02C41068: the blast zone rect of its area, read
+// from the camera manager, [0x102F7020] / 0x02D29634 vt +0x10C; the same rect StageData(0) - (3) give: left, right, top,
+// bottom). While anything rides it (a fighter's feet or one of its owner's clones on its line, or in the 2 frames' grace
+// after), its line never goes over StageData(2) - pb_safe(): a rise past that is held there (it levels off), and one ridden
+// already over it (landed on while flying free) is taken down to it at most pb_rise_v() a frame. Unridden it rises on from
+// there (pb_low kept). A rider can still jump off it or be launched: the game's own rules then. py: its place last frame
+void pb_keep_safe(int on, float py)
+{
+    float top;
+    float cap;
+    float line;
+    float want;
+    if (on == 0 && pb_rode == 0)
+    {
+        return;
+    }
+    top = StageData(0x2);
+    if (top <= StageData(0x3))
+    {
+        return;                           // (no blast zone read: nothing done)
+    }
+    cap = top - pb_safe();
+    line = pb_y + pb_top();
+    if (line <= cap)
+    {
+        return;
+    }
+    want = py + pb_top() - pb_rise_v();   // (over it already: down at most pb_rise_v() a frame)
+    if (want < cap)
+    {
+        want = cap;
+    }
+    if (want > line)
+    {
+        want = line;
+    }
+    pb_low = pb_low + (line - want);
+    pb_y = want - pb_top();
+}
+
 void pb_leave()
 {
     pb_phase = 0x2;
@@ -1053,6 +1101,7 @@ void pb_frame()
 {
     int ride;
     int st;
+    float py;
     if (pb_on == 0)
     {
         if (pb_var(0) < 0.5f)
@@ -1105,9 +1154,11 @@ void pb_frame()
         pb_leave();
         return;
     }
+    py = pb_y;
     pb_x = pb_x0 + pb_h * (float)pb_t;    // parabeetle v2: sideways by the stick (mostly up: pb_curve)
-    pb_y = pb_y0 + pb_curve(pb_t);
+    pb_y = pb_y0 + pb_curve(pb_t) - pb_low;
     ride = pb_riders();
+    pb_keep_safe(ride & 0x1, py);         // beetle safety v1: levelled off under the top blast line while ridden
     if (ride & 0x1)
     {
         pb_on_n += 1;

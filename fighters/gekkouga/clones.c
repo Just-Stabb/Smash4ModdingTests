@@ -1393,6 +1393,7 @@ int gk_lw_loop()
     {
         func_23(0x289);
         func_2341(0);
+        gk_lw_air();                      // beetle safety v1: the air stance's fall (vanilla's switch kept his ground 0)
         GroundModule(0x2710, 0x5);
     }
     else if (global19 == 0x2 && global18 == 0)
@@ -1423,6 +1424,36 @@ int gk_lw_loop()
         MotionModule(0x4, 1.0f);
     }
     return 0;
+}
+
+// beetle safety v1 (the user: "if down special is held from the ground and there is no ground under Greninja (usually
+// after being pushed off of a platform), it acts like how it does in the air"): the stance is one status on the ground and
+// in the air (0x155: motion 0x271 / 0x289); the game turns the situation to the air when he leaves the ground (pushed or slid
+// off an edge, a platform or a Parabeetle's line gone) and the loop switches over as vanilla's does (func_2337: the air
+// motion, func_2341's air control, the air correction). Vanilla's switch never set his fall: the ground stance's main zeroes
+// the gravity energy's acceleration (func_2336: KineticModule(0xf, 1, 0)) and only the start (func_2340) sets the air one,
+// so a ground stance held off an edge hung in the air for the whole charge. Now the switch gives him the air stance's own
+// fall, as func_2340 does when the stance starts in the air: the gravity energy reset, its speed his downward speed if he
+// already used the stance this airtime (0x20000081) else 0, its acceleration / limit the stance's air params 0x8000001 /
+// 0x8000002, on. The charge goes on (gk_lw_tick, one status); his clones copy his motion and height (the channel)
+void gk_lw_air()
+{
+    float v;
+    v = 0;
+    if (WorkModule(0x10, 0x20000081) == 0x1)
+    {
+        v = KineticModuleF(0x1, 0x1);
+        if (v > 0)
+        {
+            v = 0;
+        }
+    }
+    WorkModule(0x2710, 0x20000081);
+    KineticModule(0xe, 0x1, 0, 0, 0, 0, 0, 0);
+    KineticModule(0x11, 0x1, v);
+    KineticModule(0xf, 0x1, -WorkModuleF(0, 0x8000001));
+    KineticModule(0x14, 0x1, -WorkModuleF(0, 0x8000002));
+    KineticModule(0xb, 0x1);
 }
 
 void gk_lw_exit()
