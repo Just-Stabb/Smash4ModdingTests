@@ -2161,3 +2161,90 @@ script, slot or ACMD command: Sm4shCommand unchanged.
 - the sound's timing (from the frame order: +- 1 frame);
 - the burnout fall (assumes the slow steps his physics one frame in two);
 - the dodge cancel when shield and special land on the same frame.
+
+## Parabeetle v1 (`greninja_parabeetle_v1.zip`, over usmash spike v2 / trail dim v1; exe_v46z_gkb17, Sm4shCommand v1.7.30)
+
+The user: "I want Greninja to spawn a parabeetle under him after doing the hydro pump stance. The parabeetle should swoop
+down slightly then rise. Spawning a parabeetle should have a 7.5 second cooldown"; "it should work like a rising platform
+with collision that can be dropped through. There should be no jets at all. If the move is used on cooldown, it does the
+stance and a small boost upwards into special fall"; the ride: a platform anyone can stand on, carried, with the zip's
+wait / rise / ridden; the path: forward his way, about 4 s, then away.
+
+**Up special** (`clones.c` `gk_pb_*`; `gekkouga_build.py` MSC_EDITS: func_2303, the stance's loop, ends in `gk_pb_end`
+in place of `func_16(0x15d)`):
+- The stance is vanilla's (SpecialHi 0x154: 16 frames, its lean toward the stick, undone at its end). No jet (0x15D):
+  so no water article (native, per jet), no jet effects or sounds.
+- Off cooldown: a request (his VAR_12 = his facing x (1 his, 2 / 3 a clone's, + 4 on the ground)) and
+  `ArticleModule(0x2710, 10)`; Fall (0xE: actionable). On the ground: a hop (2.4: off the ground as vanilla's moves leave
+  it, `func_20(2)` / `GroundModule(0x2710, 5)`, the gravity energy's speed) onto a beetle made 11.5 over his feet.
+- The cooldown `gk_pb_cooldown()` 450 from the spawn (`gk_pb_tick`, every frame; under the burnout's slow his frame runs
+  every other frame: not compensated).
+- On cooldown: SpecialFall (0x10) with vanilla's special fall set-up (`func_2329`: landing lag 0x0700000E, air speed
+  0x0700000B), up at `gk_pb_boost()` 2.75 (21 units with his gravity 0.18: a quarter of a straight-up two-jet Hydro
+  Pump, about 85 from his vl special_hi), his clones' smoke puff at his feet (the cue).
+- The hop / boost speed is set again on his first frame in Fall / SpecialFall (his VAR_13), in case the status set-up
+  resets it.
+- The clones in formation (`gk_art_clones`) get theirs one a frame after his is claimed (`gk_pb_q`); a request not
+  claimed in 5 frames is dropped with the queue. On cooldown they mirror his boost (no beetles).
+- KO / reset (`gk_pb_clear`): `ArticleModule(0x2712, 10)`, the cooldown 0.
+- His beetle reports him on it (bit 8 of his VAR_30, `gk_pb_heartbeat`, 2 frames' grace): his clones then copy his
+  vertical movement (`gk_physics`), riding theirs.
+
+**The article** (weapon kind 0x1A4, article 10, folder `parabeetle`, 3 at once; `weapons/parabeetle.c`):
+- Start: its owner / code from the executable's claim; its place his (the slot position variables) or the clone's (his
+  shared VAR_24 - 27); its line 0.3 under the feet (ground: 11.5 over them); facing his way; a puff.
+- Path: forward 0.75 a frame; down 8 over 20 frames (half a cosine); then up to 0.4 a frame over 30 frames, steady after
+  (+74 at frame 239); at 240 it leaves (VAR_5 2: its line removed), flying forward 1.6 / up 0.6 + 0.12 a frame, removed
+  30 frames later.
+- Bob: its root's Y (the wings' bob) is taken out of the motions (`chr0_to_omo.py --hold`) and done by the article
+  (`pb_bob`: 3 harmonics for wait, 1 for rise, ridden's 7 values; within 0.063 of the source), so the collision line
+  stays on the shell (10.84 over its origin in every motion; the line at 10.6).
+- Motions: wait (0) in the swoop, rise (1) as it climbs; something on it 2 frames in a row: ridden (2, 7 frames), then
+  rise while it carries (as the source game: a Parabeetle climbs with its rider).
+- Riders (`pb_riders`): any slot's fighter (kind > 0, not Dead / Rebirth) with its feet 1 under to 1.5 over its line,
+  within its ends + 1.5; his clones (his VAR_31 alive bits, their places). Its owner on it: the heartbeat bit.
+- No hitbox (empty scripts), no hurtboxes (the moon's specializer: +0x1C a blr): it hurts nobody and isn't hurt.
+- Removed: its timer, its owner's status Dead / Rebirth (and his own `ArticleModule(0x2712)`), a reset, the blast zone.
+
+**The executable** (feature `pbeetle`, `tools/gekkouga_clone_cave.py` `pb_source`):
+- The kind: a bunshin descriptor copy whose motion info lists `anim_hash` of FitGekkougaParabeetleMainA00Wait / A01Rise
+  / A02Ridden (its main.pac's names), u16 flags as the skeleton's (loaded with him, c00), base kind Mario's pump, the
+  skeleton's module row (the hydrant's GroundModule, the SoundModule), the moon's specializer with the skeleton's +0x34 /
+  +0xAC and +0x94 `pb_94`; his article list's 11th row (3 at once; 33 instances in all of the 64).
+- `pb_claim`: the first live Greninja whose VAR_12 is set: copied to its VAR_1, cleared; its VAR_0 his slot.
+- `pb_col_make` / `pb_col_place`: the skeleton's route (its kind's bundle, `parabeetle.lvd`, GC_MAKE, placed, GC_ON,
+  GC_ENABLE); every flying frame its GroundModule's frame update, its 2 vertices moved (GC_MOVEV: riders carried) to
+  its place + (-10 / +10, 10.6), the commit; a ground that isn't 2 vertices is left alone (failed); gone: made again 3
+  times; leaving: GC_FREE.
+- **Drop-through, read from the exe**: the ground maker `0x02AC2B84` ORs 0x2000 (the passable bit the line tests leave
+  out with 0x102000) into every line's attribute when the collision's flag word +0xE8 has bit 0
+  (`0x02AC2D18` - `0x02AC2D30`): the .lvd's 4th flag byte. `parabeetle.lvd` (`gekkouga_build.parabeetle_lvd`): the
+  hydrant's with one floor line at PB_VERTS and flags [0, 1, 0, 1]. The .lvd and the exe ship together (2 vertices).
+- Diag: **S4PB** claimed (owner, code), **S4PC** collision (state, ground), **S4PF** removed.
+
+**The model and motions** (`tools/mdl0_to_nud.py`, `tools/chr0_to_omo.py`, `gekkouga_build.py parabeetle`; docs/
+wii-model-conversion.md):
+- met_pata.mdl0 (v11): 6 bones, 2 objects (80 / 394 triangles), 2 materials. Scale 1.25: the shell 25.8 long (30.1 with
+  its head), 45.7 across the wings; the line 20 wide (about 1.7 x his 12).
+- The body: met_pata on Smash 4's fighter body shader (lit by the game; the source's light sphere maps lm_01e / lm_02e
+  are its lighting). The shell: its TEV (flat red x light + 0.686 x an EnvCamera reflection) baked: texture = red +
+  0.686 x met_pata_shell_env, UVs its per-vertex sphere coordinates seen from the side facing right. Opaque (the
+  source's blend / alpha compare / PNGs).
+- Triangles turned to counter-clockwise (GX's front faces are clockwise): the first render showed the inside.
+- wait / rise 80 frames (loop), ridden 7; textures 0x4030A000 - 2.
+- Previews (`tools/gekkouga_parabeetle_preview.py`): `$S/gk_preview/parabeetle_model.png`, `parabeetle_anims.gif`,
+  `parabeetle_path.png`.
+
+**Tests**:
+- `gekkouga_clone_cave_test` 348 / 387 (release / A_release), 0 failures (`pb_checks` on a fresh emulator: tables,
+  descriptor hashes, row, singleton, the list, the claim, the collision calls, the move, the remakes, a wrong ground, no
+  .lvd, a wrong GroundModule, the removal, S4PB / S4PC / S4PF); gkb16 = RELEASE - pbeetle byte for byte (321 / 0).
+- `gekkouga_clones_test ... --vut=greninja_usmash_trail_v1.zip --pb-src=...` 638 checks (`parabeetle_side_tests`,
+  `parabeetle_tests`, `parabeetle_data_tests`: the converters against the source, every OMO frame against its CHR0, the
+  shell bake, the lvd; the package, Sm4shCommand v1.7.30).
+- msc_stack_check 0 problems (his globals 126 <= 128, parabeetle 41); the opcode guard OK; import_call_check 0 on both
+  exes; `supamario_ui_cave_test` 0 failures.
+
+**Not confirmed in game**: everything; in particular the new kind loading its model / motions, the drop-through line,
+riders carried, the hop / boost speeds through the status change, the clones' ride (and whether their line test sees
+an article's ground).

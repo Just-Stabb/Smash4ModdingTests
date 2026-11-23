@@ -1726,8 +1726,10 @@ PB_ARTICLE = 10                   # his list: 6 articles, clones 6 / 7, skeleton
 PB_MAX = 3
 PB_LVD = 'parabeetle.lvd'
 PB_MOTIONS = ('FitGekkougaParabeetleMainA00Wait', 'FitGekkougaParabeetleMainA01Rise', 'FitGekkougaParabeetleMainA02Ridden')
-PB_TOP = 11.4                     # its line over its origin (the shell's top at the model's scale PB_SCALE, 0.5 under its
-PB_HALF = 10.0                    # highest point) and its half length: 20 wide (Greninja ~12: his clones' boxes x +- 6)
+PB_TOP = 10.6                     # its line over its origin (the shell's top at the model's scale PB_SCALE, 10.84 in every
+                                  # motion once its root's bob is the article's own: tools/gekkouga_build.py PB_ROOT; 0.24
+                                  # under it, so feet sit on the shell)
+PB_HALF = 10.0                    # its half length: 20 wide (Greninja ~12: his clones' boxes x +- 6; the shell 32 long)
 PB_VERTS = ((-PB_HALF, PB_TOP), (PB_HALF, PB_TOP))   # the .lvd's vertices (a floor: left to right, normal up)
 PB_SCALE = 1.25                   # the model's scale (tools/gekkouga_build.py parabeetle: the source's units x this)
 PB_REMAKE = 3

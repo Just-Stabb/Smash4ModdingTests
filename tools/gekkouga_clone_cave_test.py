@@ -3339,10 +3339,10 @@ def pb_checks(patched, info, diag):
     check('his article list: 11 entries, article 10 the Parabeetle (0x1A4, 3 at once: his and his two clones\')',
           (e.w(lst + 4), [e.w(e.w(lst) + 16 * C.PB_ARTICLE + 4 * j) for j in range(4)]),
           (11, [C.PB_KIND, C.PB_MAX, 0, 0]))
-    check('parabeetle strings: "parabeetle", "parabeetle.lvd"; its 2 vertices (x -10 / +10, y + 11.4: left to right)',
+    check('parabeetle strings: "parabeetle", "parabeetle.lvd"; its 2 vertices (x -10 / +10, y + 10.6: left to right)',
           (e.cstr(A['pb_str']), e.cstr(A['pb_lvd']),
            [round(x, 3) for x in struct.unpack('>4f', bytes(e.mu.mem_read(A['pb_verts'], 16)))]),
-          ('parabeetle', 'parabeetle.lvd', [-10.0, 11.4, 10.0, 11.4]))
+          ('parabeetle', 'parabeetle.lvd', [-10.0, 10.6, 10.0, 10.6]))
     # ---- the game's side, stubbed
     calls = []
     st = dict(file=1, ground=1)
@@ -3456,7 +3456,7 @@ def pb_checks(patched, info, diag):
     want_v = [(gm, i, 30.0 + vx, round(40.0 + vy, 3)) for i, (vx, vy) in enumerate(C.PB_VERTS)]
     check('parabeetle collision: as the skeleton\'s (the hydrant\'s set-up): its kind\'s bundle (kind 0x1A4), '
           '"parabeetle.lvd" in it, GroundModule +0xEC = the file, the grounds made (gm, 1, 0, 0), its 2 vertices placed at '
-          'it (x +- 10, y + 11.4), the line recomputed, on (then the grounds turned on), both handles released',
+          'it (x +- 10, y + 10.6), the line recomputed, on (then the grounds turned on), both handles released',
           c1, [('res_get', 0xABC0, C.PB_KIND, 0, 0), ('res_find', 0x1111, 'parabeetle.lvd', 1), ('assign', gm + 0xEC, 0x2222),
                ('make', gm, 1, 0, 0)] + [('setv',) + v for v in want_v] +
               [('commit', gm), ('on', gm, 1), ('enable', gm), ('res_free', 2), ('res_free', 2)])

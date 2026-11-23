@@ -492,9 +492,11 @@ def msc_tests(mscsb, src):
     frames(m2, 5)
     m2.game.log = []
     frames(m2, 1, st=0xB1)
-    check('KO (0xB1): the clones removed, no burnout, the channel closed',
+    check('KO (0xB1): the clones removed, no burnout, the channel closed (parabeetle v1: his Parabeetles removed too: '
+          'article 10)',
           ([x for x in m2.game.log if x[0] == 'article'], m2.g('gk_ability'), m2.g('gk_burnout'), m2.game.vars.get(0x0F00031F)),
-          ([('article', 0x2712, 6), ('article', 0x2712, 7)], 0, 0, 0.0))
+          ([('article', 0x2712, 6), ('article', 0x2712, 7)] + ([('article', 0x2712, 10)] if 'gk_pb_clear' in
+                                                               open(src).read() else []), 0, 0, 0.0))
     m2.setg('gk_burnout', 100)
     frames(m2, 1, st=0xB2)
     check('respawn (0xB2): the burnout ended', m2.g('gk_burnout'), 0)
@@ -4568,7 +4570,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (37, 38):   # round gauge v1: the damage panel's files; clone fix v3: his MSC
         want_top = ['INSTALL_TO_data', 'README.txt']
-    if len(earlier) in (42, 44, 45, 46):   # usmash spike v2 / trail dim v1: the exes (ice2, bgrav) and data; ice detonation v1: the exes, data (+ Sm4shCommand); tuning v1: the exes (the gauge's ready state, the skeleton's bottom) and data; smash
+    if len(earlier) in (42, 44, 45, 46, 47):   # parabeetle v1: the exes (pbeetle), data (+ Sm4shCommand); usmash spike v2 / trail dim v1: the exes (ice2, bgrav) and data; ice detonation v1: the exes, data (+ Sm4shCommand); tuning v1: the exes (the gauge's ready state, the skeleton's bottom) and data; smash
         # tune v1: the exes (the half shield damage) and data
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (41, 43):   # clone moves v1, nair / fair v1: data only
@@ -4632,6 +4634,16 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
                             43):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
+        elif len(earlier) == 47:
+            check('parabeetle v1: Sm4shCommand v1.7.30 (ParabeetleWait / Rise / Ridden in ModAnimNames.txt, with -> lines)',
+                  ([t for t in top if t.startswith('Sm4shCommand_v')],
+                   z.read('Sm4shCommand_v1.7.30/ModAnimNames.txt') == open(os.path.join(HERE, 'Sm4shCommand', 'SM4SHCommand',
+                                                                                         'ModAnimNames.txt'), 'rb').read()),
+                  (['Sm4shCommand_v1.7.30'], True))
+            mn = open(os.path.join(HERE, 'Sm4shCommand', 'SM4SHCommand', 'ModAnimNames.txt')).read()
+            check('parabeetle v1: ModAnimNames.txt names its 3 scripts, each with a -> line to its own animation '
+                  '(parabeetle/FitGekkougaParabeetleMain*.omo: the Hitbox Viewer plays them)',
+                  [n for n, f in zip(GB.PB_SCRIPTS, CC.PB_MOTIONS) if '%s -> parabeetle/%s.omo' % (n, f) not in mn], [])
         elif len(earlier) == 45:
             check('ice detonation v1: Sm4shCommand v1.7.29 (FireTrailIceBoom in ModAnimNames.txt)',
                   ([t for t in top if t.startswith('Sm4shCommand_v')],
@@ -4705,6 +4717,19 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               ['ui/info/dmg/dmg.flx', 'ui/info/dmg/img-00135.nut', 'ui/info/dmg/texlist.lst'])
         if GAUGE_SRC and GAUGE_JPG:
             gauge_tests(z)
+    if z1 and len(earlier) == 47:
+        check('parabeetle v1: INSTALL_TO_data: his MSC (the up special\'s end, the cooldown, the clones\' beetles) and the '
+              'Parabeetle\'s files (model + parabeetle.lvd, motion, scripts, MSC); INSTALL_TO_code exe_v46z_gkb17; TEST_ONLY '
+              'A_release',
+              (sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+               sorted({n.split('/')[1] for n in names if n.startswith('TEST_ONLY_INSTALL_TO_code/') and n.count('/') > 1})),
+              (sorted(['fighter/gekkouga/script/msc/gekkouga.mscsb', 'fighter/gekkouga/script/msc/parabeetle/parabeetle.mscsb',
+                       'fighter/gekkouga/motion/parabeetle/main.pac'] +
+                      ['fighter/gekkouga/model/parabeetle/c00/' + f for f in (
+                          'model.nud', 'model.nut', 'model.vbn', 'model.jtb', 'model.sb', 'model.nhb', 'model.xmb', 'model.flp',
+                          'parabeetle.lvd')] +
+                      ['fighter/gekkouga/script/animcmd/weapon/parabeetle/' + f for f in (
+                          'game.bin', 'effect.bin', 'sound.bin', 'motion.mtable')]), ['A_release']))
     if z1 and len(earlier) == 45:
         check('ice detonation v1: INSTALL_TO_data: his MSC (the blast request), his bank (the explosion, the sparkles), the '
               'fire trail\'s MSC (the blast mode) and scripts (its 4th slot), the shuriken\'s game / effect scripts; '
@@ -5020,7 +5045,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                                                                len(earlier) in (31, 32), len(earlier) == 33,
                                                                len(earlier) in (34, 35), len(earlier) in (36, 37, 38, 39),
                                                                len(earlier) in (40, 41), len(earlier) in (42, 43),
-                                                               len(earlier) == 44, len(earlier) == 45)):
+                                                               len(earlier) == 44, len(earlier) == 45, len(earlier) == 46)):
             if not b:
                 continue
             p = os.path.join(td, '%d.rpx' % i)
@@ -5059,7 +5084,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 47)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 48)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -5124,6 +5149,10 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_ice_detonation_v1', 'exe_v46z_gkb16', 'spike', '300', 'KBG 50', 'BKB 25', 'geyser', 'trail', '0.65',
          'neutral air', 'nair_fair_v1', 'IceBoom', '156', 'creeper', 'S4ID', 'S4IF', 'S4BG', '840', 'gravity', 'air dodge',
          'LandingLight', 'trail_dim.png', 'confirmed in game') if len(earlier) == 46 else \
+        ('greninja_usmash_trail_v1', 'exe_v46z_gkb17', 'Parabeetle', 'stance', '450', '7.5', 'cooldown', 'special fall',
+         'boost', '21', 'jet', 'Fall', 'drop', 'down', 'carr', 'swoop', '0.75', '0.4', '240', 'wait', 'rise', 'ridden',
+         'clone', '1.25', 'parabeetle.lvd', 'S4PB', 'S4PC', 'S4PF', 'Sm4shCommand_v1.7.30', 'parabeetle_model.png',
+         'parabeetle_anims.gif', 'confirmed in game') if len(earlier) == 47 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -5137,7 +5166,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
 
 def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False, gkb5=False, gkb6=False,
                 gkb7=False, gkb8=False, gkb9=False, gkb10=False, gkb11=False, gkb12=False, gkb13=False, gkb14=False,
-                gkb15=False):
+                gkb15=False, gkb16=False):
     """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
     release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
@@ -5167,6 +5196,8 @@ def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=
             else set()   # (ice detonation v1's gkb15)
         drop |= {'ice2', 'bgrav'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 or gkb11 or gkb12 or gkb13 \
             or gkb14 or gkb15 else set()   # (usmash spike v2 / trail dim v1's gkb16)
+        drop |= {'pbeetle'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 or gkb11 or gkb12 or gkb13 \
+            or gkb14 or gkb15 or gkb16 else set()   # (parabeetle v1's gkb17)
         variants = C.VARIANTS if not (sk12 or b2 or gkb5 or gkb6 or gkb7) else \
             C.VARIANTS + (('G_pose', (C.RELEASE - {'sway'}) | {'pose'}),)       # (up to v1.5: + G_pose)
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE - drop)] + \
@@ -5188,7 +5219,8 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
                    (os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC),
                    (os.path.join(msc, 'skeleton', 'skeleton.mscsb'), GB.SKELETON_MSC),
                    (os.path.join(msc, 'firetrail', 'firetrail.mscsb'), GB.TRAIL_MSC),
-                   (os.path.join(msc, 'shuriken', 'shuriken.mscsb'), getattr(GB, 'SHURIKEN_MSC', ''))):
+                   (os.path.join(msc, 'shuriken', 'shuriken.mscsb'), getattr(GB, 'SHURIKEN_MSC', '')),
+                   (os.path.join(msc, 'parabeetle', 'parabeetle.mscsb'), getattr(GB, 'PARABEETLE_MSC', ''))):
         if not os.path.exists(f):
             continue
         r = subprocess.run([sys.executable, os.path.join(HERE, 'msc_stack_check.py'), f, src], capture_output=True, text=True)
@@ -5204,7 +5236,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
                                                 len(earlier) == 30, len(earlier) in (31, 32), len(earlier) == 33,
                                                 len(earlier) in (34, 35), len(earlier) in (36, 37, 38, 39),
                                                 len(earlier) in (40, 41), len(earlier) in (42, 43), len(earlier) == 44,
-                                                len(earlier) == 45):
+                                                len(earlier) == 45, len(earlier) == 46):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
@@ -5223,6 +5255,625 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
                   bool(last) and last[0].endswith(' 0 failures'), True)
 
 
+def pb_his_setup(mscsb, src, situation=2, lr=1.0):
+    """parabeetle v1: his MSC with the calls the up special's end makes logged (Kinetic, Ground, Model, the situation)"""
+    m = fresh(mscsb, src)
+    g = m.game
+    g.lr = lr
+    g.situation = situation
+    m.vm.g[18] = 0 if situation == 0 else 2
+
+    def sysf(sid, a, old=g.sys):
+        if sid == 0x10:
+            g.log.append(('kinetic', a[0], a[1]) + tuple(fv(x) for x in a[2:3]))
+            return 0
+        if sid == 0x1A:
+            g.log.append(('ground', a[0], a[1]))
+            return 0
+        if sid == 0x27:
+            g.log.append(('model', a[0], a[1]) + tuple(fv(x) for x in a[2:5]))
+            return 0
+        if sid == 0x18 and a[0] == 0x2:
+            g.log.append(('situation', a[1]))
+            return 0
+        return old(sid, a)
+    g.sys = sysf
+    return m, g
+
+
+def parabeetle_side_tests(mscsb, src):
+    """parabeetle v1 (README "Parabeetle v1"): his up special's stance end (gk_pb_end: MSC_EDITS func_2303), the request
+    and the clones' queue (gk_pb_tick), the cooldown, the boost, the KO / reset, the ride heartbeat and the clones' ride"""
+    REQ, BOOST = CC.GK_VAR_PBREQ, 0x0F00030D
+    c = open(src).read()
+    a, b, e_ = GB.func_span(c, 'func_2303')
+    body = c[b:e_]
+    check('parabeetle: his stance\'s loop (SpecialHi 0x154, func_2303) ends in gk_pb_end at its motion\'s end; no jet '
+          '(SpecialHiJet 0x15D) anywhere in it (so no water article, effect or sound)',
+          ('if (MotionModule(0x2712))\n    {\n        gk_pb_end();' in body, '0x15d' in body), (True, False))
+    m, g = pb_his_setup(mscsb, src)
+    check('parabeetle constants: cooldown 450 (7.5 s), article 10, request life 5, boost 2.75, hop 2.4',
+          (m('gk_pb_cooldown'), m('gk_pb_article'), m('gk_pb_req_frames'), fv(m('gk_pb_boost')), fv(m('gk_pb_hop'))),
+          (450, 10, 5, 2.75, 2.4))
+    grav = 0.18
+    full = 3.7 * 10 + 3.7 * 0.9 * 10 + (3.7 * 0.9 * 0.7) ** 2 / (2 * grav)
+    boost = 2.75 ** 2 / (2 * grav)
+    check('parabeetle: the boost rises %.1f units (2.75^2 / (2 x 0.18)), about a quarter of a straight-up Hydro Pump (%.1f: '
+          'two jets 3.7 / 3.33 a frame x 10 frames, the end\'s 0.7 x speed under his gravity)' % (boost, full),
+          0.2 <= boost / full <= 0.3, True)
+    # ---- off cooldown, in the air, facing right
+    m('gk_pb_end')
+    check('parabeetle: off cooldown, in the air: Fall (0xE: actionable), not the jet; his stance\'s lean undone '
+          '(ModelModule(1, 2, 0, 0, 0)); a Parabeetle asked for (his VAR_12 = +1: his own, facing right) and made '
+          '(ArticleModule(0x2710, 10)); no lift (he lands on it as it swoops)',
+          (g.status_req, [x for x in g.log if x[0] == 'model'], g.vars.get(REQ), [x for x in g.log if x[0] == 'article'],
+           g.vars.get(BOOST, 0.0), [x for x in g.log if x[0] in ('kinetic', 'situation', 'ground')]),
+          ([(0xE, 0)], [('model', 1, 2, 0.0, 0.0, 0.0)], 1.0, [('article', 0x2710, 10)], 0.0, []))
+    check('parabeetle: the cooldown 450 from the spawn, the request up 5 frames', (m.g('gk_pb_cd'), m.g('gk_pb_req_t')),
+          (450, 5))
+    # ---- on the ground, facing left
+    m, g = pb_his_setup(mscsb, src, situation=0, lr=-1.0)
+    m('gk_pb_end')
+    check('parabeetle: on the ground (facing left): his VAR_12 = -5 (left, his own, + 4 grounded: it starts over his '
+          'feet), Fall, and a hop: off the ground (situation air, the ground correction off: func_20(2), GroundModule '
+          '(0x2710, 5)), his gravity energy at 2.4 up (KineticModule 0x11 / 0xB), VAR_13 = 2.4 (again on his first frame)',
+          (g.vars.get(REQ), g.status_req, [x for x in g.log if x[0] in ('kinetic', 'situation', 'ground')],
+           g.vars.get(BOOST)),
+          (-5.0, [(0xE, 0)], [('situation', 2), ('ground', 0x2710, 5), ('kinetic', 0x11, 1, 2.4), ('kinetic', 0xB, 1)],
+           2.4))
+    # ---- on cooldown
+    m, g = pb_his_setup(mscsb, src)
+    g.vars[0x0700000B], g.vars[0x0700000E] = 0.6, 32.0
+    m.setg('gk_pb_cd', 300)
+    m('gk_pb_end')
+    check('parabeetle: on cooldown (in the air): SpecialFall (0x10), no Parabeetle (no request, no ArticleModule), up at '
+          '2.75 (KineticModule 0x11, VAR_13 for his next frame), vanilla\'s special fall set-up (func_2329: landing lag '
+          '0x0700000E 32, air speed 0x0700000B 0.6, flag 0x20000003), a puff at his feet (the cue); the cooldown runs on',
+          (g.status_req, g.vars.get(REQ, 0.0), [x for x in g.log if x[0] == 'article'],
+           [x for x in g.log if x[0] == 'kinetic'], g.vars.get(BOOST), (g.vars.get(0x0), g.vars.get(0x1)),
+           0x20000003 in g.flags, [x[:2] for x in g.log if x[0] == 'effect'], m.g('gk_pb_cd')),
+          ([(0x10, 0)], 0.0, [], [('kinetic', 0x11, 1, 2.75), ('kinetic', 0xB, 1)], 2.75, (32.0, 0.6), True,
+           [('effect', 0x3)], 300))
+    m2 = fresh(mscsb, src)
+    m2.game.x, m2.game.y = 5.0, 7.0
+    m2('gk_puff_at', f2i(5.0), f2i(7.0))
+    check('parabeetle: the cooldown cue is his clones\' smoke puff (gk_puff_at) at his feet', [x[:2] for x in g.log if
+          x[0] == 'effect'] == [x[:2] for x in m2.game.log if x[0] == 'effect'], True)
+    m, g = pb_his_setup(mscsb, src, situation=0)
+    m.setg('gk_pb_cd', 1)
+    m('gk_pb_end')
+    check('parabeetle: on cooldown on the ground: off the ground (situation air), up at 2.75, SpecialFall',
+          (g.status_req, [x for x in g.log if x[0] in ('kinetic', 'situation', 'ground')]),
+          ([(0x10, 0)], [('situation', 2), ('ground', 0x2710, 5), ('kinetic', 0x11, 1, 2.75), ('kinetic', 0xB, 1)]))
+    # ---- the tick: the boost again on his first frame in SpecialFall / Fall, the cooldown down to 0
+    m, g = pb_his_setup(mscsb, src)
+    g.vars[BOOST] = 2.75
+    m.vm.g[4] = 0x154
+    m('gk_pb_tick')
+    check('parabeetle tick: still in the stance (0x154): the boost waits', ([x for x in g.log if x[0] == 'kinetic'],
+                                                                           g.vars.get(BOOST)), ([], 2.75))
+    m.vm.g[4] = 0x10
+    m('gk_pb_tick')
+    check('parabeetle tick: his first frame in SpecialFall: up at 2.75 again (KineticModule 0x11 / 0xB), VAR_13 0',
+          ([x for x in g.log if x[0] == 'kinetic'], g.vars.get(BOOST)), ([('kinetic', 0x11, 1, 2.75), ('kinetic', 0xB, 1)],
+                                                                         0.0))
+    g.vars[BOOST] = 2.4
+    m.vm.g[4] = 0x1B
+    g.log = []
+    m('gk_pb_tick')
+    check('parabeetle tick: out of the stance some other way (not Fall / SpecialFall): the pending boost dropped, not given',
+          ([x for x in g.log if x[0] == 'kinetic'], g.vars.get(BOOST)), ([], 0.0))
+    m.setg('gk_pb_cd', 450)
+    for _ in range(449):
+        m('gk_pb_tick')
+    cd1 = m.g('gk_pb_cd')
+    m('gk_pb_tick')
+    check('parabeetle tick: the cooldown counts down a frame at a time: 1 left after 449, 0 at 450 (7.5 s)',
+          (cd1, m.g('gk_pb_cd')), (1, 0))
+    m('gk_pb_tick')
+    check('parabeetle tick: ... and stays 0', m.g('gk_pb_cd'), 0)
+    # ---- the clones' Parabeetles (two clones in formation), one a frame after his is claimed
+    m, g = pb_his_setup(mscsb, src, lr=-1.0)
+    m.setg('gk_ability', 300)
+    m.setg('gk_alive', 3)
+    m('gk_pb_end')
+    seq = [g.vars.get(REQ)]
+    m('gk_pb_tick')
+    seq.append(g.vars.get(REQ))
+    g.vars[REQ] = 0.0                                     # the executable's claim (his beetle)
+    m('gk_pb_tick')
+    seq.append(g.vars.get(REQ))
+    g.vars[REQ] = 0.0                                     # the left clone's claimed
+    m('gk_pb_tick')
+    seq.append(g.vars.get(REQ))
+    g.vars[REQ] = 0.0
+    m('gk_pb_tick')
+    seq.append(g.vars.get(REQ))
+    check('parabeetle clones (clone articles: both in formation): his request -1, kept while not claimed; claimed -> the '
+          'left clone\'s (-2) the next frame, then the right one\'s (-3), then nothing; each made (ArticleModule 0x2710, '
+          '10 x 3); one cooldown',
+          (seq, [x for x in g.log if x[0] == 'article'], m.g('gk_pb_cd')),
+          ([-1.0, -1.0, -2.0, -3.0, 0.0], [('article', 0x2710, 10)] * 3, 446))
+    m, g = pb_his_setup(mscsb, src, situation=0)
+    m.setg('gk_ability', 300)
+    m.setg('gk_alive', 2)
+    m('gk_pb_end')
+    g.vars[REQ] = 0.0
+    m('gk_pb_tick')
+    check('parabeetle clones: on the ground the clone\'s too (+4): only the right clone out: +7', g.vars.get(REQ), 7.0)
+    m, g = pb_his_setup(mscsb, src)
+    m.setg('gk_ability', 300)
+    m.setg('gk_alive', 3)
+    m.setg('gk_lfall', 10)                                # the left clone falling on its own: not in formation
+    m('gk_pb_end')
+    g.vars[REQ] = 0.0
+    m('gk_pb_tick')
+    check('parabeetle clones: a clone falling on its own (not copying him) gets none: only the right one\'s (+3)',
+          g.vars.get(REQ), 3.0)
+    m, g = pb_his_setup(mscsb, src)
+    m.setg('gk_ability', 300)
+    m.setg('gk_alive', 3)
+    m.setg('gk_pb_cd', 100)
+    m('gk_pb_end')
+    m('gk_pb_tick')
+    check('parabeetle clones: on cooldown: no beetle for them either (they mirror his boost)',
+          (g.vars.get(REQ, 0.0), [x for x in g.log if x[0] == 'article'], g.status_req), (0.0, [], [(0x10, 0)]))
+    # ---- not claimed: dropped
+    m, g = pb_his_setup(mscsb, src)
+    m.setg('gk_ability', 300)
+    m.setg('gk_alive', 3)
+    m('gk_pb_end')
+    for _ in range(5):
+        m('gk_pb_tick')
+    check('parabeetle: a request not claimed in 5 frames (no room: 3 out) dropped, and the clones\' with it',
+          (g.vars.get(REQ), m.g('gk_pb_q'), m.g('gk_pb_req_t'), [x for x in g.log if x[0] == 'article']),
+          (0.0, 0, 0, [('article', 0x2710, 10)]))
+    # ---- KO / reset
+    m, g = pb_his_setup(mscsb, src)
+    m.setg('gk_pb_cd', 200)
+    g.vars[REQ] = 1.0
+    frames(m, 1, st=0xB1)
+    check('parabeetle: his KO (Dead 0xB1): his beetles removed (ArticleModule(0x2712, 10)), the cooldown 0, no request',
+          ([x for x in g.log if x[0] == 'article'], m.g('gk_pb_cd'), g.vars.get(REQ)), ([('article', 0x2712, 10)], 0, 0.0))
+    m, g = pb_his_setup(mscsb, src)
+    m.setg('gk_pb_cd', 200)
+    m('gk_reset')
+    check('parabeetle: a training reset / restart (gk_reset): removed, cooldown 0',
+          ([x for x in g.log if x[0] == 'article' and x[2] == 10], m.g('gk_pb_cd')), ([('article', 0x2712, 10)], 0))
+    # ---- the ride heartbeat (bit 8 of his VAR_30, his own beetle's)
+    m, g = pb_his_setup(mscsb, src)
+    g.vars[0x0F00031E] = 8.0 + 1.0 + 256.0
+    m('gk_pb_heartbeat')
+    r1 = (m.g('gk_pb_ride'), g.vars.get(0x0F00031E))
+    m('gk_pb_heartbeat')
+    r2 = m.g('gk_pb_ride')
+    m('gk_pb_heartbeat')
+    check('parabeetle heartbeat: bit 8 in his VAR_30 (his own beetle carries him): taken out (the other bits kept), 2 frames '
+          'of ride; then 1, 0', (r1, r2, m.g('gk_pb_ride')), ((2, 257.0), 1, 0))
+    # ---- the clones ride theirs: while he stands on his beetle (situation ground, the heartbeat) they copy his rise
+    def start(ride):
+        m = fresh_nodelay(mscsb, src)
+        g = m.game
+        g.x, g.y = 0.0, 10.0
+        m.setg('gk_lw_charge', 300)
+        m('gk_lw_press')
+        frames(m, 6)
+        g.floors = [(-1000.0, 1000.0, -60.0)]             # the stage far below: the beetles aren't stage floors here
+        g.situation = 0
+        m.vm.g[18] = 0
+        ys = []
+        for k in range(6):
+            g.y = round(10.0 + 0.4 * (k + 1), 3)
+            g.press = set()
+            g.vars[0x0F00031E] = float((m.g('gk_alive') & g.beat) | (8 if ride else 0))
+            m.vm.g[4] = 0
+            m('gekkouga_frame')
+            ys.append((m.gf('gk_ly'), m.gf('gk_ry')))
+        return ys
+    ys = start(True)
+    check('parabeetle clones ride: he stands on his rising beetle (0.4 a frame; ground, its heartbeat): the clones copy his '
+          'vertical movement (on theirs, made under them, rising as his): 10.4 ... 12.4',
+          ys[1:], [(round(10.0 + 0.4 * (k + 1), 3),) * 2 for k in range(1, 6)])
+    ys0 = start(False)
+    check('parabeetle clones ride: the same without the heartbeat (on a floor the clones can\'t see): they fall with their '
+          'gravity (the line test\'s floors; theirs are the beetles\' lines in game)', ys0[-1][0] < 10.0, True)
+
+
+PB_SRC_DIR = None
+
+
+def parabeetle_tests(mscsb, src):
+    """parabeetle v1: its MSC (parabeetle.mscsb): the claim's start (his / a clone's place, the ground's), its path (the
+    swoop, the rise), its bob, the riders (fighters, his clones) and the motions, the heartbeat, the leaving, the removals"""
+    import math
+    import gekkouga_clone_cave as C
+    LEN = {0: 80, 1: 80, 2: 7}
+
+    def make(code=1.0, slot=3, his=(40.0, 50.0), shared=None):
+        m = MSC(mscsb, src)
+        g = m.game
+        g.x, g.y = 0.0, 0.0
+        g.kind_at = 0
+
+        def sysf(sid, a, old=g.sys):
+            if sid == 0x12 and a[0] == 0x1:
+                g.log.append(('motion', a[1]))
+                g.motion, g.kind_at = a[1], 0
+                g.frame = 0.0
+                return 0
+            if sid == 0x14 and a[0] == 0:
+                g.log.append(('lr', fv(a[1])))
+                g.lr = fv(a[1])
+                return 0
+            if sid == 0x21 and a[0] == 0x9:
+                g.log.append(('remove',))
+                return 0
+            if sid == 0xA and a[0] in (0x4, 0x5):
+                x = i2f(a[1])
+                return f2i(math.cos(x) if a[0] == 0x4 else math.sin(x))
+            return old(sid, a)
+        g.sys = sysf
+        if code is not None:
+            g.vars[0x0F000300] = float(slot)
+            g.vars[0x0F000301] = float(code)
+        g.vars[0x0F000020 + 4 * (slot - 1)] = his[0]
+        g.vars[0x0F000021 + 4 * (slot - 1)] = his[1]
+        g.vars[0x0F0000A0 + 8 * (slot + 2) + 5] = float(C.GK_KIND)
+        for k, v in (shared or {}).items():
+            g.vars[0x0F000340 + 8 * (slot - 1) + k] = v
+        return m, g
+
+    def run(m, n=1):
+        g = m.game
+        for _ in range(n):
+            m('pb_frame')
+            g.kind_at += 1
+            g.frame = float(g.kind_at % LEN.get(g.motion, 80))
+
+    def line(m):
+        return round(m.game.y + fv(m('pb_top')), 3)
+    m, g = make(code=None)
+    run(m, 30)
+    check('parabeetle: nobody claimed it: it waits hidden (VisibilityModule 0), nothing else ...',
+          sorted(set(x for x in g.log)), [('visible', 0)])
+    run(m, 1)
+    check('parabeetle: ... and after 30 frames removes itself', [x for x in g.log if x[0] == 'remove'], [('remove',)])
+    B0 = 0.007 + 0.7598 - 0.0388 + 0.1015              # its bob at the wait motion's frame 0 (pb_bob's fit)
+    m, g = make()
+    run(m)
+    check('parabeetle constants: line 10.6 over its place (PB_TOP), half length 10 (PB_HALF: 20 wide), the executable\'s',
+          (fv(m('pb_top')), fv(m('pb_half'))), (C.PB_TOP, C.PB_HALF))
+    check('parabeetle start (code +1: his, facing right; him at (40, 50) in the air): at his X (its first step: 40.75); '
+          'the wait motion (0), facing right, shown; its phase 1 (VAR_5: the executable makes its line); an arrival puff',
+          (round(g.x, 3), [x for x in g.log if x[0] in ('lr', 'motion', 'visible')], g.vars.get(0x0F000305),
+           [x[:3] for x in g.log if x[0] == 'effect']),
+          (40.75, [('motion', 0), ('lr', 1.0), ('visible', 1)], 1.0, [('effect', 0x3, 0x1000021)]))
+    m, g = make()
+    run(m)
+    g.vars[0x0F000029] = 500.0                            # (he jumps away: nobody on it)
+    pyst = [(m.g('pb_t'), m.gf('pb_x'), m.gf('pb_y'), round(g.y - m.gf('pb_y'), 3), g.motion, g.vars.get(0x0F000305))]
+    for t in range(2, 241):
+        run(m)
+        pyst.append((m.g('pb_t'), m.gf('pb_x'), m.gf('pb_y'), round(g.y - m.gf('pb_y'), 3), g.motion,
+                     g.vars.get(0x0F000305)))
+    y0 = m.gf('pb_y0')
+    x0 = m.gf('pb_x0')
+    check('parabeetle start: its line when made (its place + its bob at frame 0 + 10.6) = his feet - 0.3 (49.7)',
+          round(y0 + B0 + C.PB_TOP, 2), 49.7)
+    xs = [round(p[1] - x0, 3) for p in pyst[:239]]
+    check('parabeetle path: forward 0.75 a frame his way (+1): 0.75 t for t 1 - 239 (179.25 at 239)',
+          xs == [round(0.75 * t, 3) for t in range(1, 240)], True)
+    dy = [round(p[2] - y0, 3) for p in pyst[:239]]
+    want = []
+    for t in range(1, 240):
+        if t <= 20:
+            want.append(round(-8 * (1 - math.cos(math.pi * t / 20)) / 2, 3))
+        else:
+            u = t - 20
+            want.append(round(-8 + (0.4 * u * u / 60 if u <= 30 else 0.4 * 15 + 0.4 * (u - 30)), 3))
+    err = max(abs(a_ - b_) for a_, b_ in zip(dy, want))
+    check('parabeetle path: the swoop: down 8 over 20 frames (half a cosine: still at both ends), then the rise: up to 0.4 '
+          'a frame over 30 frames, then steady (max error %.3f)' % err, err < 0.01, True)
+    check('parabeetle path: lowest at frame 20 (-8), back to its start height at frame %d, +%.1f at frame 239' % (
+          next(t for t, v in enumerate(dy, 1) if t > 20 and v >= 0), dy[-1]),
+          (min(dy), dy.index(min(dy)) + 1, round(dy[-1], 1)), (-8.0, 20, round(-8 + 6 + 0.4 * 189, 1)))
+    check('parabeetle motions with nobody on it: wait (0) through the swoop, rise (1) once it rises (frame 21 on)',
+          ([p[4] for p in pyst[:20]] == [0] * 20, [p[4] for p in pyst[20:239]] == [1] * 219), (True, True))
+    check('parabeetle: flying 239 frames (phase 1), leaving at 240 (VAR_5 2: the executable removes its line)',
+          ([p[5] for p in pyst[:239]] == [1.0] * 239, pyst[239][5]), (True, 2.0))
+    lx, ly = g.x, g.y
+    run(m, 29)
+    check('parabeetle leaving: flies off forward and up (x %+.1f, y %+.1f in 29 frames), still there ...' % (
+          g.x - lx, g.y - ly), (g.x - lx > 40, g.y - ly > 50, [x for x in g.log if x[0] == 'remove']), (True, True, []))
+    run(m, 1)
+    check('parabeetle leaving: ... removed 30 frames after (4.5 s in all)', [x for x in g.log if x[0] == 'remove'],
+          [('remove',)])
+    # ---- the bob: the article bobs by its root's motion, so its line stays on the shell
+    held = PB_HELD or {}
+    if held:
+        errs = []
+        for kind, name in enumerate(C.PB_MOTIONS):
+            h = held[name]
+            m2, g2 = make()
+            run(m2)
+            m2.setg('pb_kind', kind)
+            for f in range(len(h) if kind != 2 else 7):
+                g2.frame = float(f)
+                errs.append((kind, f, abs(fv(m2('pb_bob')) - h[f])))
+        worst = max(errs, key=lambda e: e[2])
+        check('parabeetle bob: its MSC\'s pb_bob = the root Y taken out of each motion (tools/chr0_to_omo.py hold) on every '
+              'frame of wait (80), rise (80), ridden (7): worst %.3f (motion %d frame %d)' % (worst[2], worst[0], worst[1]),
+              worst[2] <= 0.1, True)
+    bobs = [p[3] for p in pyst[:20]]
+    check('parabeetle bob: the article\'s place = its path + the bob (the wait motion\'s: 0.84 at frame 0 down to -1.8 at '
+          'frame 26)', (bobs[0] <= 0.84 and min(bobs) < -1.5), True)
+    # ---- the ground's: higher, its swoop ending 1 over the floor
+    m, g = make(code=-5.0, his=(10.0, 0.0))
+    run(m)
+    check('parabeetle start (code -5: his, facing left, on the ground): its line 11.5 over his feet (he hops onto it), '
+          'facing left', (round(m.gf('pb_y0') + B0 + C.PB_TOP, 2), [x for x in g.log if x[0] == 'lr'], round(g.x, 2)),
+          (11.5, [('lr', -1.0)], 9.25))
+    lows = []
+    for _ in range(40):
+        run(m)
+        lows.append(line(m))
+    check('parabeetle (ground): its line\'s lowest (the swoop\'s bottom with the bob) about 1 over the floor (%.2f), never '
+          'under it' % min(lows), 0.5 <= min(lows) <= 1.5, True)
+    # ---- a clone's: from his shared places
+    m, g = make(code=2.0, shared={0: -14.0, 1: 30.0, 2: 14.0, 3: 31.0})
+    run(m)
+    check('parabeetle start (code +2: the left clone\'s): at its place (his VAR_24 / 25: -14, 30): its line 29.7',
+          (round(m.gf('pb_x0'), 2), round(m.gf('pb_y0') + B0 + C.PB_TOP, 2), m.g('pb_which')), (-14.0, 29.7, 2))
+    m, g = make(code=-7.0, shared={0: -14.0, 1: 30.0, 2: 14.0, 3: 31.0})
+    run(m)
+    check('parabeetle start (code -7: the right clone\'s, on the ground, facing left): at (14, 31 + 11.5)',
+          (round(m.gf('pb_x0'), 2), round(m.gf('pb_y0') + B0 + C.PB_TOP, 2), m.g('pb_which'), m.g('pb_ground')),
+          (14.0, 42.5, 3, 1))
+    # ---- riders
+    m, g = make()
+    run(m)
+    g.vars[0x0F000029] = 500.0
+    run(m, 4)
+    top = line(m)
+    px = m.gf('pb_x')
+    slot1 = (0x0F000020, 0x0F000021, 0x0F0000A0 + 8 * 3 + 5, 0x0F0000A0 + 8 * 3 + 2)
+    g.vars[slot1[2]] = 0x10                               # slot 1: a fighter (kind 0x10)
+    g.vars[slot1[0]], g.vars[slot1[1]] = px + 5.0, top + 30.0
+    g.log = []
+    run(m)
+    check('parabeetle riders: a fighter 30 over it: nothing on it (wait)', (m.g('pb_rode'), g.motion), (0, 0))
+    ms = []
+    for k in range(10):
+        g.vars[slot1[0]], g.vars[slot1[1]] = m.gf('pb_x') + 5.0, line(m)
+        run(m)
+        ms.append(g.motion)
+    check('parabeetle riders: a fighter lands on it (its feet on the line, 5 from its middle): on it from its 2nd frame '
+          'there (one passing through the line\'s band is in it a frame at most), ridden (2: the user\'s ridden.chr0, the '
+          'press) for its 7 frames, then rise (1) while it carries (VAR_8 1)',
+          (ms, g.vars.get(0x0F000308)), ([0] + [2] * 7 + [1] * 2, 1.0))
+    m3, g3 = make()
+    run(m3)
+    g3.vars[0x0F000029] = 500.0
+    run(m3, 3)
+    g3.vars[slot1[2]] = 0x10
+    hits = []
+    for k in range(4):
+        g3.vars[slot1[0]], g3.vars[slot1[1]] = m3.gf('pb_x'), line(m3) + 1.2 - 1.8 * k   # falling 1.8 a frame through it
+        run(m3)
+        hits.append(m3.g('pb_rode'))
+    check('parabeetle riders: one falling through its line\'s band (1.8 a frame) isn\'t on it', hits, [0, 0, 0, 0])
+    check('parabeetle riders: not its owner: no heartbeat in his VAR_30', g.vars.get(0x0F000356, 0.0), 0.0)
+    g.vars[slot1[1]] = line(m) + 40.0
+    ms = []
+    for k in range(4):
+        run(m)
+        ms.append(g.motion)
+    check('parabeetle riders: it jumps off: ridden for 2 more frames (a frame or two off the line), then back to wait '
+          '(still in its swoop)', ms, [1, 1, 0, 0])
+    g.vars[slot1[0]], g.vars[slot1[1]] = m.gf('pb_x') + 13.5, line(m)   # (it moves 0.75 a frame under him)
+    run(m, 2)
+    check('parabeetle riders: past its end (its line +- 10, + 1.5): not on it', m.g('pb_rode'), 0)
+    for k in range(2):
+        g.vars[slot1[0]], g.vars[slot1[1]] = m.gf('pb_x') - 10.5, line(m) - 0.8   # (11.25 from it after its step)
+        run(m)
+    check('parabeetle riders: 11.25 from its middle, 0.8 under the line: on it (the line\'s ends + 1.5, 1 under)', m.g('pb_rode') > 0,
+          True)
+    g.vars[slot1[1]] = 500.0
+    run(m, 4)
+    g.vars[slot1[2]] = -1.0
+    g.vars[slot1[0]], g.vars[slot1[1]] = m.gf('pb_x'), line(m)
+    run(m)
+    check('parabeetle riders: an empty slot (kind -1) at its place: nobody', m.g('pb_rode'), 0)
+    g.vars[0x0F000028], g.vars[0x0F000029] = m.gf('pb_x') - 2.0, line(m) + 0.5
+    run(m)
+    g.vars[0x0F000028], g.vars[0x0F000029] = m.gf('pb_x') - 2.0, line(m) + 0.5
+    g.vars[0x0F000356] = 1.0                              # the clones' heartbeat bits already there
+    run(m)
+    check('parabeetle riders: its owner (slot 3) on it: bit 8 added to his VAR_30 (the clones\' bit 1 kept: 9), ridden',
+          (g.vars.get(0x0F000356), g.motion), (9.0, 2))
+    m, g = make(shared={0: 0.0, 1: 0.0, 7: 4747001.0})
+    run(m)
+    g.vars[0x0F000029] = 500.0
+    run(m, 2)
+    for k in range(2):
+        g.vars[0x0F000350], g.vars[0x0F000351] = m.gf('pb_x') + 1.0, line(m)
+        run(m)
+    check('parabeetle riders: his clone (alive: his VAR_31 4747000 + 1) on it: ridden', (m.g('pb_rode') > 0, g.motion),
+          (True, 2))
+    g.vars[0x0F000357] = 4747002.0
+    run(m, 4)
+    check('parabeetle riders: ... that clone gone (flags 2: only the other one alive): not ridden', m.g('pb_rode'), 0)
+    # ---- its owner KO'd; hitlag
+    m, g = make()
+    run(m, 10)
+    g.vars[0x0F0000A0 + 8 * 5 + 2] = float(0xB1)
+    run(m)
+    check('parabeetle: its owner KO\'d (his status Dead 0xB1): its line removed (VAR_5 2) and it removes itself',
+          (g.vars.get(0x0F000305), [x for x in g.log if x[0] == 'remove']), (2.0, [('remove',)]))
+    m, g = make()
+    run(m, 10)
+    t0, x0_ = m.g('pb_t'), g.x
+    g.hitlag = 3
+    run(m, 3)
+    check('parabeetle: in hitlag (StopModule 1) it holds (no step)', (m.g('pb_t'), g.x), (t0, x0_))
+
+
+def parabeetle_data_tests(out):
+    """parabeetle v1: its files (the converters' output) against the user's source (when --pb-src is given) and the
+    executable's constants"""
+    import math
+    import numpy as np
+    import lvd
+    import nud
+    import nut
+    import omo
+    import mdl0_to_nud as M
+    import chr0_to_omo as CH
+    import s3ds_enemy as se
+    import gekkouga_clone_cave as C
+    F = os.path.join(out, 'fighter', 'gekkouga')
+    md = os.path.join(F, 'model', 'parabeetle', 'c00')
+    files = sorted(os.listdir(md))
+    check('parabeetle model: model.nud / .nut / .vbn / .jtb / .sb / .nhb / .xmb / .flp and parabeetle.lvd',
+          files, sorted(['model.nud', 'model.nut', 'model.vbn', 'model.jtb', 'model.sb', 'model.nhb', 'model.xmb',
+                         'model.flp', 'parabeetle.lvd']))
+    vb = omo.vbn_read(os.path.join(md, 'model.vbn'))
+    check('parabeetle skeleton: TransN (the added root) + the source\'s 6 bones in order, parents kept',
+          [(n, p) for n, p, _h in vb], [('TransN', 0x0FFFFFFF), ('skl_root', 0), ('face', 1), ('wing_L_1', 1), ('wing_L_2', 3),
+                                        ('wing_R_1', 1), ('wing_R_2', 5)])
+    jt = open(os.path.join(md, 'model.jtb'), 'rb').read()
+    check('parabeetle model.jtb: one table, joint i = bone i (7)', struct.unpack('>8H', jt), (7, 0, 1, 2, 3, 4, 5, 6))
+    for f in se.DEFAULT_FILES:
+        check('parabeetle %s: reference/enemy_model_defaults\' (without sb / nhb the bone getter crashes, without xmb black)'
+              % f, open(os.path.join(md, f), 'rb').read() == open(os.path.join(se.DEFAULTS, f), 'rb').read(), True)
+    ms = nud.read(os.path.join(md, 'model.nud'))
+    dn, texs = nut.load(os.path.join(md, 'model.nut'))
+    check('parabeetle NUD: 2 meshes (the shell 46 vertices / 80 triangles, the body 253 / 394: the source\'s 80 / 394 faces),'
+          ' rigged, the fighter body shader 0x9A011063, culled back',
+          [(x.name, sum(p.nv for p in x.polygons), sum(len(p.idx) // 3 for p in x.polygons), x.polygons[0].vert_size >> 4 != 0,
+            hex(x.polygons[0].materials[0].flags), x.polygons[0].materials[0].cull) for x in ms],
+          [('polygon0', 46, 80, True, '0x9a011063', 1029), ('polygon1', 253, 394, True, '0x9a011063', 1029)])
+    tid = sorted(t.tex_id for t in texs)
+    check('parabeetle NUT: 3 textures in his range (0x4030A000: the flat normal map, the baked shell, met_pata)',
+          [hex(t) for t in tid], ['0x4030a000', '0x4030a001', '0x4030a002'])
+    ims = {t.tex_id: nut.decode(dn, t) for t in texs}
+    check('parabeetle NUT: the shell 32 x 32 (the env map\'s), met_pata 64 x 128', (ims[0x4030A001].shape[:2],
+                                                                                   ims[0x4030A002].shape[:2]),
+          ((32, 32), (128, 64)))
+    pac = dict(omo.pac_read(os.path.join(F, 'motion', 'parabeetle', 'main.pac')))
+    check('parabeetle main.pac: its 3 animations, the names the executable\'s motion info hashes (PB_MOTIONS)',
+          sorted(pac), sorted(n + '.omo' for n in C.PB_MOTIONS))
+    check('parabeetle OMOs: wait 80 frames, rise 80, ridden 7 (the CHR0s\' frame counts); 7 nodes each',
+          [(omo.Omo(pac[n + '.omo']).frames, len(omo.Omo(pac[n + '.omo']).nodes)) for n in C.PB_MOTIONS],
+          [(80, 7), (80, 7), (7, 7)])
+    w = os.path.join(F, 'script', 'animcmd', 'weapon', 'parabeetle')
+    mt = open(os.path.join(w, 'motion.mtable'), 'rb').read()
+    check('parabeetle motion.mtable: ParabeetleWait / Rise / Ridden (motion kinds 0 / 1 / 2)',
+          list(struct.unpack('>3I', mt)), [acmd.crc(n) for n in GB.PB_SCRIPTS])
+    for f in ('game.bin', 'effect.bin', 'sound.bin'):
+        a = acmd.ACMDFile.load(os.path.join(w, f))
+        check('parabeetle %s: its 3 scripts empty (no hitbox: it isn\'t hurt and hurts nobody; no effect, no sound)' % f,
+              sorted((h, [c.name for c in sc]) for h, sc in a.scripts.items()),
+              sorted((acmd.crc(n), ['Script_End']) for n in GB.PB_SCRIPTS))
+    lv = lvd.LVD(os.path.join(md, 'parabeetle.lvd'))
+    c = lv.collisions[0]
+    check('parabeetle.lvd: one collision, drop-through (flag 4: the ground maker makes its line passable, 0x2000), the '
+          'hydrant\'s other flags; one floor line x -10 -> +10 at y 10.6 (= the executable\'s PB_VERTS: they ship '
+          'together), normal up, no ledges',
+          (len(lv.collisions), c.flags, [tuple(round(x, 3) for x in v) for v in c.verts], c.normals, c.cliffs),
+          (1, [0, 1, 0, 1], [tuple(v) for v in C.PB_VERTS], [[0.0, 1.0]], []))
+    msc = MSC(os.path.join(F, 'script', 'msc', 'parabeetle', 'parabeetle.mscsb'), GB.PARABEETLE_MSC)
+    check('parabeetle MSC: its line height / half length = the executable\'s PB_TOP / PB_HALF',
+          (fv(msc('pb_top')), fv(msc('pb_half'))), (C.PB_TOP, C.PB_HALF))
+    if not PB_SRC_DIR:
+        return
+    src = os.path.join(PB_SRC_DIR, GB.PB_MDL0)
+    model = M.parse(src)
+    check('mdl0_to_nud: the source parsed: MDL0 v11, 6 bones, 2 objects (80 + 394 triangles = the headers\' face counts), 2 '
+          'materials, the draw list',
+          (model['version'], len(model['bones']), [len(o['tris']) for o in model['objects']],
+           [o['nfaces'] for o in model['objects']], len(model['materials']), len(model['draw'])),
+          (11, 6, [80, 394], [80, 394], 2, 2))
+    check('mdl0_to_nud: each bone\'s SRT (Rz Ry Rx) gives its stored bind matrix (max error < 1e-3)',
+          max(float(np.abs(b['world'][:3] - b['bind']).max()) for b in model['bones']) < 1e-3, True)
+    S_ = C.PB_SCALE
+    import nud_preview
+    items, bones_, bw = nud_preview.load(md)
+    worst = 0.0
+    for i, b in enumerate(model['bones']):
+        want_ = b['world'].copy()
+        want_[:3, 3] *= S_
+        worst = max(worst, float(np.abs(bw[i + 1][:3] - want_[:3]).max()))
+    check('mdl0_to_nud: the VBN\'s bind pose = the source\'s (translations x %g; TransN identity): max error %.4f' % (S_, worst),
+          worst < 2e-3, True)
+    for oi, it in enumerate(items):
+        ov = M.object_vertices(model, model['objects'][oi])
+        a1 = np.unique(np.round(ov['pos'] * S_, 2), axis=0)
+        a2 = np.unique(np.round(it['pos'], 2), axis=0)
+        check('mdl0_to_nud: %s\'s vertices = the source\'s (world, x %g; welded corners: %d -> %d)' % (
+              it['name'], S_, len(ov['pos']), len(it['pos'])),
+              (len(a1), bool(np.allclose(a1, a2, atol=0.011)) if len(a1) == len(a2) else False), (len(a2), True))
+    uv1 = model['arrays']['uv'][1][1]
+    it = items[1]
+    check('mdl0_to_nud: the body\'s UVs = the source\'s UV set 1 (range %s - %s, mirrored wrap: NUD 2)' % (
+          np.round(uv1.min(0), 3).tolist(), np.round(uv1.max(0), 3).tolist()),
+          (np.allclose(it['uv'].min(0), uv1.min(0), atol=2e-3), np.allclose(it['uv'].max(0), uv1.max(0), atol=2e-3),
+           it['wrap']), (True, True, (2, 2)))
+    it = items[0]
+    nv = it['nrm'] @ M.VIEW_RIGHT.T
+    want_uv = M.sphere_uv(nv)
+    check('mdl0_to_nud: the shell\'s UVs are its sphere-map coordinates (GX EnvCamera: 0.5 + 0.5 nx, 0.5 - 0.5 ny of the '
+          'normal seen from the side, facing right), in 0 - 1, clamped',
+          (bool(np.allclose(it['uv'], want_uv, atol=2e-3)), float(it['uv'].min()) >= 0, float(it['uv'].max()) <= 1,
+           it['wrap']), (True, True, True, (3, 3)))
+    from PIL import Image
+    red = np.asarray(Image.open(os.path.join(PB_SRC_DIR, 'met_pata_shell.png')).convert('RGBA'))[..., :3].reshape(-1, 3).mean(0)
+    env = np.asarray(Image.open(os.path.join(PB_SRC_DIR, 'met_pata_shell_env.png')).convert('RGBA')).astype(float)
+    mats = {x['name']: x for x in model['materials']}
+    k = mats['mat_met_pata_shell']['regs']['C1'][3]
+    want_t = np.clip(red[None, None, :] + k * env[..., :3], 0, 255)
+    got_t = ims[0x4030A001][..., :3].astype(float)
+    err = float(np.abs(want_t - got_t).mean())
+    check('mdl0_to_nud: the shell\'s texture = its flat red (153, 28, 2) + %.3f x met_pata_shell_env (its TEV: C1 alpha '
+          '175 / 255; GX2 BC1, mean error %.1f / 255)' % (k, err), err < 6.0, True)
+    check('mdl0_to_nud: the source\'s materials are opaque (blend off, alpha compare always): no alpha (its PNGs are '
+          'opaque too)', [(x['blend'] & 1, (x['alpha_compare'] >> 16) & 0x3F) for x in model['materials']],
+          [(0, 0x3F), (0, 0x3F)])
+    # the OMOs against the CHR0s, every frame of every bone
+    worst = {}
+    for name, ch in zip(C.PB_MOTIONS, GB.PB_CHR0):
+        anim = CH.parse(os.path.join(PB_SRC_DIR, ch + '.chr0'))
+        o = omo.Omo(pac[name + '.omo'])
+        wr, wt = 0.0, 0.0
+        for f in range(o.frames):
+            for b in model['bones']:
+                ab = anim['bones'].get(b['name'])
+                sc, rot, tr = CH.local_at(ab, b, f) if ab else (b['scale'], b['rot'], b['pos'])
+                tr = np.asarray(tr) * S_
+                if b['name'] == GB.PB_ROOT:
+                    tr = tr.copy()
+                    tr[1] = 0.0
+                pos, q, s_ = o.sample(se.bone_hash(b['name']), f)
+                R1 = M.euler_xyz(rot)
+                R2 = np.array(omo.qmat(q))[:3, :3]
+                ang = math.degrees(math.acos(max(-1.0, min(1.0, (np.trace(R1.T @ R2) - 1) / 2))))
+                wr = max(wr, ang)
+                wt = max(wt, float(np.abs(np.asarray(pos) - tr).max()))
+        worst[name] = (round(wr, 2), round(wt, 3))
+    check('chr0_to_omo: every frame / bone of each OMO = its CHR0 (Hermite / linear keys, x 1.25; the root\'s Y held 0): '
+          'worst rotation / translation error %s' % worst,
+          all(r <= 0.5 and t <= 0.02 for r, t in worst.values()), True)
+    global PB_HELD
+    PB_HELD = {}
+    for name, ch in zip(C.PB_MOTIONS, GB.PB_CHR0):
+        anim = CH.parse(os.path.join(PB_SRC_DIR, ch + '.chr0'))
+        _b, _f, _l, held = CH.to_omo(anim, model, S_, None, {GB.PB_ROOT: 1})
+        PB_HELD[name] = held[GB.PB_ROOT]
+
+
+PB_HELD = None
+
+
 def main():
     global FX_PKG, GAUGE_SRC, GAUGE_JPG
     FX_PKG = next((x[5:] for x in sys.argv[1:] if x.startswith('--fx=')), None)
@@ -5230,12 +5881,13 @@ def main():
     GAUGE_JPG = next((x[12:] for x in sys.argv[1:] if x.startswith('--gauge-jpg=')), None)
     global GAUGE_VL
     GAUGE_VL = next((x[5:] for x in sys.argv[1:] if x.startswith('--vl=')), None)
-    global ICE_CLIP
+    global ICE_CLIP, PB_SRC_DIR
     ICE_CLIP = next((x[11:] for x in sys.argv[1:] if x.startswith('--ice-clip=')), None)
+    PB_SRC_DIR = next((x[9:] for x in sys.argv[1:] if x.startswith('--pb-src=')), None)
     a = [x for x in sys.argv[1:] if not x.startswith('--v') and not x.startswith('--fx=') and not x.startswith('--gauge-')
-         and not x.startswith('--ice-clip=')]
+         and not x.startswith('--ice-clip=') and not x.startswith('--pb-src=')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff', 'rg11', 'cm', 'tu', 'nr', 'st', 'id') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff', 'rg11', 'cm', 'tu', 'nr', 'st', 'id', 'ut') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -5261,6 +5913,10 @@ def main():
         trail_data_tests(out)
     script_tests(out, user)
     msc_ops_tests(out)
+    if os.path.exists(os.path.join(msc, 'parabeetle', 'parabeetle.mscsb')):
+        parabeetle_data_tests(out)
+        parabeetle_side_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
+        parabeetle_tests(os.path.join(msc, 'parabeetle', 'parabeetle.mscsb'), GB.PARABEETLE_MSC)
     if len(earlier) >= 46:
         usmash_trail_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'), out,
                            user, ICE_CLIP)

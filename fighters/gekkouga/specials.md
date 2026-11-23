@@ -120,6 +120,9 @@ frame vanilla teleports him the Running Skeleton (article 8) is made at `(0x31, 
 
 ## Up B: Hydro Pump (0x154, 0x15D, 0x15F, 0x15E)
 
+**Modded (README.md "Parabeetle v1"):** the stance (0x154) ends in `gk_pb_end` (clones.c): a Parabeetle (article 10) and
+Fall, or on cooldown a boost into SpecialFall; the jet (0x15D) and what follows it below are never reached.
+
 ```
 SpecialHi 0x154 --> SpecialHiJet 0x15D --timer / land--> SpecialHiEnd 0x15F --(2nd jet)--> SpecialHiJet 0x15D
                          |                                    |

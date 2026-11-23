@@ -47,7 +47,8 @@ Smash 4 model (what is written):
   little-endian as the game's fighters'. model.jtb: one table, joint i = bone i.
 - model.nud: one mesh per object, rigged (every vertex on its node: a single-bound object on its node, a weighted
   one through its PNMTXIDX: one bone each, weight 255; positions in the bind pose's world space), normals,
-  tangents, white vertex colour, the UV set 0. Material: Smash 4's skinned fighter body shader (0x9A011063:
+  tangents, white vertex colour, the UV set 0; every triangle's winding turned (GX draws clockwise front faces, Smash 4's
+  NUDs counter-clockwise: the vanilla models' winding agrees with their normals). Material: Smash 4's skinned fighter body shader (0x9A011063:
   colour, a flat normal map, the shared ramp) lit by the game, the source's wrap and culling.
 - Lighting: the source's TEV is decoded (--info prints it). Wii models of this era light themselves with sphere
   maps addressed by the camera-space normal ("lm_01e" diffuse, "lm_02e" specular: EnvCamera texgens): the game's
@@ -511,6 +512,9 @@ def object_vertices(model, obj):
             node = obj['node'] if obj['node'] >= 0 else v['node']
             if node is None:
                 raise ValueError('MDL0: object %s: a vertex with no matrix loaded' % obj['name'])
+            if node not in model['node_bone']:
+                raise ValueError('MDL0: object %s uses node %d, an envelope (blended weights): not handled' % (
+                    obj['name'], node))
             bi = model['node_bone'][node]
             w = np.vstack([bones[bi]['world'], [0, 0, 0, 1]])
             p = pos_a[v['pos']]
@@ -681,7 +685,8 @@ def convert(src, tex_dir, out_dir, scale=1.0, face='+z', head=None, tex_id=0x15A
         nrm = ov['nrm'][first] @ turn.T
         uv = ov['uv'][first]
         bone = ov['bone'][first] + 1
-        tri = vidx.reshape(-1, 3)
+        tri = vidx.reshape(-1, 3)[:, [0, 2, 1]]    # GX's front faces are clockwise; the NUD's counter-clockwise (the
+                                                # game's fighters': their winding agrees with their normals)
         baked = mat['name'] in env_bake_mats and env_bake(mat, images)
         tinfo = dict(name=obj['name'], material=mat['name'], vertices=len(first), triangles=len(tri),
                      uv_min=list(np.round(uv.min(0), 4)), uv_max=list(np.round(uv.max(0), 4)))

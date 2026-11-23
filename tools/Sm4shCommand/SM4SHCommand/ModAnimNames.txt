@@ -624,3 +624,10 @@ FireTrailLw4 -> firetrail/FitPacmanFirehydrantMainD03SpecialLw.omo
 // blast (an ice hit on a burning fighter, 52 frames later): its game script is empty (the hitbox is its MSC's, sized by
 // the burn amount); it plays the carrier's animation as the trails do.
 FireTrailIceBoom -> firetrail/FitPacmanFirehydrantMainD03SpecialLw.omo
+// Parabeetle v1 (fighters/gekkouga/README.md "Parabeetle v1"): the Parabeetle article (weapon kind 0x1A4, folder
+// "parabeetle": script/animcmd/weapon/parabeetle), its motion kinds 0 / 1 / 2 (motion.mtable): wait (flying), rise, ridden
+// (the press when landed on); its scripts are empty (no hitbox, effect or sound). Each plays its own animation, the
+// user's CHR0 converted (tools/chr0_to_omo.py), from motion/parabeetle/main.pac.
+ParabeetleWait -> parabeetle/FitGekkougaParabeetleMainA00Wait.omo
+ParabeetleRise -> parabeetle/FitGekkougaParabeetleMainA01Rise.omo
+ParabeetleRidden -> parabeetle/FitGekkougaParabeetleMainA02Ridden.omo

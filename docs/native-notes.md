@@ -3980,6 +3980,18 @@ MSC on a bunshin-based kind, the 4-shape group.
   GroundModule: the hydrant's words). The hydrant's handle callbacks (+0x44 on, +0x48 `0x02B34424`, +0x4C its accessor;
   +0xA4 / +0xA8 `0x02B34470` / +0xAC) only set its WorkModule flag `0x10000010` when a contact record (type 0 / 2, object
   id not 0x50000000, +0x2C set) comes in (and clear it, +0xA8, when the flag was on): its own logic, not the collision.
+- **Article grounds: drop-through from the .lvd (Greninja parabeetle v1, read from exe_v46z_ui10)**: the ground maker
+  `0x02AC2B84` reads each collision of the article's .lvd as the stage loader parsed it (0x10C bytes: +0xE8 its flag
+  word, the file's 4 flag bytes; +0xEC / +0xF0 the vertices, +0xF4 / +0xF8 the normals, +0x104 / +0x108 the lines (16
+  bytes: +0xC the line's attribute)). For each line it takes the attribute (`0x0313E3E0`) and, when +0xE8 bit 0 is set
+  (the 4th flag byte: lvd.py's drop-through), ORs 0x2000 into it (`0x02AC2D18` - `0x02AC2D30`) before making the ground
+  (`0x02D49F2C`, the attributes in r9); 0x2000 is the passable bit the line tests leave out (mask 0x102000). +0xE8 bit 1
+  (the 3rd byte) clear sets the new ground's +0x7C byte (the hydrant's flags [0, 1, 0, 0]: 1). So an article's .lvd
+  collision with the 4th flag set makes a soft platform as a stage's (land on it, jump up through it, drop through it).
+  Not confirmed in game.
+- **GX winding (Greninja parabeetle v1)**: a Wii MDL0's triangles are clockwise from the front (GX culls with front =
+  clockwise); Smash 4's NUD triangles are counter-clockwise (every vanilla model's winding agrees with its normals:
+  Pac-Man's hydrant 2440 / 0). tools/mdl0_to_nud.py turns them.
 - **Skeleton collision before v1.2 (skeleton v1)**: the hydrant route makes the grounds (`S4SC state=1`, handle
   0x13378650 in the user's log) but fighters neither stand on nor bump into them. Unverified: whether a lifecycle call
   (GroundModule vt +0x24 re-init `0x02AC29A4`, which zeroes +0xF0 without releasing; vt +0x4C `0x02AC2B50` / +0x2C

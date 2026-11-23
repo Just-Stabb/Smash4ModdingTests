@@ -8,6 +8,9 @@ KCAP main.pac, on the skeleton tools/mdl0_to_nud.py writes from the same model.
             an animation by tools/mtable.py anim_hash(NAME).
       --scale / --face: as given to mdl0_to_nud.py (translations x scale; the TransN root's turn).
       --info: print each CHR0's tracks (bone, component, format, keys) and write nothing.
+      --hold BONE:AXIS: that bone's translation on that axis (0 x, 1 y, 2 z) held at 0 in the OMOs; the values taken
+            out are returned (convert's info: 'held'), for an object that moves itself by them (the Parabeetle bobs its
+            whole article, collision included, by its root's bob).
 
 The files are untrusted input: only parsed (bounds checked).
 
@@ -179,8 +182,10 @@ def local_at(anim_bone, bind_bone, f):
     return vals['scale'], vals['rot'], vals['trans']
 
 
-def to_omo(anim, model, scale=1.0, turn=None):
-    """-> (OMO bytes, frames, per-bone local matrices [bones + 1][frames, 4, 4] (TransN first))"""
+def to_omo(anim, model, scale=1.0, turn=None, hold=None):
+    """-> (OMO bytes, frames, per-bone local matrices [bones + 1][frames, 4, 4] (TransN first), held values). hold:
+    {bone name: axis}: that bone's translation on that axis held at 0 in the OMO; its values (x scale) returned per frame
+    (the object's own movement can take them: an article whose collision must follow the model)"""
     import omo
     import s3ds_enemy as se
     from ultimate_fighter import _mat_quat, _node
@@ -193,6 +198,7 @@ def to_omo(anim, model, scale=1.0, turn=None):
     tn = np.repeat(T[None], frames, 0)
     locals_.append(tn)
     _node(o, se.bone_hash('TransN'), np.zeros((frames, 3)), _mat_quat(tn[:, :3, :3]), np.ones((frames, 3)))
+    held = {}
     for b in model['bones']:
         ab = anim['bones'].get(b['name'])
         mats = np.empty((frames, 4, 4))
@@ -201,11 +207,17 @@ def to_omo(anim, model, scale=1.0, turn=None):
                 sc, rot, tr = b['scale'], b['rot'], b['pos']
             else:
                 sc, rot, tr = local_at(ab, b, f)
-            mats[f] = M.srt(sc, rot, np.asarray(tr) * scale)
+            tr = np.asarray(tr, float) * scale
+            if hold and b['name'] in hold:
+                ax = hold[b['name']]
+                held.setdefault(b['name'], []).append(float(tr[ax]))
+                tr = tr.copy()
+                tr[ax] = 0.0
+            mats[f] = M.srt(sc, rot, tr)
         locals_.append(mats)
         t, q, s = se.split_trs(mats)
         _node(o, se.bone_hash(b['name']), t, q, s)
-    return o.encode(), frames, locals_
+    return o.encode(), frames, locals_, held
 
 
 def print_info(anim):
@@ -228,7 +240,7 @@ def print_info(anim):
         print('  %-10s code %08X %s' % (nm, e['code'], '; '.join(parts)))
 
 
-def convert(mdl0, out_pac, pairs, scale=1.0, face='+z', head=None, log=print):
+def convert(mdl0, out_pac, pairs, scale=1.0, face='+z', head=None, log=print, hold=None):
     import omo
     model = M.parse(mdl0)
     if face == 'auto':
@@ -243,10 +255,10 @@ def convert(mdl0, out_pac, pairs, scale=1.0, face='+z', head=None, log=print):
     entries, info = [], {}
     for name, path in pairs:
         anim = parse(path)
-        b, frames, _l = to_omo(anim, model, scale, turn)
+        b, frames, _l, held = to_omo(anim, model, scale, turn, hold)
         entries.append((name + '.omo', b))
         info[name] = dict(source=os.path.basename(path), frames=frames, loop=anim['loop'],
-                          bones=sorted(anim['bones']))
+                          bones=sorted(anim['bones']), held=held)
         log('  %s <- %s: %d frames%s' % (name, os.path.basename(path), frames, ', loop' if anim['loop'] else ''))
     os.makedirs(os.path.dirname(os.path.abspath(out_pac)), exist_ok=True)
     omo.pac_write(out_pac, entries)
@@ -262,13 +274,15 @@ def main():
     ap.add_argument('--face', default='+z')
     ap.add_argument('--head', default=None)
     ap.add_argument('--info', action='store_true')
+    ap.add_argument('--hold', action='append', default=[], help='BONE:AXIS (0 x, 1 y, 2 z): that translation held at 0')
     a = ap.parse_args()
     pairs = [tuple(p.split('=', 1)) for p in a.pairs]
     if a.info:
         for _n, p in pairs:
             print_info(parse(p))
         return
-    print(convert(a.mdl0, a.out_pac, pairs, a.scale, a.face, a.head))
+    hold = {h.split(':')[0]: int(h.split(':')[1]) for h in a.hold} or None
+    print(convert(a.mdl0, a.out_pac, pairs, a.scale, a.face, a.head, hold=hold))
 
 
 if __name__ == '__main__':

@@ -9,6 +9,9 @@
   python3 tools/gekkouga_build.py skeleton PACMAN_FIGHTER_DIR OUT_FIGHTER [TEST_ONLY_DIR]   skeleton v1: its files
                                                                 (vanilla fighter/pacman: its hydrant's model / motion)
   python3 tools/gekkouga_build.py trail PACMAN_FIGHTER_DIR OUT_FIGHTER      burn v2: the fire trail's files
+  python3 tools/gekkouga_build.py parabeetle SRC_DIR PACMAN_FIGHTER_DIR OUT_FIGHTER   parabeetle v1: the Parabeetle's files
+                                                                (SRC_DIR: the user's met_pata.mdl0, its PNGs, wait / rise /
+                                                                ridden.chr0; the hydrant's .lvd as its collision's template)
   python3 tools/gekkouga_build.py effects VANILLA_EFFECT_DIR KIRBY_PTCL FX_PKG OUT_FIGHTER   skeleton v1.2 on: his
                                                                 effect bank + the flipbooks (tools/gekkouga_fx.py) ->
                                                                 OUT_FIGHTER/effect/gekkouga/gekkouga.010d0000.ptcl / .efc
@@ -1587,6 +1590,71 @@ def cmd_trail(pacman_fighter, out_fighter):
     compile_msc(TRAIL_MSC, os.path.join(ms, 'firetrail.mscsb'))
     return len(SK_CARRIER) + 6
 
+
+# ---------------------------------------------------------------- parabeetle v1: the Parabeetle (article 10, weapon kind 0x1A4)
+PARABEETLE_MSC = os.path.join(ROOT, 'fighters', 'gekkouga', 'weapons', 'parabeetle.c')
+PB_SCRIPTS = ('ParabeetleWait', 'ParabeetleRise', 'ParabeetleRidden')   # its motion kinds 0 / 1 / 2 (motion.mtable)
+PB_CHR0 = ('wait', 'rise', 'ridden')                                     # the user's CHR0 for each
+PB_MDL0 = 'met_pata.mdl0'
+PB_ENV_BAKE = ('mat_met_pata_shell',)     # its shell: flat red + 0.686 x an EnvCamera reflection (the source's TEV):
+                                          # baked (tools/mdl0_to_nud.py env_bake)
+PB_ROOT = 'skl_root'                      # the bone whose Y translation (the wings' bob) the article itself does
+PB_TEX_ID = 0x4030A000                    # its textures' ids (his own range 0x4030xxxx; his body's are 0x403000xx)
+
+
+def parabeetle_lvd(hydrant_lvd):
+    """its collision: the hydrant's .lvd (one collision: its flags / material / names' layout kept) with one floor line on
+    the beetle's top (tools/gekkouga_clone_cave.py PB_VERTS: the executable moves these 2 vertices onto it every frame),
+    drop-through (the 4th flag byte: the article ground maker 0x02AC2B84 makes every line passable, attribute 0x2000)"""
+    import lvd
+    import gekkouga_clone_cave as C
+    lv = lvd.LVD(hydrant_lvd)
+    assert len(lv.collisions) == 1, 'the hydrant has one collision'
+    c = lv.collisions[0]
+    c.name, c.subname = 'COL_Parabeetle', 'Parabeetle'
+    c.verts = [list(map(float, v)) for v in C.PB_VERTS]
+    c.normals = [[0.0, 1.0]]                       # a floor (the line left to right, its normal turned counter-clockwise)
+    c.mats = [bytearray(c.mats[0])]
+    c.cliffs = []                                  # no ledges
+    c.flags = list(c.flags[:3]) + [1]              # drop-through
+    return lv.write()
+
+
+def pb_empty():
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    return {acmd.crc(n): [acmd.Command(by['Script_End'], [])] for n in PB_SCRIPTS}
+
+
+def cmd_parabeetle(src_dir, pacman_fighter, out_fighter, log=print):
+    """the Parabeetle's files: model/parabeetle/c00 (the user's MDL0, tools/mdl0_to_nud.py, + parabeetle.lvd),
+    motion/parabeetle/main.pac (its CHR0s, tools/chr0_to_omo.py), script/animcmd/weapon/parabeetle (empty scripts: no
+    hitbox, effect or sound), script/msc/parabeetle/parabeetle.mscsb"""
+    import acmd
+    import chr0_to_omo
+    import mdl0_to_nud
+    import gekkouga_clone_cave as C
+    mdl0 = os.path.join(src_dir, PB_MDL0)
+    dst = os.path.join(out_fighter, 'model', 'parabeetle', 'c00')
+    info = mdl0_to_nud.convert(mdl0, src_dir, dst, scale=C.PB_SCALE, face='+z', tex_id=PB_TEX_ID,
+                               env_bake_mats=PB_ENV_BAKE, log=log)
+    hyd = os.path.join(pacman_fighter, 'model', 'firehydrant', 'c00', 'firehydrant.lvd')
+    open(os.path.join(dst, 'parabeetle.lvd'), 'wb').write(parabeetle_lvd(hyd))
+    md = os.path.join(out_fighter, 'motion', 'parabeetle')
+    pairs = [(n, os.path.join(src_dir, c + '.chr0')) for n, c in zip(C.PB_MOTIONS, PB_CHR0)]
+    info['motions'] = chr0_to_omo.convert(mdl0, os.path.join(md, 'main.pac'), pairs, scale=C.PB_SCALE, face='+z', log=log,
+                                          hold={PB_ROOT: 1})   # its root's bob taken out: the article bobs (weapons/
+                                                               # parabeetle.c pb_bob), so its collision line follows it
+    ow = os.path.join(out_fighter, 'script', 'animcmd', 'weapon', 'parabeetle')
+    os.makedirs(ow, exist_ok=True)
+    for f in ('game.bin', 'effect.bin', 'sound.bin'):
+        acmd.ACMDFile(pb_empty()).save(os.path.join(ow, f))
+    open(os.path.join(ow, 'motion.mtable'), 'wb').write(b''.join(struct.pack('>I', acmd.crc(n)) for n in PB_SCRIPTS))
+    ms = os.path.join(out_fighter, 'script', 'msc', 'parabeetle')
+    os.makedirs(ms, exist_ok=True)
+    compile_msc(PARABEETLE_MSC, os.path.join(ms, 'parabeetle.mscsb'))
+    return info
+
 if __name__ == '__main__':
     a = sys.argv[1:]
     if len(a) == 3 and a[0] == 'msc':
@@ -1608,6 +1676,8 @@ if __name__ == '__main__':
         print(cmd_trail(a[1], a[2]))
     elif len(a) == 3 and a[0] == 'vl':
         print(cmd_vl(a[1], a[2]))
+    elif len(a) == 4 and a[0] == 'parabeetle':
+        print(cmd_parabeetle(a[1], a[2], a[3]))
     elif len(a) in (3, 4) and a[0] == 'skeleton':
         print(cmd_skeleton(a[1], a[2], a[3] if len(a) > 3 else None))
     else:

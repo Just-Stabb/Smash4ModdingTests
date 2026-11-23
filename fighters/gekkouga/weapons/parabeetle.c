@@ -629,6 +629,8 @@ int pb_kind;           // the motion kind playing (0 wait, 1 rise, 2 ridden)
 int pb_kind_t;         // frames in it
 int pb_rode;           // frames something has been on it (0: nothing)
 int pb_free;           // frames nothing has been on it since something was
+int pb_on_n;           // frames in a row something's feet have been on its line (on it from the 2nd: one falling or
+                       // jumping through the line's band is in it for a frame at most)
 float pb_x0;           // where it started (its origin: its collision line is pb_top() over it), its way
 float pb_y0;
 float pb_dir;
@@ -644,11 +646,13 @@ float pb_dip() { return 8.0f; }           // the swoop: down this far ...
 int pb_dip_frames() { return 20; }        // ... over this many frames (half a cosine: its speed 0 at both ends)
 float pb_rise_v() { return 0.4f; }        // then it rises: up to this many units a frame ...
 int pb_rise_ease() { return 30; }         // ... reached in this many frames (an even push), then steady: up 74 by 240
-float pb_top() { return 11.4f; }          // its collision line over its origin (tools/gekkouga_build.py PB_TOP: the shell's
-                                          // top at the model's scale 1.25, 0.5 under its highest point)
+float pb_top() { return 10.6f; }          // its collision line over its origin (tools/gekkouga_clone_cave.py PB_TOP: the
+                                          // shell's top, 10.84 at the model's scale 1.25 in every motion, its root's bob
+                                          // taken out: pb_bob)
 float pb_half() { return 10.0f; }         // ... from x - this to x + this (20 wide: 1.7 x his 12)
 float pb_gap() { return 0.3f; }           // in the air its top starts this far under his feet
-float pb_lift() { return 9.0f; }          // on the ground: this far over his feet (its swoop's bottom 1 over the floor)
+float pb_lift() { return 11.5f; }         // on the ground: its line this far over his feet: its lowest (the swoop's bottom,
+                                          // frame 20, the wait motion's bob then 2.5 under its first frame's) 1 over the floor
 float pb_leave_vx() { return 1.6f; }      // leaving: forward ...
 float pb_leave_vy() { return 0.6f; }      // ... and up, rising faster each frame
 float pb_leave_ay() { return 0.12f; }
@@ -712,6 +716,64 @@ float pb_curve(int t)
     return -d + pb_rise_v() * (float)pb_rise_ease() / 2.0f + pb_rise_v() * (u - (float)pb_rise_ease());
 }
 
+// its root's bob (the source's skl_root Y, x 1.25, taken out of its motions: tools/gekkouga_build.py PB_ROOT): the whole
+// article bobs by it, so its collision line (pb_top() over its place) stays on its shell. Fitted to the motions' values
+// (tools/gekkouga_clones_test.py checks every frame within 0.1): wait 3 harmonics of its 80 frames, rise 1 of 40, ridden
+// its 7 frames' values
+float pb_bob()
+{
+    float t;
+    float w;
+    int i;
+    float a;
+    float b;
+    t = MotionModuleF(0x1);
+    if (pb_kind == 0x2)
+    {
+        i = (int)t;
+        if (i >= 6)
+        {
+            return 0;
+        }
+        a = pb_ridden_y(i);
+        b = pb_ridden_y(i + 1);
+        return a + (b - a) * (t - (float)i);
+    }
+    if (pb_kind == 0x1)
+    {
+        w = 2.0f * M_PI * t / 40.0f;
+        return -0.0045f + 0.7418f * MathF(0x4, w) - 1.0257f * MathF(0x5, w);
+    }
+    w = 2.0f * M_PI * t / 80.0f;
+    return 0.007f + 0.7598f * MathF(0x4, w) - 1.8181f * MathF(0x5, w) - 0.0388f * MathF(0x4, 2.0f * w) +
+        0.0352f * MathF(0x5, 2.0f * w) + 0.1015f * MathF(0x4, 3.0f * w) - 0.048f * MathF(0x5, 3.0f * w);
+}
+
+float pb_ridden_y(int i)
+{
+    if (i == 0x1)
+    {
+        return -1.06f;
+    }
+    if (i == 0x2)
+    {
+        return -1.875f;
+    }
+    if (i == 0x3)
+    {
+        return -1.582f;
+    }
+    if (i == 0x4)
+    {
+        return -0.938f;
+    }
+    if (i == 0x5)
+    {
+        return -0.293f;
+    }
+    return 0;
+}
+
 void pb_motion(int k)
 {
     if (k != pb_kind)
@@ -723,7 +785,8 @@ void pb_motion(int k)
 }
 
 // its start: the code the executable copied from his request (its VAR_1), the place from his (the slot's position) or
-// his clone's (his shared variables)
+// his clone's (his shared variables). Its place (pb_x, pb_y) is its path's; the article is at pb_y + pb_bob() (its
+// root's bob, its line with it)
 void pb_start()
 {
     int c;
@@ -762,24 +825,24 @@ void pb_start()
         x = pb_slot_pos(pb_slot, 0);
         y = pb_slot_pos(pb_slot, 0x1);
     }
+    pb_kind = -1;
+    pb_motion(0);
     pb_x0 = x;
-    pb_y0 = y - pb_top() - pb_gap();
+    pb_y0 = y - pb_top() - pb_gap() - pb_bob();   // its line (its place + its bob + pb_top()) just under his feet
     if (pb_ground)
     {
-        pb_y0 = y - pb_top() + pb_lift();
+        pb_y0 = y - pb_top() + pb_lift() - pb_bob();
     }
     pb_x = pb_x0;
     pb_y = pb_y0;
     PostureModule(0, pb_dir);
     PostureModule(0x2);
-    PostureModule(0x3, pb_x, pb_y, 0);
+    PostureModule(0x3, pb_x, pb_y + pb_bob(), 0);
     VisibilityModule(0x2710, 0x1);
     pb_on = 0x1;
     pb_t = 0;
     pb_phase = 0x1;
     pb_set(5, 1.0f);                      // the executable: its collision made, moved with it
-    pb_kind = -1;
-    pb_motion(0);
     pb_rode = 0;
     pb_free = 0;
     EffectModule(0x3, pb_fx_puff(), pb_x, pb_y + pb_top() * 0.5f, 0, 0, 0, 0, pb_fx_puff_size(), 0, 0xffffffff);
@@ -796,7 +859,7 @@ int pb_riders()
     float y;
     int flags;
     n = 0;
-    top = pb_y + pb_top();
+    top = pb_y + pb_bob() + pb_top();
     s = 0x1;
     while (s <= 0x8)
     {
@@ -945,7 +1008,7 @@ void pb_frame()
         pb_x = pb_x + pb_vx;
         pb_y = pb_y + pb_vy;
         pb_vy = pb_vy + pb_leave_ay();
-        PostureModule(0x3, pb_x, pb_y, 0);
+        PostureModule(0x3, pb_x, pb_y + pb_bob(), 0);
         return;
     }
     if (StopModule(0x1))
@@ -960,12 +1023,24 @@ void pb_frame()
     }
     pb_x = pb_x0 + pb_speed() * pb_dir * (float)pb_t;
     pb_y = pb_y0 + pb_curve(pb_t);
-    PostureModule(0x3, pb_x, pb_y, 0);
     ride = pb_riders();
+    if (ride & 0x1)
+    {
+        pb_on_n += 1;
+    }
+    else
+    {
+        pb_on_n = 0;
+    }
+    if (pb_on_n < 0x2)
+    {
+        ride = 0;
+    }
     pb_set(8, (float)ride + 0);           // diag: 1 something on it, 3 its owner too
     if (ride & 0x2)
     {
         pb_beat();
     }
     pb_anim(ride & 0x1);
+    PostureModule(0x3, pb_x, pb_y + pb_bob(), 0);
 }
