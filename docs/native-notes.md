@@ -4094,5 +4094,7 @@ MSC on a bunshin-based kind, the 4-shape group.
   is 0) writes slot n's colour at +0x18 + 0x4C n (scaled by +0x34 - +0x3C into +8 - +0xC) and its on byte +0x50 + 0x4C n;
   vt +0x44(slot) clears the on bytes; vt +0xAC (`0x02C1A288`) picks the slot shown: 1 when its on byte (+0x9C) is set and
   slot 0 is off or slot 1's priority (+0x98) is higher than slot 0's (+0x4C); vt +0xCC / +0xC4 read / write the slot
-  Color_Overlay writes to (+0xD5); `0x02C1A2C8` resets slot 1 (priority 0x32). Outline_Shell's table in exe_v46z_ui10:
+  Color_Overlay writes to (+0xD5); `0x02C1A2C8` resets slot 1 (priority 0x32). vt +0x8C (`0x02C1A278`, MSC op 0x271A) sets slot
+  r5's priority to r4 (both start at 0x32: `0x02C1A0C4`), so a slot 1 overlay is hidden whenever slot 0 is on unless its
+  priority is raised (Greninja's ice detonation flash, fighters/gekkouga/README.md "Usmash spike v2 / trail dim v1"). Outline_Shell's table in exe_v46z_ui10:
   os_tab `0x04BE5F5C`, os_g `0x04BE5D10` (+0 entries in use: os_frame skips everything at 0), os_count `0x04BE5388`.

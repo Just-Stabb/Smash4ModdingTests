@@ -109,7 +109,7 @@ MSC_BODIES = {
     # ... and SpecialLwHit 0x160 (unused) the split clones' regroup call: the start of his stance (clones.c gk_rg_*)
     'func_2346': ('void', 'gk_rg_main(); // Greninja mod: aligned kick v1, the regroup (clones.c)'),
     'func_2347': ('int', 'return gk_rg_loop(); // Greninja mod: aligned kick v1, the regroup (clones.c)'),
-    'func_2349': ('void', 'func_2340(); // Greninja mod: the regroup: the stance\'s physics (clones.c)'),
+    'func_2349': ('void', 'gk_rg_init(); // Greninja mod: the regroup: the stance\'s physics, the fall\'s in the air (clones.c)'),
 }
 # attack loops: a chain cancel first
 MSC_CHAIN = {'func_293': 0x1, 'func_302': 0x2, 'func_309': 0x4}

@@ -3969,6 +3969,15 @@ void gk_fland(int c)
 // counter stance (speciallw / specialairlw, frames 0 - 7.6: before its intangible window 8 - 19, at 0.4: gk_rg_anim()
 // frames), the stance's own slow fall; the clones walk (same floor) / float back to their formation places (his X -/+ 14,
 // his Y) over gk_rg_frames() (eased: slow start and end; not through walls' tests: they float), then formation
+// usmash spike v2 / trail dim v1 (the user: "allow the reform command ... work in the air, still by pressing shield and
+// special"; "If Greninja is in the middle of airdodging, allow him to cancel into the reform command"): it was allowed in
+// the air already (Fall / jumps), but in the air shield is the air dodge: shield (held or pressed with special) put him
+// in EscapeAir (0x22) first, which wasn't one of its statuses, so the press never took. Now EscapeAir is (any frame: the
+// dodge cancelled, its intangibility ended at once: HitModule(0x2710, 0)), where special alone is enough (shield started
+// the dodge); elsewhere special with shield held, as before. In the air: the shield / air dodge commands are cleared
+// with the specials (no dodge from the same press after it), the stance's air motion (specialairlw, the same 19 frames
+// at 0.4) with the fall's kinetics (KineticModule(0, 0): his gravity, drift and the speed he had, no stall: gk_rg_init),
+// then Fall (no special fall); landing during it ends it in LandingLight (a normal landing, no aerial landing lag)
 int gk_rg_frames() { return 75; }         // 1.25 s
 int gk_rg_anim() { return 19; }
 float gk_rg_rate() { return 0.4f; }
@@ -3987,6 +3996,10 @@ int gk_rg_ok(int st)
     {
         return 0x1;                       // shielding
     }
+    if (st == 0x22)
+    {
+        return 0x1;                       // EscapeAir: the air dodge cancelled (usmash spike v2 / trail dim v1)
+    }
     return 0;
 }
 
@@ -3996,18 +4009,40 @@ int gk_rg_try()
     {
         return 0;
     }
-    if (ControlModule(0x2712, 0x3) == 0)
+    if (global4 != 0x22 && ControlModule(0x2712, 0x3) == 0)
     {
-        return 0;
+        return 0;                         // shield held (in the air dodge: special alone)
     }
     if (!gk_rg_ok(global4))
     {
         return 0;
     }
-    WorkModule(0, 32.0f + 0, 0x0f0003c9); // Buffer_Clear (specials): no special status
+    if (global18 == 0x2)
+    {
+        WorkModule(0, 160.0f + 0, 0x0f0003c9);   // Buffer_Clear (specials and shield / air dodge): no special, no dodge
+    }
+    else
+    {
+        WorkModule(0, 32.0f + 0, 0x0f0003c9);    // Buffer_Clear (specials): no special status
+    }
     global24 = global24 - (global24 & 0xf000);
     func_16(0x160, 0x1);
     return 0x1;
+}
+
+// its init (func_2349's body): the stance's physics on the ground (func_2340, as before); in the air the fall's (no stall,
+// his speed kept), the air dodge's intangibility (if it came from one) ended
+void gk_rg_init()
+{
+    HitModule(0x2710, 0);
+    if (global18 == 0x2)
+    {
+        KineticModule(0, 0);
+    }
+    else
+    {
+        func_2340();
+    }
 }
 
 // his status 0x160's main (func_2346's body)
@@ -4050,8 +4085,8 @@ int gk_rg_loop()
     }
     else if (global19 == 0x2 && global18 == 0)
     {
-        func_23(0x271);
-        MotionModule(0x4, gk_rg_rate());
+        func_16(0x17, 0);                 // landed during it: LandingLight (usmash spike v2 / trail dim v1; the clones go on
+        return 0x1;                       // regrouping: mode 3 runs on its own clock)
     }
     return 0;
 }

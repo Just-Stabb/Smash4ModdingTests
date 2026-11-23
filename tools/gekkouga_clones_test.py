@@ -1318,6 +1318,7 @@ def split_tests(mscsb, src):
     g.status_req = []
     g.x = 0.0
     lx0, rx0 = m.gf('gk_lx'), m.gf('gk_rx')
+    m.vm.g[18] = 0                                # (standing: the situation global; usmash spike v2's air clear reads it)
     ak_frame(m, g, st=0x1C, press=(1,), guard=True)
     check('regroup: special pressed with shield held (Guard 0x1C): his short call (0x160), the special eaten',
           (g.status_req, g.vars.get(0x0F0003C9)), ([(0x160, 1)], 32.0))
@@ -1339,6 +1340,253 @@ def split_tests(mscsb, src):
     ak_frame(m, g, st=0)
     check('regroup: formation again: VAR_28 his motion (kind x 1024 + frame), flags without 128',
           int(g.vars.get(0x0F00031F)) - 4747000 & 0x80, 0)
+
+
+def usmash_trail_tests(mscsb, src, out, user, ice_clip=None):
+    """usmash spike v2 / trail dim v1 (README): up smash's whole strong part a spike; the trails dimmer (the bank: its
+    emitters' colour scale); the ice detonation's sound (the bank / table, the cut, his MSC's play / stop, no blast sound),
+    the clones' ability 840 frames"""
+    import acmd
+    import fighter_own_bank as FB
+    import gekkouga_clone_cave as C
+    import gekkouga_sound as GS
+    import minecraft_sound as MS
+    import ptcl as P
+    import gekkouga_fx as FX
+    B = os.path.join(out, 'fighter', 'gekkouga', 'script', 'animcmd')
+    gm = acmd.ACMDFile.load(os.path.join(B, 'body', 'game.bin'))
+    cg = acmd.ACMDFile.load(os.path.join(B, 'weapon', 'clone', 'game.bin'))
+    ug = acmd.ACMDFile.load(os.path.join(user, 'body', 'game.bin'))
+    pv = lambda c, n: c.params[c.info['syntax'].index(n)]   # noqa: E731
+
+    def timeline(sc):
+        fr, out_ = 0.0, []
+        for c in sc:
+            if c.name == 'FRAME':
+                fr = float(c.params[0])
+            if c.name in GB.HITBOXES:
+                out_.append((fr, c))
+        return out_
+    mine = timeline(gm.scripts[acmd.crc('attackhi4')])
+    users = timeline(ug.scripts[acmd.crc('attackhi4')])
+    strong = [(f, c) for f, c in mine if GB.USMASH_STRONG[0] <= f < GB.USMASH_STRONG[1]]
+    row = lambda c: (int(pv(c, 'ID')), int(pv(c, 'Part')), int(pv(c, 'Bone')), float(pv(c, 'Damage')), int(pv(c, 'Angle')),   # noqa: E731
+                     int(pv(c, 'KBG')), int(pv(c, 'FKB')), int(pv(c, 'BKB')))
+    bad = [row(c) for f, c in strong if (int(pv(c, 'Angle')), int(pv(c, 'KBG')), int(pv(c, 'FKB')), int(pv(c, 'BKB'))) !=
+           (300, 50, 0, 25)]
+    kb = lambda pc, d, kbg=50, bkb=25: round(((pc / 10.0 + pc * d / 20.0) * 1.4 + 18) * kbg / 100.0 + bkb, 1)   # noqa: E731
+    check('usmash spike v2 (the user: "make all of the strong part of Up smash\'s hitbox do the spike"): the strong part is '
+          'every hitbox his AttackHi4 sets at %d (the only setting frame from 15 to 21): the geyser (ID 0, Part 1, 14 %%, '
+          'Y 27, off at 19) and the four sword hits (inner 1 / 2, outer 3 / 4, 11 %%, off at 21): frames %d - %d. Each now '
+          'angle 300 (down and away, by position), KBG 50, FKB 0, BKB 25 (none with another angle or a bigger knockback); '
+          'its damage its own (uncharged): KB at weight 100: geyser %.0f / %.0f / %.0f, swords %.0f / %.0f / %.0f at 0 / '
+          '100 / 150 %%' % (GB.USMASH_STRONG[0], GB.USMASH_STRONG[0], GB.USMASH_STRONG[1] - 1, kb(14, 14), kb(114, 14),
+                            kb(164, 14), kb(11, 11), kb(111, 11), kb(161, 11)),
+          (sorted({f for f, _c in strong}), sorted(row(c) for f, c in strong), bad,
+           max(int(pv(c, 'KBG')) for f, c in strong), max(int(pv(c, 'BKB')) for f, c in strong)),
+          ([18.0], [(0, 1, 0, 14.0, 300, 50, 0, 25), (1, 1, 0x19, 11.0, 300, 50, 0, 25), (2, 1, 0x18, 11.0, 300, 50, 0, 25),
+                    (3, 1, 0x19, 11.0, 300, 50, 0, 25), (4, 1, 0x18, 11.0, 300, 50, 0, 25)], [], 50, 25))
+    before = [(f, row(c)) for f, c in mine if f < GB.USMASH_STRONG[0] or f >= GB.USMASH_STRONG[1]]
+    ub = [(f, row(c)) for f, c in users if f < GB.USMASH_STRONG[0] or f >= GB.USMASH_STRONG[1]]
+    check('usmash spike v2: left as they are (the user\'s script\'s values): the first weak hit (12: ID 0, Part 0, 5 %, angle '
+          '366, KBG 120, BKB 30) before the strong part and the late capsule (21: ID 1, 10 %, angle 40, KBG 98, BKB 30) '
+          'after it', before, ub)
+    cs = timeline(cg.scripts[acmd.crc('attackhi4')])
+    check('usmash spike v2: the clones\' copy the same (each strong hitbox 300 / KBG 50 / BKB 25, its damage x1.0; the weak '
+          'hit and the late capsule as his)', sorted((f, row(c)[0], row(c)[3:]) for f, c in cs),
+          sorted((f, row(c)[0], row(c)[3:]) for f, c in mine))
+    sd = sorted((row(c)[0], float(pv(c, 'Damage')), int(pv(c, 'ShieldDamage')),
+                 round((float(pv(c, 'Damage')) + int(pv(c, 'ShieldDamage'))) * 1.19 * C.SH_SCALE, 2)) for f, c in strong)
+    check('usmash spike v2: shield damage still halved by the exe\'s shalf: it keys on his motion kind (99, up smash: '
+          'SH_KINDS %s), not on the hitboxes, and their damage / ShieldDamage fields (0, never negative) are unchanged: '
+          'shield HP %s' % (C.SH_KINDS, [x[3] for x in sd]), (99 in C.SH_KINDS, 'shalf' in C.RELEASE, [x[2] for x in sd]),
+          (True, True, [0] * 5))
+    # the trails
+    pp = P.Ptcl(open(os.path.join(out, 'fighter', 'gekkouga', 'effect', 'gekkouga', 'gekkouga.010d0000.ptcl'), 'rb').read())
+    si = pp.find_set('PtcGekkougaFireTrail')
+    ems = [e['data'] for e in pp.sets[si]['emitters']]
+    others = [round(pp.field(e['data'], 'color_scale'), 3) for n_ in ('PtcGekkougaFireBody', 'PtcGekkougaFireTip')
+              for e in pp.sets[pp.find_set(n_)]['emitters']]
+    lum = FX.TRAIL_BRIGHTNESS * (0.299 * FX.TRAIL_TINT[0] + 0.587 * FX.TRAIL_TINT[1] + 0.114 * FX.TRAIL_TINT[2])
+    check('trail dim v1 (the user: "make the smash attack fire trails less bright"): PtcGekkougaFireTrail\'s %d emitters '
+          '(both layers) colour scale (0x778) %g (was 1.0) and colour 0 the warm tint %s (was white): drawn colour 0 x the '
+          'texture\'s rgb, additive: red x%.2f, green x%.2f, blue x%.2f, luminance x%.2f (55 - 65 %%: the user\'s "less '
+          'bright"); the white-hot cores a pale orange, not grey; alpha 1, additive as before; the other fires\' scale 1.0'
+          % (len(ems), FX.TRAIL_BRIGHTNESS, FX.TRAIL_TINT, *(FX.TRAIL_BRIGHTNESS * t for t in FX.TRAIL_TINT), lum),
+          ([round(pp.field(e, 'color_scale'), 3) for e in ems],
+           {tuple(round(x, 3) for x in pp.field(e, 'color0_keys')[:4]) for e in ems},
+           {pp.field(e, 'alpha_init') for e in ems}, {pp.field(e, 'blend_type') for e in ems}, set(others),
+           0.55 <= lum <= 0.65),
+          ([FX.TRAIL_BRIGHTNESS] * len(ems), {tuple(FX.TRAIL_TINT) + (1.0,)}, {1.0}, {1}, {1.0}, True))
+    # the sound
+    bank = open(os.path.join(out, 'fighter', 'gekkouga', 'sound', 'snd_se_Gekkouga.nus3bank'), 'rb').read()
+    _s, tones = MS.tones_of(bank)
+    last = MS.parse_entry(tones[-1])
+    t_new = FB.Table(open(os.path.join(out, 'sound', 'config', 'soundlabeltable.bin'), 'rb').read())
+    row_ = t_new.row_of(2058)
+    vol = round(struct.unpack('<f', last[2][12:16])[0], 2)
+    check('ice detonation sound: his bank + label 97 snd_se_Gekkouga_IceBoom (0x%08X: row 0x768, the 7th added), TONE %+g dB '
+          '(%d tones), the MSC\'s id' % (C.ICE_SND_ID, GS.ICE_SOUND[2], len(tones)),
+          (FB.binf(bank), last[1], vol, row_, len(t_new.tones(row_)), t_new.tones(row_)[97] == len(tones) - 1,
+           'int gk_is_sound() { return 0x7680061; }' in open(os.path.join(ROOT, 'fighters', 'gekkouga', 'clones.c')).read(),
+           C.ICE_SND_ID),
+          (('snd_se_Gekkouga', 2058), 'snd_se_Gekkouga_IceBoom', GS.ICE_SOUND[2], 0x768, 98, True, True, 0x07680061))
+    if ice_clip:
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            w, on, start = GS.ice_cut(ice_clip, tmp)
+            pcm = FB.load_audio(w).astype(float) / 32768.0
+            o2 = GS.boom_onset(pcm, FB.RATE)
+        n_ = round(struct.unpack('<I', last[2][-0x18:-0x14])[0])
+        check('ice detonation sound: the clip\'s boom onset (1 ms windows: the rise into its loudest 10 ms) at %.3f s; '
+              'with the %d-frame countdown the whole clip fits (its clicks and fuse hiss kept, at its speed and pitch): '
+              '%.3f s of silence in front, so its boom comes %.2f frames after its start (the blast lands at %d - %d frames '
+              'after the arming); the bank\'s one-shot that long (%d samples)' % (
+                  on, C.ICE2_FRAMES, -start, o2 * 60, C.ICE2_FRAMES, C.ICE2_FRAMES + 1, n_),
+              (abs(o2 * 60 - C.ICE_SND_LEAD) <= 1.0, start < 0, n_ == len(pcm)), (True, True, True))
+    m = MSC(mscsb, src)
+    g = m.game
+    snd = []
+    old = g.sys
+
+    def sysf(sid, a, old=old):
+        if sid == 0x1E:
+            snd.append((a[0], a[1]))
+        return old(sid, a)
+    g.sys = sysf
+    seen = {}
+    for nm, play, stop in (('play', 1.0, 0.0), ('stop', 0.0, 1.0), ('both', 1.0, 1.0), ('none', 0.0, 0.0)):
+        snd[:] = []
+        g.vars[0x0F0003B4], g.vars[0x0F0003B5] = play, stop
+        m('gk_is_tick')
+        seen[nm] = (list(snd), g.vars.get(0x0F0003B4), g.vars.get(0x0F0003B5))
+    I = 0x07680061
+    check('ice detonation sound: his MSC (gk_is_tick, every frame): the executable\'s play request (gk_vi(52)) plays it '
+          '(SoundModule 0x2710), its stop (gk_vi(53), a cancelled countdown) stops it (0x2714), stop before play, each '
+          'request cleared',
+          seen, {'play': ([(0x2710, I)], 0.0, 0.0), 'stop': ([(0x2714, I)], 0.0, 0.0),
+                 'both': ([(0x2714, I), (0x2710, I)], 0.0, 0.0), 'none': ([], 0.0, 0.0)})
+    snd[:] = []
+    g.vars[0x0F0003B0] = 4.3
+    m('gk_ib_tick')
+    blast = list(snd)
+    snd[:] = []
+    m('gk_reset')
+    sk = open(os.path.join(ROOT, 'fighters', 'gekkouga', 'weapons', 'skeleton.c')).read()
+    check('ice detonation sound: the blast plays no sound now (the skeleton\'s SkBoom 0x07680060 was the old one: replaced, '
+          'the user\'s "Replace what the old sound was"); a battle reset (gk_reset) stops the detonation\'s sound; the '
+          'skeleton keeps its own explosion sound', (blast, snd, 'int sk_snd_boom() { return 0x7680060; }' in sk),
+          ([], [(0x2714, I)], True))
+    check('clones: the ability 840 frames (14 s, the user; 720 before), the burnout still 480, the gauge\'s ability drain '
+          'over 840 (gk_pct(left, gk_ability_frames()))', (m('gk_ability_frames'), m('gk_burnout_frames')), (840, 480))
+
+
+def air_regroup_tests(mscsb, src):
+    """usmash spike v2 / trail dim v1 (the user: the regroup "work in the air, still by pressing shield and special"; "If
+    Greninja is in the middle of airdodging, allow him to cancel into the reform command"): the air press (special with
+    shield held from a fall / jump), the air dodge's cancel (special alone, early / mid / late), none with no clones out
+    split or in the burnout; the air call's motion, kinetics and intangibility; the clones' regroup to him while he falls;
+    a landing mid-call"""
+    calls = []
+
+    def fresh():
+        m, g, _tr = ak_run(mscsb, src, True, frames_=24)        # split, all in the air
+        old = g.sys
+
+        def sysf(sid, a, old=old):
+            calls.append((sid, tuple(a)))
+            return old(sid, a)
+        g.sys = sysf
+        g.status_req = []
+        m.vm.g[18] = 2
+        return m, g
+    m, g = fresh()
+    got = {}
+    for nm, st, press, guard, t in (('Fall, special + shield held', 0xE, (1,), True, 5.0),
+                                    ('a jump, special + shield held', 0xB, (1,), True, 5.0),
+                                    ('Fall, special without shield', 0xE, (1,), False, 5.0),
+                                    ('Fall, shield without special', 0xE, (), True, 5.0),
+                                    ('EscapeAir frame 1, special', 0x22, (1,), False, 1.0),
+                                    ('EscapeAir frame 15, special', 0x22, (1,), False, 15.0),
+                                    ('EscapeAir frame 30, special', 0x22, (1,), False, 30.0),
+                                    ('EscapeAir frame 15, special + shield', 0x22, (1,), True, 15.0)):
+        g.status_req, g.vars[0x0F0003C9] = [], 0.0
+        m.vm.g[9] = f2i(t)
+        ak_frame(m, g, st=st, press=press, guard=guard)
+        got[nm] = (g.status_req, g.vars.get(0x0F0003C9))
+    yes = ([(0x160, 1)], 160.0)
+    check('air regroup: in the air special with shield held (a fall, a jump) calls the regroup (0x160) and clears the '
+          'specials and the shield / air dodge commands (Buffer_Clear 160: no special, no air dodge from the press); special '
+          'alone or shield alone: nothing; in the air dodge (EscapeAir 0x22) special alone cancels it into the call at '
+          'its frame 1, 15 and 30 (shield started the dodge), with shield held too', got,
+          {'Fall, special + shield held': yes, 'a jump, special + shield held': yes,
+           'Fall, special without shield': ([], 0.0), 'Fall, shield without special': ([], 0.0),
+           'EscapeAir frame 1, special': yes, 'EscapeAir frame 15, special': yes, 'EscapeAir frame 30, special': yes,
+           'EscapeAir frame 15, special + shield': yes})
+    none = {}
+    for nm in ('formation (no clones split)', 'the burnout', 'the aligned kick'):
+        m2, g2 = fresh()
+        if nm.startswith('formation'):
+            g2.vars[0x0F000388] = 0.0
+        elif nm == 'the burnout':
+            m2.setg('gk_burnout', 300)
+            m2.setg('gk_ability', 0)
+        else:
+            g2.vars[0x0F000388] = 1.0
+        m2.vm.g[9] = f2i(10.0)
+        ak_frame(m2, g2, st=0x22, press=(1,), guard=True)
+        none[nm] = [r for r in g2.status_req if r[0] == 0x160]
+    check('air regroup: none where the ground one is unavailable (the dodge goes on): clones in formation, the burnout, '
+          'the aligned kick', none, {k: [] for k in none})
+    # the call in the air: motion, kinetics, intangibility
+    m, g = fresh()
+    x0, y0 = g.x, g.y
+    m.vm.g[4] = 0x160
+    calls[:] = []
+    m('gk_rg_init')
+    init = [c for c in calls if c[0] in (0x10, 0x2D)]
+    calls[:] = []
+    g.log = []
+    m('gk_rg_main')
+    mo = [(c[1][1], round(fv(c[1][3]), 3)) for c in calls if c[0] == 0x12 and c[1][0] == 1]
+    check('air regroup: its init in the air: HitModule(0x2710, 0) (the air dodge\'s intangibility ended), KineticModule(0, '
+          '0) (the fall\'s kinetics: his gravity, drift and the speed he had: no stall, no momentum change; the ground one '
+          'keeps the stance\'s func_2340); its motion the stance\'s air one (specialairlw 0x289) at 0.4 for 19 frames '
+          '(frames 0 - 7.6); the clones regrouping (mode 3)', (init, mo, int(g.vars.get(0x0F000388))),
+          ([(0x2D, (0x2710, 0)), (0x10, (0, 0))], [(0x289, 0.4)], 3))
+    # the regroup in the air: he falls 1 a frame, they ease to his X -/+ 14 and his Y
+    lx0, ly0 = m.gf('gk_lx'), m.gf('gk_ly')
+    pts = []
+    for t in range(75):
+        g.y = round(g.y - 1.0, 3)
+        m.vm.g[19], m.vm.g[18] = 2, 2
+        ak_frame(m, g, st=0x160 if t < 19 else 0xE)
+        pts.append((m.gf('gk_lx'), m.gf('gk_ly'), m.gf('gk_rx'), m.gf('gk_ry'), g.x, g.y))
+    step = max(abs(b[0] - a[0]) + abs(b[1] - a[1]) for a, b in zip([(lx0, ly0)] + pts, pts))
+    end = pts[-1]
+    check('air regroup: they float back to him while he falls (75 frames eased, the biggest step %.2f; not a teleport), '
+          'to his X -/+ 14 and his Y at the end, then formation (mode 0)' % step,
+          (step < 4.0, round(end[0] - end[4], 2), round(end[2] - end[4], 2), round(end[1] - end[5], 2),
+           round(end[3] - end[5], 2), int(g.vars.get(0x0F000388))), (True, -14.0, 14.0, 0.0, 0.0, 0))
+    # landing mid-call
+    m, g = fresh()
+    m.vm.g[4] = 0x160
+    m('gk_rg_init')
+    m('gk_rg_main')
+    g.status_req = []
+    m.vm.g[9] = f2i(6.0)
+    m.vm.g[19], m.vm.g[18] = 2, 2
+    r_air = m('gk_rg_loop')
+    m.vm.g[19], m.vm.g[18] = 2, 0
+    r_land = m('gk_rg_loop')
+    check('air regroup: landing mid-call (frame 6 of 19) ends it in LandingLight (0x17: a normal landing, no aerial '
+          'landing lag); in the air before it, nothing; the clones go on regrouping (mode 3)',
+          (r_air, r_land, g.status_req, int(g.vars.get(0x0F000388))), (0, 1, [(0x17, 0)], 3))
+    m.vm.g[9] = f2i(19.0)
+    m.vm.g[19], m.vm.g[18] = 2, 2
+    g.status_req = []
+    check('air regroup: its 19 frames over in the air: Fall (0xE, not a special fall)', (m('gk_rg_loop'), g.status_req),
+          (1, [(0xE, 0)]))
 
 
 def bugfix_tests(mscsb, src):
@@ -2027,13 +2275,13 @@ def smash_tune_tests(mscsb, src, out, user):
           'his body) now IDs 1 / 2 (the lower IDs: they win where the outer ones overlap them) at %d degrees (down and away, '
           'by position: behind him down and back), KBG %d / BKB %d (weak: KB %.0f at 0 %%, %.0f at 100 %%, %.0f at 150 %% on '
           'weight 100; tumble from 80), 11 %% (the uncharged damage); the outer ones IDs 3 / 4 as before (44, KBG 100, BKB '
-          '30); their reserves renumbered; the geyser off at 19; at 21 the body capsule (ID 1) and IDs 2 - 4 removed as '
-          'before' % (
+          '30; usmash spike v2: they and the geyser spike too: usmash_trail_tests); their reserves renumbered; the geyser off '
+          'at 19; at 21 the body capsule (ID 1) and IDs 2 - 4 removed as before' % (
               GB.USMASH_SPIKE['Angle'], GB.USMASH_SPIKE['KBG'], GB.USMASH_SPIKE['BKB'], kb(11), kb(111), kb(161)),
           (at18, res, later),
-          ([(0, 0, 27.0, 30.0, 14.0, 90, 104, 30, 0), (1, 0x19, 0.0, 17.5, 11.0, 300, 50, 25, 0),
-            (2, 0x18, 0.0, 17.5, 11.0, 300, 50, 25, 0), (3, 0x19, -20.0, 23.5, 11.0, 44, 100, 30, 0),
-            (4, 0x18, -20.0, 23.5, 11.0, 44, 100, 30, 0)],
+          ([(0, 0, 27.0, 30.0, 14.0, 300, 50, 25, 0), (1, 0x19, 0.0, 17.5, 11.0, 300, 50, 25, 0),   # (usmash spike v2:
+            (2, 0x18, 0.0, 17.5, 11.0, 300, 50, 25, 0), (3, 0x19, -20.0, 23.5, 11.0, 300, 50, 25, 0),   # the geyser and the
+            (4, 0x18, -20.0, 23.5, 11.0, 300, 50, 25, 0)],                                            # outer hits too)
            [(0, 0, 27.0), (1, 0x19, 0.0), (2, 0x18, 0.0), (3, 0x19, -4.0), (4, 0x18, -4.0)],
            [(19.0, 'Remove_Hitbox', 0), (21.0, 'Extended_Hitbox', 1), (21.0, 'Remove_Hitbox', 2),
             (21.0, 'Remove_Hitbox', 3), (21.0, 'Remove_Hitbox', 4)]))
@@ -2155,11 +2403,11 @@ def ice_tests(mscsb, src, tr_mscsb, out, user):
         g.log = []
         frames(m, 1, 0x2D)
         got.append(arts())
-    check('ice: the executable\'s blast request (his gk_vi(48) = 4.25): article 9 made at once with the explosion\'s sound '
-          '(0x%X: the skeleton\'s), again 3 frames later (not claimed yet), then nothing; dropped after %d frames' %
-          (0x7680060, 6),
+    check('ice: the executable\'s blast request (his gk_vi(48) = 4.25): article 9 made at once (usmash spike v2 / trail dim '
+          'v1: no sound of its own: the skeleton\'s 0x%X gone, the detonation\'s own sound plays from the arming), again 3 '
+          'frames later (not claimed yet), then nothing; dropped after %d frames' % (0x7680060, 6),
           (got, g.vars.get(V)),
-          ([[('article', 0x2710, 9), ('sound', 0x2710, 0x7680060)], [], [], [('article', 0x2710, 9)], [], [], [], []], 0.0))
+          ([[('article', 0x2710, 9)], [], [], [('article', 0x2710, 9)], [], [], [], []], 0.0))
     g.vars[V] = 4.5
     g.log = []
     frames(m, 1, 0xB1)
@@ -2169,7 +2417,7 @@ def ice_tests(mscsb, src, tr_mscsb, out, user):
     g.log = []
     frames(m, 1, 0)
     check('ice: claimed (his request 0 again): the next request starts over (made at once, in any status: KO\'d too)', arts(),
-          [('article', 0x2710, 9), ('sound', 0x2710, 0x7680060)])
+          [('article', 0x2710, 9)])
     m('gk_reset')
     check('ice: a reset (gk_reset): the request gone', (g.vars.get(V), m.g('gk_ib_t')), (0.0, 0))
     check('ice: his MSC reads the request the executable writes (gk_vi(48) = 0x%08X = ICE_VAR)' % V,
@@ -3744,6 +3992,7 @@ def skeleton_sound_tests(mscsb, src, out=None):
           'the first voice 10 - 40 frames in', gaps, (-30, 60, 10, 40))
 
 FX_PKG = None                             # skeleton v1.7: the flipbooks' folder (--fx=...), for the explosion's orange
+ICE_CLIP = None                           # usmash spike v2 / trail dim v1: the ice detonation's clip (--ice-clip=), for the cut
 
 
 def boom_orange(folder):
@@ -4319,7 +4568,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (37, 38):   # round gauge v1: the damage panel's files; clone fix v3: his MSC
         want_top = ['INSTALL_TO_data', 'README.txt']
-    if len(earlier) in (42, 44, 45):   # ice detonation v1: the exes, data (+ Sm4shCommand); tuning v1: the exes (the gauge's ready state, the skeleton's bottom) and data; smash
+    if len(earlier) in (42, 44, 45, 46):   # usmash spike v2 / trail dim v1: the exes (ice2, bgrav) and data; ice detonation v1: the exes, data (+ Sm4shCommand); tuning v1: the exes (the gauge's ready state, the skeleton's bottom) and data; smash
         # tune v1: the exes (the half shield damage) and data
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (41, 43):   # clone moves v1, nair / fair v1: data only
@@ -4371,7 +4620,15 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                                                                           if len(earlier) in (37, 40) else ''),
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want and
                      n not in again and not (len(earlier) in (37, 40) and n.startswith('INSTALL_TO_data/ui/info/dmg/')) and
-                     not (len(earlier) == 40 and n == 'INSTALL_TO_data/param/fighter/fighter_param_vl_gekkouga.bin')), [])
+                     not (len(earlier) == 40 and n == 'INSTALL_TO_data/param/fighter/fighter_param_vl_gekkouga.bin') and
+                     not (len(earlier) == 46 and n == 'INSTALL_TO_data/sound/config/soundlabeltable.bin')), [])
+        if len(earlier) == 46:
+            check('usmash spike v2 / trail dim v1: INSTALL_TO_data/sound/config/soundlabeltable.bin the built one (his row + '
+                  'label 97: the ice detonation\'s sound), new over what the earlier packages install',
+                  (z.read('INSTALL_TO_data/sound/config/soundlabeltable.bin') ==
+                   open(os.path.join(out, 'sound', 'config', 'soundlabeltable.bin'), 'rb').read(),
+                   z.read('INSTALL_TO_data/sound/config/soundlabeltable.bin') !=
+                   z1.read('INSTALL_TO_data/sound/config/soundlabeltable.bin')), (True, True))
         if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
                             43):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
@@ -4763,7 +5020,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                                                                len(earlier) in (31, 32), len(earlier) == 33,
                                                                len(earlier) in (34, 35), len(earlier) in (36, 37, 38, 39),
                                                                len(earlier) in (40, 41), len(earlier) in (42, 43),
-                                                               len(earlier) == 44)):
+                                                               len(earlier) == 44, len(earlier) == 45)):
             if not b:
                 continue
             p = os.path.join(td, '%d.rpx' % i)
@@ -4802,7 +5059,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 46)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 47)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -4864,6 +5121,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_smash_tune_v1', 'exe_v46z_gkb15', 'ice', 'burn', '52', 'yellow', 'black', '60', 'KBG 80', 'BKB 50',
          'smoke', '8x', 'Water Shuriken', 'uncharged', 'sparkle', 'S4IA', 'S4IB', 'S4IC', 'shield', 'ice_boom.gif',
          'ice_flash.gif', 'ice_sparkle.gif', 'Sm4shCommand_v1.7.29', 'confirmed in game') if len(earlier) == 45 else \
+        ('greninja_ice_detonation_v1', 'exe_v46z_gkb16', 'spike', '300', 'KBG 50', 'BKB 25', 'geyser', 'trail', '0.65',
+         'neutral air', 'nair_fair_v1', 'IceBoom', '156', 'creeper', 'S4ID', 'S4IF', 'S4BG', '840', 'gravity', 'air dodge',
+         'LandingLight', 'trail_dim.png', 'confirmed in game') if len(earlier) == 46 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -4876,7 +5136,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
 
 
 def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False, gkb5=False, gkb6=False,
-                gkb7=False, gkb8=False, gkb9=False, gkb10=False, gkb11=False, gkb12=False, gkb13=False, gkb14=False):
+                gkb7=False, gkb8=False, gkb9=False, gkb10=False, gkb11=False, gkb12=False, gkb13=False, gkb14=False,
+                gkb15=False):
     """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
     release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
@@ -4904,6 +5165,8 @@ def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=
             else set()   # (smash tune v1's gkb14)
         drop |= {'ice'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 or gkb11 or gkb12 or gkb13 or gkb14 \
             else set()   # (ice detonation v1's gkb15)
+        drop |= {'ice2', 'bgrav'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 or gkb11 or gkb12 or gkb13 \
+            or gkb14 or gkb15 else set()   # (usmash spike v2 / trail dim v1's gkb16)
         variants = C.VARIANTS if not (sk12 or b2 or gkb5 or gkb6 or gkb7) else \
             C.VARIANTS + (('G_pose', (C.RELEASE - {'sway'}) | {'pose'}),)       # (up to v1.5: + G_pose)
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE - drop)] + \
@@ -4940,7 +5203,8 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
                                                 len(earlier) in (22, 23, 24, 25), len(earlier) in (26, 27, 28, 29),
                                                 len(earlier) == 30, len(earlier) in (31, 32), len(earlier) == 33,
                                                 len(earlier) in (34, 35), len(earlier) in (36, 37, 38, 39),
-                                                len(earlier) in (40, 41), len(earlier) in (42, 43), len(earlier) == 44):
+                                                len(earlier) in (40, 41), len(earlier) in (42, 43), len(earlier) == 44,
+                                                len(earlier) == 45):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
@@ -4966,9 +5230,12 @@ def main():
     GAUGE_JPG = next((x[12:] for x in sys.argv[1:] if x.startswith('--gauge-jpg=')), None)
     global GAUGE_VL
     GAUGE_VL = next((x[5:] for x in sys.argv[1:] if x.startswith('--vl=')), None)
-    a = [x for x in sys.argv[1:] if not x.startswith('--v') and not x.startswith('--fx=') and not x.startswith('--gauge-')]
+    global ICE_CLIP
+    ICE_CLIP = next((x[11:] for x in sys.argv[1:] if x.startswith('--ice-clip=')), None)
+    a = [x for x in sys.argv[1:] if not x.startswith('--v') and not x.startswith('--fx=') and not x.startswith('--gauge-')
+         and not x.startswith('--ice-clip=')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff', 'rg11', 'cm', 'tu', 'nr', 'st') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff', 'rg11', 'cm', 'tu', 'nr', 'st', 'id') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -4994,6 +5261,10 @@ def main():
         trail_data_tests(out)
     script_tests(out, user)
     msc_ops_tests(out)
+    if len(earlier) >= 46:
+        usmash_trail_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'), out,
+                           user, ICE_CLIP)
+        air_regroup_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     if len(earlier) >= 45:
         ice_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'),
                   os.path.join(msc, 'firetrail', 'firetrail.mscsb'), out, user)

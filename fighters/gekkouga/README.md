@@ -267,7 +267,7 @@ are vanilla Smash 4 (`fighter-smash4-vanilla.zip`: model/body c00-c07, motion/bo
   0x8A, with SpecialLw param 0x8000003's chance, vanilla's), and put back, all in the same frame.
 - The capsules: his shield group 1 (built by the exe as 4 capsules on joint 0 at z = -28, -14, 14, 28 along his
   facing, y 3-15, radius 5.5); each frame shape i is on when an alive clone's offset x his facing falls in its band.
-- The end (720 frames): both clones removed (smoke), the channel closed (VAR_31 0), the burnout. A KO (0xB1 / 0xB2)
+- The end (720 frames; 840 from usmash spike v2 / trail dim v1): both clones removed (smoke), the channel closed (VAR_31 0), the burnout. A KO (0xB1 / 0xB2)
   ends the ability without a burnout.
 
 The clone article (weapon kind 0x1A1, his articles 6 / 7: docs/native-notes.md "Greninja's clones"): bunshin's native
@@ -2045,3 +2045,119 @@ sparkles); import_call_check 0 on both exes; supamario_ui_cave_test 0 failures; 
 **Not confirmed in game:** everything here; in particular that the victim hit handler sees every hurtbox hit once (and
 no shield hit), that the shuriken's float 5 is its charge (only its sound script's use says so), the article's blast
 hitbox made from MSC (`AttackModule 0x272C`, as Kirby's vanilla Stone), and the common emitter's look in his bank.
+
+## Usmash spike v2 / trail dim v1 (`greninja_usmash_trail_v1.zip`, over ice detonation v1; exe_v46z_gkb16)
+
+The user: up smash "make all of the strong part of Up smash's hitbox do the spike" ("the outer hits were knocking back
+rather than spiking"); "make the smash attack fire trails less bright"; neutral air "how it was in the previous build";
+the ice detonation's sound ("time with the ice detonation's timer and explosion", "Replace what the old sound was"),
+"triple the delay of the explosion", "the opponent flashing doesn't occur"; "increase the clone length to 14 seconds and
+make it so Greninja has his normal gravity and fall speed in burnout"; the regroup "work in the air", "If Greninja is in
+the middle of airdodging, allow him to cancel into the reform command".
+
+**Up smash spike v2** (`gekkouga_build.py` `usmash_spike`, `USMASH_STRONG`, `usmash_strong`):
+- The strong part: every hitbox AttackHi4 sets at frame 18 (the only setting frame from 15 to 21), out 18 - 20:
+  - the geyser: ID 0, Part 1, 14 %, Y 27 on joint 0, off at 19;
+  - the sword hits: inner IDs 1 / 2 (hands), outer IDs 3 / 4 (20 along the blades), 11 %, off at 21.
+- All five: angle 300 (by position: down and away either side), KBG 50, FKB 0, BKB 25. Before: geyser 90 / 104 / 30,
+  outer 44 / 100 / 30 (smash tune v1 had spiked the inner hands only).
+- Damage kept (uncharged). KB at weight 100, 0 / 100 / 150 %: geyser 42 / 98 / 126, swords 39 / 84 / 107.
+- Unchanged: the first weak hit (12, ID 0 Part 0, 5 %, 366) and the late capsule (21, ID 1, 10 %, 40 / 98 / 30).
+- Shield damage still halved: `shalf` keys on motion kind 99, not on the hitboxes; damage / ShieldDamage unchanged.
+- The clones' copies follow.
+
+**Trail dim v1** (`gekkouga_fx.py` `TRAIL_BRIGHTNESS` 0.65, `TRAIL_TINT` (1.0, 0.82, 0.6)):
+- PtcGekkougaFireTrail's 4 emitters (both layers): colour scale (0x778) 1.0 -> 0.65 and colour 0 white -> the tint.
+  The template draws colour 0 x scale x the texture's rgb, additive: red x0.65, green x0.53, blue x0.39, luminance
+  x0.55.
+- A plain x0.6 (tried first) left the white-hot cores mid grey (they were clipped to white where flames overlap);
+  tinted they stay pale orange.
+- Preview `$S/gk_preview/trail_dim.png` (`gekkouga_trail_preview.py --before`): lit pixels' mean value 0.60 -> 0.50 (the
+  before clipped), hue 42 -> 33 degrees, saturation 0.71 -> 0.86 (dimmer, not washed out).
+
+**Neutral air: the ring back to nair ring v1** (the user's request): `nair_ring` / `ring_boxes` / `NAIR_RING_*` as git
+08e6a1b exactly (weak hits, Part 1, IDs 1-6, 2.5 %, angle 60, KBG / BKB 25, fire, sound 8, hitlag 0.5, no shield damage,
+set at 14, moved at 16 - 22, removed at 24; the burst's own hit removed at 19). Smash tune v1's windbox is undone; burst
+sizes 12 / 14 kept; its own burn again. The script and the clones' copy equal nair_fair_v1's; `nair_fair_tests` restored.
+
+**Ice detonation v2** (exe feature `ice2`, `tools/gekkouga_clone_cave.py` `ICE2_FRAMES`, `ice_snd`, `ICE_PRIO`):
+- **Countdown** 52 -> **156** frames (2.6 s): the blast asked at 155, landing 156 - 157. Flash: 3 frames a colour to
+  frame 90 (30 x 3), then 2.
+- **Why the flash never showed** (the game's ColorBlendModule, run in the test):
+  - the set (vt +0x4C `0x02C1A12C`) wrote slot 1 every frame, with or without burns;
+  - the draw takes the slot vt +0xAC (`0x02C1A288`) picks: slot 1 only if slot 0 is off or slot 1's priority (+0x98)
+    is higher than slot 0's (+0x4C), and both start at 0x32 (`0x02C1A0C4`);
+  - so anything in slot 0 hid it.
+  - Now: each countdown frame vt +0x8C (`0x02C1A278`) gives slot 1 priority `ICE_PRIO` 1000 first; at the end or a
+    cancel the slot is cleared and its priority set back to 0x32 (nothing stuck).
+- **Sound** (`tools/gekkouga_sound.py --ice=`, label 97 `IceBoom`, `0x07680061`, TONE +4 dB):
+  - the user's creeper_explosion.mp3, its boom onset at 2.451 s (1 ms windows, `boom_onset`: the rise into its loudest
+    10 ms);
+  - the whole clip with 0.149 s of silence in front (`ice_cut`), so the boom comes `ICE_SND_LEAD` = 156 frames after
+    its start; speed and pitch its own;
+  - +4 dB: the creeper boom's loudest 400 ms is 6 dB under the skeleton's SkBoom at the same peak (vanilla TONEs go to
+    +6.2).
+- **Playback:** `ice_arm` -> `ice_snd(victim, 1)`: the blast's choice of Greninja (the burns' owner, else the first
+  live one) gets VAR `0x0F0003B4` (gk_vi(52)) = 1; his MSC (`clones.c` `gk_is_tick`) plays it (SoundModule 0x2710) from
+  him (his MSC can't play at the victim). Recorded at the victim's ice state +0x1C.
+- **Stop:** a KO, a reset (gk_clear's -1), the victim gone, or no Greninja for the blast (`ir_none`) -> VAR `0x0F0003B5`
+  = 1 -> SoundModule 0x2714. His `gk_reset` stops it too.
+- **The blast plays no sound** (`gk_ib_tick`: the skeleton's SkBoom dropped there); the skeleton keeps it.
+- **Diag:** **S4ID** play / stop (victim, cmd, Greninja); **S4IF** every 8th frame (victim, frame, red x100, slot 0 /
+  1 on, priorities).
+- **Its size** (the user asked, then retracted: "It's just extremely hard to make it larger"): L = b / 40, b = remaining
+  burn + 0.5 a stack. Fresh: smash 16.5, forward air 5.9, neutral air 3.5, skeleton explosion 36.5 (a smash burn runs
+  down 4 % a second). Mid (L 0.5, 11.5 %, radius 15): a smash + a forward air; full (L 1): two smashes + a forward air,
+  or a skeleton explosion + a neutral air. No broken link found in the path (recorded before the clear; the type float
+  copied whole to the article; the hitbox / effect sized from it).
+
+**Clones: 14 s** (`gk_ability_frames` 720 -> **840**): the gauge's drain (`gk_pct(left, gk_ability_frames())`) follows;
+the burnout stays 480; the exe holds no copy.
+
+**Burnout gravity** (exe feature `bgrav`, `bg_set`, from slot 13 with the slow flag):
+- The burnout's slow is the Timer item's SlowModule slot 3, rate 2: his per-frame work one frame in two, his kinetics
+  with it. So he fell at half speed and gained it at a quarter.
+- While it is on: his own entry in the base exe's Gravity_Set table (`GS_TABLE` 0x04BD3E00, Mode 1: gravity x4, max
+  fall x2; re-made every frame, since a status change clears it), and work float 0x24 (the gravity update's fast-fall
+  speed when > 0) = 2 x param 0x0300001B. Real frame by real frame that is his own fall.
+- Off at the end: the entry cleared, 0x24 back to 0.
+- Still slowed: animations, ground / air movement, the status (everything else the slow does).
+- Diag **S4BG**.
+
+**Air regroup and the air dodge cancel** (`clones.c` `gk_rg_*`):
+- Why it failed in the air: it allowed falls and jumps already, but shield there is the air dodge, which put him in
+  EscapeAir (0x22) first, not one of its statuses.
+- Now EscapeAir is one (any frame): special alone cancels the dodge (shield started it). Elsewhere: special with
+  shield held.
+- In the air: Buffer_Clear 160 (specials and shield / air dodge), the stance's air motion (specialairlw at 0.4, 19
+  frames), init `gk_rg_init`:
+  - HitModule(0x2710, 0): the dodge's intangibility ends;
+  - KineticModule(0, 0): the fall's kinetics (his gravity, drift and speed; no stall).
+- The clones float back to him as he falls, then formation. Then Fall (no special fall).
+- Landing during it: LandingLight (a normal landing, no aerial lag).
+- Unavailable as on the ground: not split, the burnout, the aligned kick.
+
+**Exe:** exe_v46z_gkb16 = RELEASE (gkb15 + `ice2` + `bgrav`); gkb15 = RELEASE - ice2 - bgrav, byte for byte. No new
+script, slot or ACMD command: Sm4shCommand unchanged.
+
+**Tests:**
+- `gekkouga_clone_cave_test` 320 / 356 (release / A_release), 0 failures:
+  - `ice_checks` at 156 frames, the priority calls, the sound play / stop (owner, fallback, none, KO, reset), S4ID;
+  - `render_checks`: the game's own ColorBlendModule code with slot 0 held on: v1's slot hidden, now slot 1 drawn
+    every frame (yellow / black), back to slot 0 at the end, a reset;
+  - `bgrav_checks`: the table / work float, on / off, the fall per real frame.
+- `gekkouga_clones_test ... --vid=greninja_ice_detonation_v1.zip --ice-clip=...` 554 / 0:
+  - `usmash_trail_tests`: the strong part's hitboxes (none non-spike or stronger), the weak hit / capsule unchanged,
+    the clones' copy, shalf, the trail's emitters, the bank / table / the cut (onset 156 +- 1), gk_is_tick, no blast
+    sound, the skeleton's kept, 840;
+  - `air_regroup_tests`: the air press, the dodge cancel at frames 1 / 15 / 30, none when not split / burnout / kick,
+    init / motion, the regroup while falling, landing mid-call, Fall after;
+  - `nair_fair_tests` restored; smash tune's spike check moved to v2.
+- `gekkouga_fx_test` 60 / 0; msc_stack_check 0 problems (his globals 122 <= 128); the opcode guard OK;
+  import_call_check 0 on both exes; `supamario_ui_cave_test` 0 failures.
+
+**Not confirmed in game:** everything; in particular:
+- the flash now showing;
+- the sound's timing (from the frame order: +- 1 frame);
+- the burnout fall (assumes the slow steps his physics one frame in two);
+- the dodge cancel when shield and special land on the same frame.

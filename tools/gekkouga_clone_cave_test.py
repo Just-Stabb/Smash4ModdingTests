@@ -2858,6 +2858,80 @@ def shalf_checks(e, info):
     check('shalf: the lookup called with the battle object manager and the attacker\'s id', looked[0], (mgr, gk_id))
 
 
+def bgrav_checks(e, info, diag):
+    """bgrav (the user: "make it so Greninja has his normal gravity and fall speed in burnout"): bg_set's Gravity_Set entry
+    (the base exe's GS table: Mode 1, gravity x BG_RATE^2, max fall x BG_RATE) and his fast-fall speed (work float 0x24
+    = BG_RATE x param 0x0300001B) while the burnout's slow is on, both cleared when it ends; and, with the slow taken as
+    one kinetic step every BG_RATE frames, his fall per real frame against his own (the game's update's formula)"""
+    from unicorn.ppc_const import UC_PPC_REG_FPR1 as F1
+    lab, F = info['labels'], info['feats']
+    if 'bgrav' not in F:
+        check('bgrav off: no bg_set', 'bg_set' in lab, False)
+        return
+    gk = e.fighter(None)
+    acc = e.w(gk['f'] + C.BASE_ACC)
+    wm = e.alloc(0x20, b'\0')
+    vt = e.alloc(0x100, b'\0')
+    e.setw(wm, vt)
+    g, s_ = e.alloc(4), e.alloc(4)
+    e.setw(vt + 0x44, g)
+    e.setw(vt + 0x4C, s_)
+    e.setw(acc + 0x28, wm)
+    stm = e.alloc(0x60, b'\0')
+    e.setw(acc + 0x20, stm)
+    DIVE = 2.2
+    sv = {}
+    e.stub(g, lambda e_: e_.mu.reg_write(F1, f2d(DIVE if e_.r(4) == 0x0300001B else 0.0)))
+    e.stub(s_, lambda e_: sv.__setitem__(e_.r(4), round(d2f(e_.mu.reg_read(F1)), 4)))
+    for i in range(C.GS_N * 8):
+        e.setw(C.GS_TABLE + 4 * i, 0)
+    e.setw(C.GS_TABLE, 0x12345678)                     # another fighter's entry (kept)
+    ent = lambda: [(i, e.w(C.GS_TABLE + 0x20 * i + 4), round(struct.unpack('>f', struct.pack('>I', e.w(C.GS_TABLE + 0x20 * i + 8)))[0], 4),   # noqa: E731
+                    round(struct.unpack('>f', struct.pack('>I', e.w(C.GS_TABLE + 0x20 * i + 12)))[0], 4), e.w(C.GS_TABLE + 0x20 * i + 16))
+                   for i in range(C.GS_N) if e.w(C.GS_TABLE + 0x20 * i) == acc]
+    e.call(lab['bg_set'], gk['f'], 2, 0)
+    e.call(lab['bg_set'], gk['f'], 2, 1)
+    on = (ent(), sv.get(0x24))
+    check('bgrav: the burnout\'s slow on: his Gravity_Set entry (the base exe\'s table 0x%08X, the first free: 1; Mode 1 '
+          'multipliers: gravity x %g, max fall x %g; made once, re-made each frame: a status change clears it) and his fast '
+          'fall (work float 0x24, which the game\'s gravity update takes over param 0x0300001B) = %g x his %g'
+          % (C.GS_TABLE, C.BG_RATE ** 2, C.BG_RATE, C.BG_RATE, DIVE), on,
+          ([(1, stm, C.BG_RATE ** 2, C.BG_RATE, 1)], round(C.BG_RATE * DIVE, 4)))
+    sv.clear()
+    e.call(lab['bg_set'], gk['f'], 0, 1)
+    check('bgrav: the burnout over (the slow off): his entry cleared (another fighter\'s kept), work float 0x24 back to 0',
+          (ent(), sv.get(0x24), e.w(C.GS_TABLE)), ([], 0.0, 0x12345678))
+    sv.clear()
+    e.call(lab['bg_set'], gk['f'], 0, 0)
+    check('bgrav: not in the burnout (and not before): nothing written', sv, {})
+    e.setw(C.GS_TABLE, 0)
+    # the fall, real frame by real frame (the gravity update: v += -g down to -max; fast fall v = -dive; the slow: one
+    # step every BG_RATE frames, the position moving by v each step)
+    G, MX = 0.09, 1.65
+    n = int(C.BG_RATE)
+
+    def fall(g_, mx, frames, step, dive=None):
+        v, y, out = 0.0, 0.0, []
+        for f in range(frames):
+            if f % step == 0:
+                v = -dive if dive else max(v - g_, -mx)
+                y += v
+            out.append(y)
+        return out
+    norm = fall(G, MX, 120, 1)
+    slow = fall(G, MX, 120, n)
+    comp = fall(G * C.BG_RATE ** 2, MX * C.BG_RATE, 120, n)
+    vmax = lambda ys, k: round((ys[-1] - ys[-1 - k]) / k, 3)   # noqa: E731
+    check('bgrav: falling 120 frames from rest (gravity %g, max fall %g): his own %.3f a frame at most; slowed (a step every '
+          '%d frames) %.3f, %.0f %% of the drop; with bgrav\'s values %.3f, %.0f %% (within the step\'s quantisation); a fast '
+          'fall (%g): his own %.2f, slowed %.2f, with bgrav %.2f' % (
+              G, MX, -vmax(norm, n), n, -vmax(slow, n), 100 * slow[-1] / norm[-1], -vmax(comp, n), 100 * comp[-1] / norm[-1],
+              DIVE, -vmax(fall(0, 0, 40, 1, DIVE), n), -vmax(fall(0, 0, 40, n, DIVE), n),
+              -vmax(fall(0, 0, 40, n, DIVE * C.BG_RATE), n)),
+          (vmax(comp, n) == vmax(norm, n), abs(comp[-1] / norm[-1] - 1) < 0.03, vmax(slow, n) == round(vmax(norm, n) / n, 3),
+           vmax(fall(0, 0, 40, n, DIVE * C.BG_RATE), n) == vmax(fall(0, 0, 40, 1, DIVE), n)), (True, True, True, True))
+
+
 CB_SET, CB_CLEAR, CB_PRIO, CB_PICK, CB_INIT = 0x02C1A12C, 0x02C1A110, 0x02C1A278, 0x02C1A288, 0x02C1A0C4   # the game's
 
 
@@ -2907,7 +2981,7 @@ def render_checks(e, lab, A, N, fl, put, hit, frame, st, vacc):
     mid = (pick(), col(1)[:3])
     e.call(lab['gk_clear'], until=C.CLEAR_BACK)
     frame()
-    check('ice2: slot 0 off: the flash drawn too (frame 5 yellow: %s); a reset mid-countdown: slot 1 off, priority 0x32, '
+    check('ice2: slot 0 off: the flash drawn too (frame 5, black: %s); a reset mid-countdown: slot 1 off, priority 0x32, '
           'nothing drawn from either slot' % (mid,), (mid[0], e.mu.mem_read(mod + 0x9C, 1)[0], e.w(mod + 0x98), st()[0]),
           (1, 0, 0x32, 0))
     e.setw(vacc + C.W_COLOUR, old)
@@ -3301,6 +3375,7 @@ def main():
     skdist_checks(e, info)
     shalf_checks(e, info)
     ice_checks(e, info, diag)
+    bgrav_checks(e, info, diag)
     fighter_desc_checks(e, img, info)
     g1_checks(e, info)
     s13_checks(e, info)

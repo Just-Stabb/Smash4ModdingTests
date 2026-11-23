@@ -69,10 +69,13 @@ FIRE_TIP_H = 15.0                  # at the outer ends of his water (fire_torch_
 TRAIL_FULL = True                  # tuning v1: the trails' flames wide, two clips (False: fire trail fix v1 - clone moves v1)
 TRAIL_WIDE = 3.0                   # trail lite v1 (half the flames, the same lengths: each wider; tuning v1 1.9)
 TRAIL_SECOND = 0.7
-TRAIL_BRIGHTNESS = 0.6             # usmash spike v2 / trail dim v1 (the user: "make the smash attack fire trails less bright"):
-                                   # both layers' colour scale (emitter 0x778, as the burn tiers' brightness: colour 0 x it;
-                                   # the template's combiner 1 draws colour 0 x the texture's rgb, additive) 1.0 -> 0.6: every
-                                   # channel x0.6, so the flames' hue and saturation stay (dimmer, not greyer); alpha kept
+TRAIL_BRIGHTNESS = 0.65            # usmash spike v2 / trail dim v1 (the user: "make the smash attack fire trails less bright"):
+TRAIL_TINT = (1.0, 0.82, 0.6)      # both layers' colour scale (emitter 0x778, as the burn tiers' brightness: colour 0 x it;
+                                   # the template's combiner 1 draws colour 0 x the texture's rgb, additive) 1.0 -> 0.65 and
+                                   # their colour 0 (white before) this warm tint: red x0.65, green x0.53, blue x0.39, about
+                                   # x0.55 in luminance (0.299 / 0.587 / 0.114). A plain x0.6 turned the flames' white-hot
+                                   # cores (clipped to white before, overlapping) mid grey (the preview): tinted, they stay a
+                                   # pale orange (dimmer, not washed out); alpha kept
 FIRE_TRAIL_H = 22.0                # the smashes' trails (fire_ground_10): its base on the call's point, ~14.5 of flame
 FIRE_RING = dict(n=15, r0=5.0, v=0.9, air=0.8, life=14, seed=7)   # burn v2.2 / v2.3: neutral air's ring of flames: n
                                    # flames round a circle of radius r0, flying out at v a frame x air a frame (~9 by frame
@@ -119,11 +122,11 @@ def _fire_sets():
     trail['offset'] = (0.0, (feet_cell_v('fire_ground_10') - 0.5) * FIRE_TRAIL_H)
     if TRAIL_FULL:                  # tuning v1 (the user: "please make the trail fire more full"): each flame wider (its
         t2 = dict(trail, size=(trail['size'][0] * TRAIL_WIDE, trail['size'][1]),   # quad x TRAIL_WIDE across: they
-                  brightness=TRAIL_BRIGHTNESS)
+                  brightness=TRAIL_BRIGHTNESS, tint=TRAIL_TINT)
         h = FIRE_TRAIL_H * TRAIL_SECOND                                             # overlap at the trails' 7 apart) and a
         t3 = dict(atlas='fire_small_5', blend=1, size=(h * cell_aspect('fire_small_5') * TRAIL_WIDE, h), fade=FIRE_FADE,
                   mirror=True, rate=0.8, offset=(0.0, (feet_cell_v('fire_small_5') - 0.5) * h),   # second, lower flame of
-                  brightness=TRAIL_BRIGHTNESS)
+                  brightness=TRAIL_BRIGHTNESS, tint=TRAIL_TINT)
         trail = dict(layers=[t2, t3])   # another clip in it (mirrored, slower: the band not one flame repeated)
     ring = dict(ring=FIRE_RING, left=False)
     ring_l = dict(ring=FIRE_RING, left=True)
@@ -536,7 +539,8 @@ def flip_emitters(p, tmpl, name, spec):
         f(em, 'alpha_diff21', 0.0)
         f(em, 'alpha_diff32', 0.0)
         f(em, 'color0_type', 0)
-        f(em, 'color0_keys', [1.0] * 32)
+        f(em, 'color0_keys', [c for _k in range(8) for c in tuple(spec['tint']) + (1.0,)]
+          if spec.get('tint') else [1.0] * 32)
         f(em, 'color_scale', spec.get('brightness', 1.0))
         f(em, 'camera_offset', 0.0)
         struct.pack_into('>I', em, 0x310, 0)           # follow type 0: on its emitter's live matrices

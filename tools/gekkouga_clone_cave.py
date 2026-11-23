@@ -105,7 +105,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
                       'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2',
-                      'gready', 'skbot', 'shalf', 'ice', 'ice2'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'gready', 'skbot', 'shalf', 'ice', 'ice2', 'bgrav'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -908,6 +908,116 @@ btu_out:
 '''
 
 
+def bg_src(D):
+    """feature bgrav (usmash spike v2 / trail dim v1): bg_set, his burnout's gravity and fall speeds put back"""
+    return r'''
+# ==== bgrav (the user: "make it so Greninja has his normal gravity and fall speed in burnout"): (r3 his entry, r4 the
+# burnout's slow flag this frame (nonzero on), r5 his slow state so far (nonzero: the Timer slow already on)). The Timer
+# slow (SlowModule slot 3, rate BG_RATE) runs his per-frame work one frame in BG_RATE, his kinetics with it, so in real
+# frames he falls at 1 / BG_RATE of his speed and gains it at 1 / BG_RATE^2. While it is on: his own Gravity_Set entry
+# (the ACMD extension's table GS, Mode 1: multipliers of his own: gravity x BG_RATE^2, max fall x BG_RATE, re-made every
+# frame: a status change clears it) and his fast-fall speed (the gravity update's work float 0x24 when > 0, else param
+# 0x0300001B) = BG_RATE x his param. When it ends: the entry cleared and work float 0x24 back to 0
+bg_set:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r27, 0x1C(r1)
+        mr r30, r4
+        mr r29, r5
+        lwz r31, %(bacc)d(r3)''' + chk_('r31', 'bg_out') + '''
+        lwz r28, 0x28(r31)              # his WorkModule''' + chk_('r28', 'bg_out') + '''
+        lis r27, %(bg_k_hi)d
+        addi r27, r27, %(bg_k_lo)d
+        cmpwi r30, 0
+        beq bg_off
+        lis r8, 0x%(gs_hi)04X
+        ori r8, r8, 0x%(gs_lo)04X
+        li r9, %(gs_n)d
+        li r11, 0
+bg_find:
+        lwz r0, 0(r8)
+        cmplw r0, r31
+        beq bg_have                     # his entry
+        cmpwi r0, 0
+        bne bg_next
+        cmpwi r11, 0
+        bne bg_next
+        mr r11, r8                      # the first free one
+bg_next:
+        addi r8, r8, 0x20
+        addi r9, r9, -1
+        cmpwi r9, 0
+        bne bg_find
+        mr. r8, r11
+        beq bg_dive                     # the table full: the fast fall only
+bg_have:
+        stw r31, 0(r8)
+        lwz r0, 0x20(r31)               # his StatusModule (the status change clear's key)
+        stw r0, 4(r8)
+        lfs f0, 0(r27)
+        stfs f0, 8(r8)                  # gravity x BG_RATE^2
+        lfs f0, 4(r27)
+        stfs f0, 0xC(r8)                # max fall x BG_RATE
+        li r0, 1
+        stw r0, 0x10(r8)                # Mode 1: multipliers of his own
+bg_dive:
+        mr r3, r28
+        lis r4, 0x300
+        addi r4, r4, 0x1B
+        lwz r12, 0(r3)
+        lwz r12, 0x44(r12)
+        mtctr r12
+        bctrl                           # his Fastfall Speed (param 0x0300001B)
+        lfs f0, 4(r27)
+        fmuls f1, f1, f0                # x BG_RATE
+        b bg_set24
+bg_off: cmpwi r29, 0
+        beq bg_out                      # (not on before: nothing)
+        lis r8, 0x%(gs_hi)04X
+        ori r8, r8, 0x%(gs_lo)04X
+        li r9, %(gs_n)d
+        li r0, 0
+bg_clr: lwz r11, 0(r8)
+        cmplw r11, r31
+        bne bg_cn
+        stw r0, 0(r8)                   # his entry cleared
+        stw r0, 4(r8)
+bg_cn:  addi r8, r8, 0x20
+        addi r9, r9, -1
+        cmpwi r9, 0
+        bne bg_clr
+        lfs f1, 8(r27)                  # 0: the param again
+bg_set24:
+        mr r3, r28
+        li r4, 0x24
+        lwz r12, 0(r3)
+        lwz r12, 0x4C(r12)
+        mtctr r12
+        bctrl''' + D('''
+        lis r3, %(gk_fg_hi)d
+        addi r3, r3, %(gk_fg_lo)d
+        mr r4, r30
+        mr r5, r29''' + osr()) + '''
+bg_out: lmw r27, 0x1C(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+'''
+
+
+def chk_(reg, bad):
+    """reg a heap pointer (0x10000000 - 0x7FFFFFFF), else to bad (r0 used)"""
+    return '''
+        lis r0, 0x1000
+        cmplw %s, r0
+        blt %s
+        lis r0, 0x8000
+        cmplw %s, r0
+        bge %s''' % (reg, bad, reg, bad)
+
+
 def ice_src(D, btint=True, snd=False):  # snd: feature ice2
     """ice detonation v1 (feature ice): ice_hit (ICE_HOOK's branch), ice_arm, ice_vic (the countdown, from burn_tick),
     ice_req (the blast's request), ice_gk_ok; snd (feature ice2): ice_snd, the detonation's sound asked of a Greninja on
@@ -1566,6 +1676,10 @@ HIT_ATTACKER = 0x2C               # hit info: the attacker's object id
 ICE_FRAMES = 52                   # ice detonation v1's countdown (ice2: ICE2_FRAMES)
 ICE2_FRAMES = 156                 # usmash spike v2 / trail dim v1 (feature ice2; the user: "please triple the delay of the
                                   # explosion"): 2.6 s; the blast asked at 155, landing at 156 - 157
+BG_RATE = 2.0                     # bgrav: the burnout's Timer slow rate (SLOW_RATE): his gravity x BG_RATE^2, max fall and
+                                  # fast fall x BG_RATE (the Gravity_Set table of the base exe's ACMD extension: GS_TABLE)
+GS_TABLE, GS_N = 0x04BD3E00, 16   # tools/acmd_ext_cave.py GS / GS_N (exe_v42 on: in exe_v46z_ui10): 0x20 an entry, +0 the
+                                  # accessor, +4 its StatusModule, +8 Accel, +0xC MaxFall, +0x10 Mode
 ICE_PRIO = 1000                   # ice2: the flash's slot (1) priority while the countdown runs (the game's default 0x32)
 ICE_LEAD = 1                      # the blast asked for one frame early (made, claimed and set within the next 1 - 2)
 ICE_STACK = 0.5                   # each stack adds this much to the burn amount (many weak stacks count)
@@ -1643,7 +1757,7 @@ assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW, SK_TO
            for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
 RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd', 'skbody',
                      'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2', 'gready', 'skbot', 'shalf', 'ice',
-                     'ice2'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+                     'ice2', 'bgrav'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
 # + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
@@ -1652,7 +1766,7 @@ RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 
 # + skbody, sktouch (exe_v46z_gkb7; v1.3 / v1.4's gkb6 is RELEASE - skbody - sktouch); skeleton v1.6: + skdist
 # (exe_v46z_gkb8; gkb7 is RELEASE - skdist); burn tint v1: + btint (exe_v46z_gkb9; gkb8 is RELEASE - btint); smash tune v1:
 # + shalf (exe_v46z_gkb14; tuning v1's gkb13 is RELEASE - shalf); ice detonation v1: + ice (exe_v46z_gkb15; gkb14 is
-# RELEASE - ice); usmash spike v2 / trail dim v1: + ice2 (exe_v46z_gkb16: the sound, the tripled countdown, the flash's slot priority; gkb15 is RELEASE - ice2)
+# RELEASE - ice); usmash spike v2 / trail dim v1: + ice2 (exe_v46z_gkb16: the sound, the tripled countdown, the flash's slot priority; bgrav: his gravity / fall speeds in the burnout; gkb15 is RELEASE - ice2 - bgrav)
 VARIANTS = (('A_release', RELEASE),)
 # skeleton v1.6 (the user: "Please stop packaging G_pose. It has no use anymore."): A_release only. The pose feature
 # stays (the exes shipped with it up to v1.5 still rebuild from this script); v1.5 and before: + ('G_pose', (RELEASE -
@@ -4208,6 +4322,10 @@ def build(rpx, diag=False, feats=None):
     A['ice_flash'] = alloc(16 * ice_frames(feats), 4) if ice else 0   # ... the flash's colour per frame
     A['ice_st'] = alloc(ICE_ST * SLOTS, 4) if ice else 0       # ... per victim
     A['ice_reqofs'] = alloc(16, 4) if ice else 0               # ... tr_claim's request offsets (the blast's first)
+    A['bg_k'] = alloc(12, 4) if 'bgrav' in feats else 0       # bgrav: BG_RATE^2, BG_RATE, 0.0
+    A['gk_fg'] = alloc(48, 4) if 'bgrav' in feats and diag else 0
+    if 'bgrav' in feats and diag:
+        fmts.append(('gk_fg', 'S4BG burnout gravity: on=%d before=%d\n'))
     for nm, fs_ in (('gk_fia', 'S4IA ice armed: victim slot=%d burn amount x100=%d stacks=%d owner slot=%d way=%d\n'),
                     ('gk_fib', 'S4IB ice blast asked: victim slot=%d of Greninja slot=%d (-1 none) amount x100=%d\n'),
                     ('gk_fic', 'S4IC ice countdown cancelled (KO): victim slot=%d status=%X at frame %d\n'),
@@ -4397,6 +4515,10 @@ def build(rpx, diag=False, feats=None):
         p.update(hit_elem=HIT_ELEMENT, ice_elem=ICE_ELEMENT, ice_back=ICE_BACK, hit_att=HIT_ATTACKER, look_hi=SH_LOOKUP >> 16,
                  look_lo=SH_LOOKUP & 0xFFFF, ice_frames=ice_frames(feats), ice_ask=ice_frames(feats) - ICE_LEAD, ice_slot=BTINT_SLOT,
                  ice_var_hi=ICE_VAR >> 16, ice_var_lo=ICE_VAR & 0xFFFF, ice_stz=ICE_ST)
+    if 'bgrav' in feats:
+        for nm in ('bg_k', 'gk_fg'):
+            p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
+        p.update(gs_hi=GS_TABLE >> 16, gs_lo=GS_TABLE & 0xFFFF, gs_n=GS_N)
     p['bshield_hi'], p['bshield_lo'] = ha(A['bconst']), K.slo(A['bconst'])
     p['thousand_hi'], p['thousand_lo'] = ha(A['bconst'] + 4), K.slo(A['bconst'] + 4)
     p['fm_hi'], p['fm_lo'] = ha(FIGHTER_MANAGER), K.slo(FIGHTER_MANAGER)
@@ -4610,7 +4732,14 @@ s13_tagdone:
 s13_tagon:''') + '''
         li r0, %(life)d
         stwx r0, r25, r12
-s13_slow:
+s13_slow:''' + ('''
+        mr r3, r31                      # bgrav: his gravity / fall speeds in the burnout
+        andi. r4, r26, %(slow)d
+        addi r5, r25, 0x20
+        slwi r12, r27, 2
+        lwzx r5, r5, r12
+        bl bg_set
+        slwi r12, r27, 2''' if 'bgrav' in feats else '') + '''
         addi r25, r25, 0x20             # the slow states
         lwzx r10, r25, r12
         andi. r0, r26, %(slow)d
@@ -6721,7 +6850,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats, 'skbot' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats, 'ice' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (ice_src(D, snd='ice2' in feats) if 'ice' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats, 'skbot' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats, 'ice' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (ice_src(D, snd='ice2' in feats) if 'ice' in feats else '') + (bg_src(D) if 'bgrav' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''
@@ -6871,6 +7000,9 @@ w_dcase:
         assert img.w(ICE_HOOK) == ICE_ORIG and ICE_HOOK not in img.relocs(), 'the victim hit handler at 0x%08X' % ICE_HOOK
         out.put(ICE_HOOK, asm1(ICE_HOOK, 'b 0x%X' % lab['ice_hit']), 'the victim hit handler -> ice_hit (ice detonation v1)',
                 ICE_ORIG)
+    if 'bgrav' in feats:
+        out.blob(A['bg_k'], struct.pack('>3f', BG_RATE * BG_RATE, BG_RATE, 0.0), 'burnout gravity multipliers (bgrav)')
+        assert BG_RATE == SLOW_RATE
     if 'skdist' in feats:
         out.blob(A['sk_dist'], struct.pack('>f', SK_DIST), 'his side special shadow\'s cap (SK_DIST)')
         for at, orig, text, note in SK_DIST_PATCH:

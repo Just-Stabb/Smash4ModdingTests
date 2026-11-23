@@ -77,7 +77,7 @@ def main():
     base.rgb[:] = NP.BG
     NP.draw_model(base, posed)
     body = np.any(np.abs(base.rgb - NP.BG) > 1e-4, axis=2)
-    flash = C.ice_flash()
+    flash = C.ice_flash(C.ice_frames(C.RELEASE))
     _d, r, sz = blast(LEVELS[1])
     boom_frames = list(range(0, 64))
     bc = {}
@@ -87,7 +87,7 @@ def main():
         bc[fr] = c
     effect_on(bc, fx(BOOM), boom_frames, (0.0, C.ICE_Y, 0.0), sz)
     gif, sheet_frames = [], []
-    for t in range(0, C.ICE_FRAMES + 1):
+    for t in range(0, C.ice_frames(C.RELEASE) + 1):
         rgb = base.rgb.copy()
         lab = 'armed, frame %d' % t
         if t >= 1:
@@ -113,7 +113,7 @@ def main():
     for i, t in enumerate(sheet_frames):
         sh.paste(t, (i * (w + 4), 22))
     ImageDraw.Draw(sh).text((6, 5), 'Ice detonation v1: the armed victim flashing yellow / black (the burn tint\'s slot) for '
-                            '%d frames, then the blast; offline render' % C.ICE_FRAMES, fill=(220, 220, 220))
+                            '%d frames, then the blast; offline render' % C.ice_frames(C.RELEASE), fill=(220, 220, 220))
     sh.save(os.path.join(a.out, 'ice_flash.png'))
     # ---- the explosion at three burn amounts
     view2, ppu2 = (-45.0, 45.0, -38.0, 60.0), 3.2

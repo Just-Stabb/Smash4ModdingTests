@@ -4,7 +4,10 @@ bank's PtcGekkougaFireTrail (0x330001C) at each flame's offset on the trail's jo
 trail turned by its way as a fighter: +Z forward, so facing right +Z is screen right), drawn by tools/fx_render.py beside
 a grey stand-in of him (Wait1) at the trail's place; one row a smash (forward / up / down), facing right.
 
-  python3 -I tools/gekkouga_trail_preview.py VANILLA_FIGHTER BUILT_FIGHTER OUT_PNG [--frame 40]
+  python3 -I tools/gekkouga_trail_preview.py VANILLA_FIGHTER BUILT_FIGHTER OUT_PNG [--frame 40] [--before OLD_FIGHTER]
+
+--before (trail dim v1): OLD_FIGHTER's bank in a left column, BUILT_FIGHTER's in the right, each labelled with its
+trail emitters' colour scale, and the lit pixels' mean brightness / hue / saturation under each (dimmer, not greyer).
 """
 import argparse
 import os
@@ -45,6 +48,7 @@ def main():
     ap.add_argument('built')
     ap.add_argument('out')
     ap.add_argument('--frame', type=int, default=40)
+    ap.add_argument('--before')
     a = ap.parse_args()
     from PIL import Image, ImageDraw
     src = open(os.path.join(ROOT, 'fighters', 'gekkouga', 'weapons', 'firetrail.c')).read()
@@ -56,26 +60,24 @@ def main():
     posed = NP.pose(items, bones, bind, o, 0)
     for it in posed:
         it['img'] = np.full((2, 2, 4), 110, np.uint8)
-    edir = os.path.join(a.built, 'effect', 'gekkouga')
-    p = ptcl.Ptcl(open(os.path.join(edir, 'gekkouga.010d0000.ptcl'), 'rb').read())
-    ef = EFC.Efc(open(os.path.join(edir, 'gekkouga.010d0000.efc'), 'rb').read())
-    ems = F.s4_emitters(p, ef.entries[gid & 0xFFFF][1] - 1, {})
-    tiles = []
-    for name, zs in offsets():
-        c = F.Canvas(*VIEW, NP.PPU)
-        c.rgb[:] = NP.BG
-        NP.draw_model(c, posed)
-        for k, z in enumerate(zs):
-            cm = F.call_matrix((0.0, 0.0, z), (0, 0, 0), 0.85 + 0.1 * ((k * 3) % 4))
-            for j, em in enumerate(ems):
-                sim = F.simulate(em, (k, cm, 1.0, None), [a.frame], seed=7 * k + j + 1)
-                if sim[a.frame] and not F.draw_s4(c, em, sim[a.frame], cm @ F.emitter_matrix(em, a.frame - k),
-                                                  float(a.frame - k)):
-                    F.draw(c, em, sim[a.frame], cm)
-        im = Image.fromarray(c.image())
-        ImageDraw.Draw(im).text((6, 4), '%s smash trail (local Z %s), facing right' % (name, ', '.join('%g' % z for z in zs)),
-                                fill=(235, 235, 235))
-        tiles.append(im)
+    if a.before:
+        cols = [render(a.before, gid, posed, a.frame), render(a.built, gid, posed, a.frame)]
+        w, h = cols[0][0][0].size
+        sheet = Image.new('RGB', (2 * w + 8, 3 * (h + 4) + 60), (18, 18, 22))
+        d = ImageDraw.Draw(sheet)
+        for c, (tiles, cs, st) in enumerate(cols):
+            for i, t in enumerate(tiles):
+                sheet.paste(t, (c * (w + 8), 22 + i * (h + 4)))
+            d.text((6 + c * (w + 8), 5), '%s: colour scale %s' % ('before' if c == 0 else 'after', cs), fill=(220, 220, 220))
+            d.text((6 + c * (w + 8), 26 + 3 * (h + 4)), 'lit pixels: mean value %.3f, hue %.1f deg, saturation %.3f'
+                   % st, fill=(220, 220, 220))
+        r = cols[1][2][0] / cols[0][2][0]
+        d.text((6, 42 + 3 * (h + 4)), 'after / before brightness %.2f; hue %+.1f deg, saturation %+.3f (trail dim v1)'
+               % (r, cols[1][2][1] - cols[0][2][1], cols[1][2][2] - cols[0][2][2]), fill=(235, 235, 160))
+        sheet.save(a.out)
+        print(a.out, 'brightness ratio %.3f' % r, cols[0][2], cols[1][2])
+        return
+    tiles = render(a.built, gid, posed, a.frame)[0]
     w, h = tiles[0].size
     sheet = Image.new('RGB', (w, 3 * (h + 4) + 22), (18, 18, 22))
     for i, t in enumerate(tiles):
@@ -84,6 +86,42 @@ def main():
                                'render, his grey stand-in at the trail\'s place' % gid, fill=(220, 220, 220))
     sheet.save(a.out)
     print(a.out)
+
+
+def render(built, gid, posed, frame):
+    """([tile per smash], the trail emitters' colour scales, (mean value, hue deg, saturation) of the lit pixels)"""
+    import colorsys
+    from PIL import Image, ImageDraw
+    edir = os.path.join(built, 'effect', 'gekkouga')
+    p = ptcl.Ptcl(open(os.path.join(edir, 'gekkouga.010d0000.ptcl'), 'rb').read())
+    ef = EFC.Efc(open(os.path.join(edir, 'gekkouga.010d0000.efc'), 'rb').read())
+    ems = F.s4_emitters(p, ef.entries[gid & 0xFFFF][1] - 1, {})
+    si = ef.entries[gid & 0xFFFF][1] - 1
+    cs = sorted({round(p.field(e['data'], 'color_scale'), 3) for e in p.sets[si]['emitters']})
+    tiles, lit = [], []
+    for name, zs in offsets():
+        c = F.Canvas(*VIEW, NP.PPU)
+        c.rgb[:] = NP.BG
+        NP.draw_model(c, posed)
+        base = c.image().astype(np.float32)
+        for k, z in enumerate(zs):
+            cm = F.call_matrix((0.0, 0.0, z), (0, 0, 0), 0.85 + 0.1 * ((k * 3) % 4))
+            for j, em in enumerate(ems):
+                sim = F.simulate(em, (k, cm, 1.0, None), [frame], seed=7 * k + j + 1)
+                if sim[frame] and not F.draw_s4(c, em, sim[frame], cm @ F.emitter_matrix(em, frame - k), float(frame - k)):
+                    F.draw(c, em, sim[frame], cm)
+        img = c.image()
+        add = np.clip(img.astype(np.float32) - base, 0, None) / 255.0     # the fire's own light (additive)
+        m_ = add.max(axis=2) > 0.02
+        lit.append(add[m_])
+        im = Image.fromarray(img)
+        ImageDraw.Draw(im).text((6, 4), '%s smash trail (local Z %s), facing right' % (name, ', '.join('%g' % z for z in zs)),
+                                fill=(235, 235, 235))
+        tiles.append(im)
+    px = np.concatenate(lit) if lit else np.zeros((1, 3))
+    mean = px.mean(axis=0)
+    h_, s_, v_ = colorsys.rgb_to_hsv(*[float(x) for x in mean])
+    return tiles, cs, (float(px.max(axis=1).mean()), h_ * 360.0, s_)
 
 
 if __name__ == '__main__':
