@@ -2321,7 +2321,7 @@ it flags v1's layout).
   kinds untouched, the maker by TIMER_15 among two Greninjas, the fallback, a bad entry, no record / manager / Greninja,
   S4CK; `fx3_*`: both entries every frame with the flash's colours, the outline cave's own FB1 write run on them, the
   counts, the end / KO / a taken-over entry, S4IF); gkb17 = RELEASE - ice3 - ccol byte for byte (349 / 0).
-- `gekkouga_clones_test ... --vpb=greninja_parabeetle_v1.zip`: `parabeetle_v2_tests` (directions: neutral / up / left /
+- `gekkouga_clones_test ... --vpb=greninja_parabeetle_v1.zip` 663 checks, 0 failures: `parabeetle_v2_tests` (directions: neutral / up / left /
   right / up-left / up-right / down / down-left / down-right / 22 degrees, the clones' codes; the snap in the air / on
   the ground / dropped / reset, the clones still; the slot map; the costumes' texture ids c00 - c07), `parabeetle_tests`
   (the hold and its report, the paths and their rise / sideways ratios, the wings moving every frame of the life with a

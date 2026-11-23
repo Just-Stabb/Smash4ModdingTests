@@ -3356,8 +3356,8 @@ def ice_checks(e, info, diag):
         check('ice diag: S4IA (victim 4, amount x100, 4 stacks, owner 2, way 1)',
               [x[1:6] for x in e.osr_full if x[0] == A['gk_fia']], [(4, int(ref[3] * 100), 4, 2, 1)])
     if snd:
-        check('ice2: on the arming hit the detonation\'s sound asked of the owner (Greninja slot 2: his VAR 0x%08X = 1, '
-              'played by his MSC), recorded at the victim\'s +0x1C (slot + 1 = 3); no stop' % SP, arm_snd, (SNDV, None, 3))
+        check('ice2: on the arming hit the detonation\'s sound asked of the owner (Greninja slot 2: his VAR 0x%08X = %g, '
+              'played by his MSC), recorded at the victim\'s +0x1C (slot + 1 = 3); no stop' % (SP, SNDV), arm_snd, (SNDV, None, 3))
         if diag:
             check('ice2 diag: S4ID (victim 4, cmd 1 play, Greninja slot 2)',
                   [x[1:4] for x in e.osr_full if x[0] == A['gk_fid']], [(4, 1, 2)])
@@ -3463,8 +3463,8 @@ def ice_checks(e, info, diag):
     check('ice: the victim KO\'d (Dead) at frame 11: the colour off at once%s, the countdown over' % (
         ' (its priority back)' if snd else ''), (got[-1 - len(P0):], st()[0]), ([('clear', C.BTINT_SLOT)] + P0, 0))
     if snd:
-        check('ice2: ... its sound stopped (Greninja slot 2: his VAR 0x%08X = 1, his MSC SoundModule 0x2714), the '
-              'record cleared' % SS, sndv(), (None, SNDV, 0))
+        check('ice2: ... its sound stopped (Greninja slot 2: his VAR 0x%08X = %g, his MSC SoundModule 0x2714), the '
+              'record cleared' % (SS, SNDV), sndv(), (None, SNDV, 0))
         if diag:
             check('ice2 diag: S4ID (victim 4, cmd 2 stop, Greninja slot 2)',
                   [x[1:4] for x in e.osr_full if x[0] == A['gk_fid']], [(4, 2, 2)])
