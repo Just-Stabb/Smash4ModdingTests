@@ -1660,4 +1660,19 @@ size of the fighter emblem (pokeball), slightly smaller. Also it's appearing on 
   - v1's flx still rebuilds byte for byte with `v11=False`;
   - the cave test's colour check, by feature;
   - gkb11 rebuilds byte for byte without `gauge2`.
+- **The charge's invulnerability** (the user: "please remove the invulnerability from the charge"):
+  - His vl group 1 gives SpecialLw / SpecialAirLw (motions 0x271 / 0x289) the intangible window 8 - 19. The fighter
+    update sets intangible when the frame crosses 8 and clears it when it crosses 19 (docs/native-notes.md "The motion's
+    intangible window").
+  - The charge holds the motion at frame 14 (`gk_lw_hold_frame`), so from frame 8 he was intangible for the whole
+    charge.
+  - Fix: `tools/gekkouga_build.py vl` (`VL_EDITS`) ships his vanilla `fighter_param_vl_gekkouga.bin` with those 4 bytes
+    0 (new in the mod), and `gk_lw_main` / `gk_lw_loop` set `HitModule(0, 0)` every frame, as Core Breaker v11 does.
+  - Nothing else in the stance makes him intangible: its scripts only toggle the counter flag 0x2100000D, and the
+    counter shield (`func_2339`) is out of the loop since clones v1.
+  - The regroup (0x160) plays frames 0 - 7.6 of the same motion (never reaches the window either way).
+  - The aligned kick's motions (0x279 / 0x28D) keep their window 1 - 4 (the vanilla counter attack's); offered to the
+    user.
+  - Tests: `invuln_tests` (the vl bytes, only 4 changed; the stance's MSC over 40 held frames: `HitModule(0, 0)` each
+    frame, nothing intangible, no shield).
 - Not confirmed in game.

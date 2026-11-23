@@ -1428,6 +1428,50 @@ def msc_ops_tests(out):
           bad, {})
 
 
+def invuln_tests(mscsb, src, out, vanilla_vl):
+    """round gauge v1.1 package (the user: "please remove the invulnerability from the charge"): his vl's stance motions
+    without their intangible window (the fighter update's, docs/native-notes.md), every other byte his; the stance's MSC
+    keeps his body state normal every frame and never sets intangibility or a shield"""
+    v = open(os.path.join(out, 'param', 'fighter', 'fighter_param_vl_gekkouga.bin'), 'rb').read()
+    v0 = open(vanilla_vl, 'rb').read()
+    diff = [i for i in range(len(v0)) if v[i] != v0[i]] if len(v) == len(v0) else None
+    r = subprocess.run([sys.executable, os.path.join(HERE, 'fighter_param_vl.py'), 'dump', os.path.join(
+        out, 'param', 'fighter', 'fighter_param_vl_gekkouga.bin'), '--kind', 'gekkouga', '--only', 'm0', '--no-labels'],
+        capture_output=True, text=True).stdout
+    win = {}
+    for ln in r.splitlines():
+        mm = re.match(r'm0\[(\d+)\]\.([34])\s+u8\s+(\d+)', ln)
+        if mm:
+            win.setdefault(int(mm.group(1)), [0, 0])[int(mm.group(2)) - 3] = int(mm.group(3))
+    check('charge invulnerability: his vl\'s SpecialLw / SpecialAirLw (0x271 / 0x289) intangible window 0 / 0 (was 8 - 19: '
+          'the charge holds the motion at 14, so from frame 8 on he was intangible for the whole charge); 4 bytes changed, '
+          'the rest his vanilla file', (win.get(0x271), win.get(0x289), len(diff) if diff is not None else 'size'),
+          ([0, 0], [0, 0], 4))
+    m = fresh(mscsb, src)
+    g = m.game
+    calls = []
+
+    def sysf(sid, a, old=g.sys):
+        if sid in (0x2D, 0x36):
+            calls.append((sid, tuple(a)))
+            return 0
+        return old(sid, a)
+    g.sys = sysf
+    g.held = {1}
+    m.vm.g[4] = 0x155
+    m('gk_lw_main')
+    n = 0
+    for t in range(40):
+        m.vm.g[18], m.vm.g[19] = 0, 0
+        if m('gk_lw_loop'):
+            break
+        m('gk_lw_tick')
+        n += 1
+    check('charge invulnerability: the stance (main + %d frames of its loop, held): his body state set normal (HitModule(0, '
+          '0)) at its start and every frame, never intangible / invincible, no shield (ShieldModule) on' % n,
+          (calls.count((0x2D, (0, 0))), [c for c in calls if c != (0x2D, (0, 0))]), (n + 1 + (1 if n < 40 else 0), []))
+
+
 def clonefix_v3_tests(mscsb, src):
     """clone fix v3 (the user: "make it so the use of down special just activates the clones. Please disable clone kick for
     the first 10 frames of clones existing. Right now if down special is pressed with max gauge, it activates the kick")"""
@@ -3406,7 +3450,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: nothing in INSTALL_TO_data but the built files%s' % (' (and round gauge v1\'s ui/info/dmg: gauge_tests)'
                                                                           if len(earlier) in (37, 40) else ''),
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want and
-                     n not in again and not (len(earlier) in (37, 40) and n.startswith('INSTALL_TO_data/ui/info/dmg/'))), [])
+                     n not in again and not (len(earlier) in (37, 40) and n.startswith('INSTALL_TO_data/ui/info/dmg/')) and
+                     not (len(earlier) == 40 and n == 'INSTALL_TO_data/param/fighter/fighter_param_vl_gekkouga.bin')), [])
         if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
@@ -3477,12 +3522,15 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         if GAUGE_SRC and GAUGE_JPG:
             gauge_tests(z)
     if z1 and len(earlier) == 40:
-        check('round gauge v1.1: INSTALL_TO_data: ui/info/dmg\'s dmg.flx only (texlist / img-00135 as v1); INSTALL_TO_code: '
-              'exe_v46z_gkb12 (feature gauge2: the charge cyan, the diag\'s S4GB line with the clip found); TEST_ONLY: '
-              'A_release', (sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and
-                                   not n.endswith('/')),
-                            sorted({n.split('/')[1] for n in names if n.startswith('TEST_ONLY_INSTALL_TO_code/') and n.count('/') > 1})),
-              (['ui/info/dmg/dmg.flx'], ['A_release']))
+        check('round gauge v1.1: INSTALL_TO_data: ui/info/dmg\'s dmg.flx (texlist / img-00135 as v1), his MSC and his vl '
+              '(the charge\'s invulnerability removed); INSTALL_TO_code: exe_v46z_gkb12 (feature gauge2: the charge cyan, '
+              'the diag\'s S4GB line with the clip found); TEST_ONLY: A_release',
+              (sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+               sorted({n.split('/')[1] for n in names if n.startswith('TEST_ONLY_INSTALL_TO_code/') and n.count('/') > 1})),
+              (['fighter/gekkouga/script/msc/gekkouga.mscsb', 'param/fighter/fighter_param_vl_gekkouga.bin',
+                'ui/info/dmg/dmg.flx'], ['A_release']))
+        check('... its vl: the build\'s (tools/gekkouga_build.py vl)', z.read('INSTALL_TO_data/param/fighter/fighter_param_vl_gekkouga.bin')
+              == open(os.path.join(out, 'param', 'fighter', 'fighter_param_vl_gekkouga.bin'), 'rb').read(), True)
         if GAUGE_SRC and GAUGE_JPG:
             gauge_tests(z, v11=True, inst=z1)
     if z1 and len(earlier) == 39:
@@ -3825,7 +3873,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clonefix_v3', 'froze', 'bitXor', '0x19', 'revert_1_gekkouga_msc', 'revert_2_clone_effect',
          'revert_3_clone_msc', 'revert_4_shuriken_msc', 'exe_v46z_gkb11', 'unconfirmed') if len(earlier) == 39 else \
         ('greninja_freeze_fix_v1', 'emblem', '0.87', 'hidden', 'Greninja', 'cyan', 'exe_v46z_gkb12', 'S4GB', 'clip',
-         'preview', 'unconfirmed') if len(earlier) == 40 else \
+         'preview', 'invulnerab', 'intangible', '8 - 19', 'fighter_param_vl_gekkouga', 'unconfirmed') if len(earlier) == 40 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -3919,6 +3967,8 @@ def main():
     FX_PKG = next((x[5:] for x in sys.argv[1:] if x.startswith('--fx=')), None)
     GAUGE_SRC = next((x[12:] for x in sys.argv[1:] if x.startswith('--gauge-src=')), None)
     GAUGE_JPG = next((x[12:] for x in sys.argv[1:] if x.startswith('--gauge-jpg=')), None)
+    global GAUGE_VL
+    GAUGE_VL = next((x[5:] for x in sys.argv[1:] if x.startswith('--vl=')), None)
     a = [x for x in sys.argv[1:] if not x.startswith('--v') and not x.startswith('--fx=') and not x.startswith('--gauge-')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
                                                'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff') for x in sys.argv[1:]
@@ -3947,6 +3997,9 @@ def main():
         trail_data_tests(out)
     script_tests(out, user)
     msc_ops_tests(out)
+    if len(earlier) >= 40:
+        invuln_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'), out,
+                     GAUGE_VL)
     if len(earlier) >= 38:
         clonefix_v3_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     if len(earlier) >= 36:

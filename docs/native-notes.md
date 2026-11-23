@@ -1178,6 +1178,10 @@ never 0; the status change's reset is the next to clear it. Mario's SpecialHi / 
 `0x225`) have 3 / 7 (Super Jump Punch: intangible 3-6); Supamario's Core Breaker v10 jumped 0 -> 30 at its second
 up special and stayed intangible to its end (the user's "invincible" blink after the landing; diag log `S4HS op=0 v=2
 lr=02E24F70 lr2=02BF2E30`). v11: his vl file has 0 / 0 there, and the status sets `HitModule(0, 0)` every frame.
+Greninja's charge stance (round gauge v1.1 package) met the other half: SpecialLw / SpecialAirLw (`0x271` / `0x289`)
+have 8 / 19, and his MSC holds the motion still at frame 14 while the charge is held, so the end is never crossed and he
+stayed intangible for the whole charge (the user: "the invulnerability from the charge"). Fixed the same way (his vl
+file 0 / 0 there, `HitModule(0, 0)` every frame of the stance).
 
 ## Weapon modules: each kind's row (Sephiroth test 82)
 

@@ -1241,7 +1241,8 @@ void gk_ready_fx()
 // ---- the charge stance (SpecialLw 0x155, his old counter: no counter shape now)
 void gk_lw_main()
 {
-    gk_bar();
+    HitModule(0, 0);                      // round gauge v1.1 package (the user: "remove the invulnerability from the
+    gk_bar();                             // charge"): his body state normal (gk_lw_loop: every frame)
     if (!StopModule(0x1))
     {
         gk_lw_tick();
@@ -1316,7 +1317,8 @@ int gk_pct(int left, int all)
 
 int gk_lw_loop()
 {
-    if (global19 == 0 && global18 == 0x2)
+    HitModule(0, 0);                      // (the motion's vl window 8 - 19, zeroed in his vl file, made him intangible
+    if (global19 == 0 && global18 == 0x2) // from frame 8 for the whole held charge: docs/native-notes.md)
     {
         func_23(0x289);
         func_2341(0);

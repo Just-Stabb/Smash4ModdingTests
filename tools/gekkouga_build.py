@@ -861,6 +861,21 @@ def cmd_data(vanilla_fighter, out_fighter, test_only=None):
     return n
 
 
+# round gauge v1.1 package (the user: "please remove the invulnerability from the charge"): his vl group 1 entries of
+# the stance motions (SpecialLw 0x271, SpecialAirLw 0x289; bytes 3 / 4: the motion's intangible window 8 - 19, set by the
+# fighter update when the frame crosses 8, cleared when it crosses 19: the charge holds the motion at 14) zeroed
+VL_EDITS = ('m0[625].3=0', 'm0[625].4=0', 'm0[649].3=0', 'm0[649].4=0')
+
+
+def cmd_vl(vanilla_vl, out):
+    """out/param/fighter/fighter_param_vl_gekkouga.bin: his vanilla vl with VL_EDITS"""
+    o = os.path.join(out, 'param', 'fighter', 'fighter_param_vl_gekkouga.bin')
+    os.makedirs(os.path.dirname(o), exist_ok=True)
+    subprocess.run([sys.executable, os.path.join(HERE, 'fighter_param_vl.py'), 'set', vanilla_vl, o, *VL_EDITS, '--kind',
+                    'gekkouga'], check=True, stdout=subprocess.DEVNULL)
+    return o
+
+
 def cmd_all(vanilla_root, user_root, out):
     """the whole fighter/gekkouga of the package (+ fighter/kirby's MSC: the trait)"""
     import shutil
@@ -1161,6 +1176,8 @@ if __name__ == '__main__':
             print('0x%08X %s' % (v, k))
     elif len(a) == 3 and a[0] == 'trail':
         print(cmd_trail(a[1], a[2]))
+    elif len(a) == 3 and a[0] == 'vl':
+        print(cmd_vl(a[1], a[2]))
     elif len(a) in (3, 4) and a[0] == 'skeleton':
         print(cmd_skeleton(a[1], a[2], a[3] if len(a) > 3 else None))
     else:
