@@ -2186,7 +2186,8 @@ in place of `func_16(0x15d)`):
   resets it.
 - The clones in formation (`gk_art_clones`) get theirs one a frame after his is claimed (`gk_pb_q`); a request not
   claimed in 5 frames is dropped with the queue. On cooldown they mirror his boost (no beetles).
-- KO / reset (`gk_pb_clear`): `ArticleModule(0x2712, 10)`, the cooldown 0.
+- KO / reset (`gk_pb_clear`): `ArticleModule(0x2712, 10)` (only while a beetle can be out: the cooldown or a request
+  running), the cooldown 0.
 - His beetle reports him on it (bit 8 of his VAR_30, `gk_pb_heartbeat`, 2 frames' grace): his clones then copy his
   vertical movement (`gk_physics`), riding theirs.
 
@@ -2239,7 +2240,7 @@ wii-model-conversion.md):
 - `gekkouga_clone_cave_test` 348 / 387 (release / A_release), 0 failures (`pb_checks` on a fresh emulator: tables,
   descriptor hashes, row, singleton, the list, the claim, the collision calls, the move, the remakes, a wrong ground, no
   .lvd, a wrong GroundModule, the removal, S4PB / S4PC / S4PF); gkb16 = RELEASE - pbeetle byte for byte (321 / 0).
-- `gekkouga_clones_test ... --vut=greninja_usmash_trail_v1.zip --pb-src=...` 638 checks (`parabeetle_side_tests`,
+- `gekkouga_clones_test ... --vut=greninja_usmash_trail_v1.zip --pb-src=...` 639 checks, 0 failures (`parabeetle_side_tests`,
   `parabeetle_tests`, `parabeetle_data_tests`: the converters against the source, every OMO frame against its CHR0, the
   shell bake, the lvd; the package, Sm4shCommand v1.7.30).
 - msc_stack_check 0 problems (his globals 126 <= 128, parabeetle 41); the opcode guard OK; import_call_check 0 on both

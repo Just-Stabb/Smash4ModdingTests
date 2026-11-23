@@ -44385,10 +44385,15 @@ void gk_pb_heartbeat()
     }
 }
 
-// a KO / a reset: his beetles removed (anyone on one falls), no request, no cooldown
+// a KO / a reset: his beetles removed (anyone on one falls), no request, no cooldown. A beetle lives 270 frames, less
+// than the cooldown: with the cooldown and the request at 0 none can be out (so nothing is asked of the ArticleModule
+// every frame of his Entry / Dead / Rebirth)
 void gk_pb_clear()
 {
-    ArticleModule(0x2712, gk_pb_article());
+    if (gk_pb_cd > 0 || gk_pb_req_t > 0)
+    {
+        ArticleModule(0x2712, gk_pb_article());
+    }
     gk_pb_cd = 0;
     gk_pb_req_t = 0;
     gk_pb_q = 0;

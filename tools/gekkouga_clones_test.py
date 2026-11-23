@@ -492,11 +492,10 @@ def msc_tests(mscsb, src):
     frames(m2, 5)
     m2.game.log = []
     frames(m2, 1, st=0xB1)
-    check('KO (0xB1): the clones removed, no burnout, the channel closed (parabeetle v1: his Parabeetles removed too: '
-          'article 10)',
+    check('KO (0xB1): the clones removed, no burnout, the channel closed (parabeetle v1: no Parabeetle can be out, no '
+          'cooldown: nothing asked for article 10)',
           ([x for x in m2.game.log if x[0] == 'article'], m2.g('gk_ability'), m2.g('gk_burnout'), m2.game.vars.get(0x0F00031F)),
-          ([('article', 0x2712, 6), ('article', 0x2712, 7)] + ([('article', 0x2712, 10)] if 'gk_pb_clear' in
-                                                               open(src).read() else []), 0, 0, 0.0))
+          ([('article', 0x2712, 6), ('article', 0x2712, 7)], 0, 0, 0.0))
     m2.setg('gk_burnout', 100)
     frames(m2, 1, st=0xB2)
     check('respawn (0xB2): the burnout ended', m2.g('gk_burnout'), 0)
@@ -5435,6 +5434,10 @@ def parabeetle_side_tests(mscsb, src):
     frames(m, 1, st=0xB1)
     check('parabeetle: his KO (Dead 0xB1): his beetles removed (ArticleModule(0x2712, 10)), the cooldown 0, no request',
           ([x for x in g.log if x[0] == 'article'], m.g('gk_pb_cd'), g.vars.get(REQ)), ([('article', 0x2712, 10)], 0, 0.0))
+    m, g = pb_his_setup(mscsb, src)
+    frames(m, 3, st=0xB1)
+    check('parabeetle: KO frames with no cooldown (none can be out: it lives 270 frames, the cooldown 450): nothing '
+          'asked of the ArticleModule', [x for x in g.log if x[0] == 'article'], [])
     m, g = pb_his_setup(mscsb, src)
     m.setg('gk_pb_cd', 200)
     m('gk_reset')
