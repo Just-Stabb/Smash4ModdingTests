@@ -2869,6 +2869,12 @@ def ice_checks(e, info, diag):
     if 'ice' not in F:
         check('ice off: the victim hit handler\'s word is the game\'s', '%08X' % e.w(C.ICE_HOOK), '%08X' % C.ICE_ORIG)
         return
+    snd = 'icesnd' in F
+    check('icesnd %s: ice_snd %s' % ('on' if snd else 'off', 'in the cave' if snd else 'not built'), 'ice_snd' in lab, snd)
+    SP, SS = C.ICE_SND_VAR, C.ICE_SND_VAR + 1
+
+    def sndv():                                         # (play, stop) written, the victim's +0x1C (its sound's Greninja)
+        return (e.vars.get(SP), e.vars.get(SS), e.w(A['ice_st'] + C.ICE_ST * 4 + 0x1C))
     check('ice: the victim hit handler (0x%08X, lwz r3, 0x20(r27)) -> b ice_hit' % C.ICE_HOOK,
           K.branch_target(C.ICE_HOOK, e.w(C.ICE_HOOK)), lab['ice_hit'])
     fl = C.ice_flash()
@@ -2988,7 +2994,9 @@ def ice_checks(e, info, diag):
     put(burns)
     e.setw(A['bti_st'] + 16 * 4, 2)
     e.setw(A['bti_st'] + 16 * 4 + 4, C.BTINT_FADE)
+    e.vars = {}
     hit(4)
+    arm_snd = sndv()
     got = st()
     check('ice: an ice hit on a burning fighter (Mario, slot 4: two smash burns of his, a neutral air, a skeleton row of '
           'another Greninja (slot 5)): every burn cleared, armed (t 1); remaining %.3f %%, 4 stacks, owner slot 2 (the most), '
@@ -3000,8 +3008,19 @@ def ice_checks(e, info, diag):
     if diag:
         check('ice diag: S4IA (victim 4, amount x100, 4 stacks, owner 2, way 1)',
               [x[1:6] for x in e.osr_full if x[0] == A['gk_fia']], [(4, int(ref[3] * 100), 4, 2, 1)])
+    if snd:
+        check('icesnd: on the arming hit the detonation\'s sound asked of the owner (Greninja slot 2: his VAR 0x%08X = 1, '
+              'played by his MSC), recorded at the victim\'s +0x1C (slot + 1 = 3); no stop' % SP, arm_snd, (1.0, None, 3))
+        if diag:
+            check('icesnd diag: S4ID (victim 4, cmd 1 play, Greninja slot 2)',
+                  [x[1:4] for x in e.osr_full if x[0] == A['gk_fid']], [(4, 1, 2)])
+    else:
+        check('icesnd off: the arming hit asks no sound', (arm_snd[0], arm_snd[1]), (None, None))
     put([(60, 6, 0.4, 2)])
+    e.vars = {}
     hit(4)
+    if snd:
+        check('icesnd: an ice re-hit while armed: no second sound (once an arming)', sndv(), (None, None, 3))
     check('ice: an ice re-hit while armed: ignored (the record kept, the new burn not cleared)', (st()[:3], insts()),
           (got[:3], 1))
     put([])
@@ -3019,6 +3038,9 @@ def ice_checks(e, info, diag):
         seen.append(got_)
         if asked is None and any(k in e.vars for k in range(C.ICE_VAR, C.ICE_VAR + 4)):
             asked = t
+    if snd:
+        check('icesnd: the countdown run out (the blast made): its sound neither played again nor stopped (the boom plays '
+              'on), the record kept', sndv(), (None, None, 3))
     want_set = [[('set', tuple(round(x, 4) for x in fl[t - 1]), C.BTINT_SLOT, 0)] for t in range(1, C.ICE_FRAMES + 1)]
     check('ice: the countdown: frames 1 - %d the flash colour in the tint\'s slot %d (once a frame; the burn tint\'s reset '
           'clears it first on frame 1), frame %d the colour off, %d nothing' % (C.ICE_FRAMES, C.BTINT_SLOT, C.ICE_FRAMES + 1,
@@ -3050,6 +3072,8 @@ def ice_checks(e, info, diag):
     for _ in range(C.ICE_FRAMES):
         frame()
     check('ice: the owner (slot 2) KO\'d (Dead): Greninja slot 5 asked', st()[6], 5)
+    if snd:
+        check('icesnd: ... and its sound from him too (the blast\'s choice: +0x1C slot 5 + 1)', sndv(), (1.0, None, 6))
     for _ in range(3):
         frame()
     e.mu.mem_write(gk5['f'] + 0x1E, b'\x00')
@@ -3060,6 +3084,8 @@ def ice_checks(e, info, diag):
         frame()
     check('ice: no Greninja who can: no blast asked (none of his VARs written), the Greninja asked -1',
           (sorted(k for k in e.vars if C.ICE_VAR <= k < C.ICE_VAR + 4), st()[6]), ([], -1))
+    if snd:
+        check('icesnd: no Greninja who can: no sound played, none to stop (no blast: no boom)', sndv(), (None, None, 0))
     for _ in range(3):
         frame()
     e.setw(gst + C.ST_KIND, 0)
@@ -3070,15 +3096,24 @@ def ice_checks(e, info, diag):
     for _ in range(10):
         frame()
     e.setw(vst + C.ST_KIND, C.ST_DEAD)
+    e.vars = {}
     got = frame()
     check('ice: the victim KO\'d (Dead) at frame 11: the colour off at once, the countdown over', (got[-1:], st()[0]),
           ([('clear', C.BTINT_SLOT)], 0))
+    if snd:
+        check('icesnd: ... its sound stopped (Greninja slot 2: his VAR 0x%08X = 1, his MSC SoundModule 0x2714), the '
+              'record cleared' % SS, sndv(), (None, 1.0, 0))
+        if diag:
+            check('icesnd diag: S4ID (victim 4, cmd 2 stop, Greninja slot 2)',
+                  [x[1:4] for x in e.osr_full if x[0] == A['gk_fid']], [(4, 2, 2)])
     if diag:
         check('ice diag: S4IC (victim 4, status 0xB1, frame 11)', [x[1:4] for x in e.osr_full if x[0] == A['gk_fic']],
               [(4, C.ST_DEAD, 11)])
     for _ in range(C.ICE_FRAMES):
         frame()
     check('ice: ... and no blast asked afterwards', sorted(k for k in e.vars if C.ICE_VAR <= k < C.ICE_VAR + 4), [])
+    if snd:
+        check('icesnd: ... nor any sound again', (e.vars.get(SP), e.vars.get(SS)), (None, 1.0))
     e.setw(vst + C.ST_KIND, 0)
     # a reset cancels it
     put([(100, 15, 0.25, 2)])
@@ -3086,7 +3121,10 @@ def ice_checks(e, info, diag):
     frame()
     e.call(lab['gk_clear'], until=C.CLEAR_BACK)
     check('ice: a match / training reset (gk_clear): the countdown -1 (off asked)', st()[0], -1)
+    e.vars = {}
     got = frame()
+    if snd:
+        check('icesnd: ... the next frame its sound stopped (his MSC\'s own reset stops it too)', sndv(), (None, 1.0, 0))
     check('ice: ... the next frame the colour off, free again (the burn tint\'s own reset clears the slot too: twice)',
           (got, st()[0]), ([('clear', C.BTINT_SLOT)] * 2, 0))
     check('ice: ... nothing after', frame(), [])

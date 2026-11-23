@@ -109,7 +109,9 @@ float gk_sk_dist() { return 36.0f; }      // skeleton v1.6: the shadow's / skele
 int gk_tr_req_frames() { return 5; }      // burn v2: the trail requests' life (6 trails out already: none is made)
 int gk_ib_frames() { return 6; }          // ice detonation v1: the blast request's life (made again at gk_ib_retry())
 int gk_ib_retry() { return 3; }
-int gk_ib_sound() { return 0x7680060; }   // the skeleton's explosion sound (skeleton v1.5: his row 0x768, label 96)
+int gk_is_sound() { return 0x7680061; }   // usmash spike v2 / trail dim v1: the ice detonation's fuse and boom (his row
+                                          // 0x768, label 97: tools/gekkouga_sound.py ICE_SOUND), in place of the skeleton's
+                                          // explosion sound (label 96) the blast played
 
 float gk_abs(float v)
 {
@@ -136,6 +138,7 @@ void gekkouga_frame()
     gk_gen = gen;
     gk_gen_seen = 0x1;
     gk_sk_heartbeat();
+    gk_is_tick();                         // usmash spike v2 / trail dim v1: the detonation's sound (play / stop)
     gk_ib_tick();                         // ice detonation v1: a blast the executable asked of him
     gk_sk_queue();                        // clone articles v1: the clones' skeletons, one a frame after his
     gk_sh_tick();                         // ... and their shurikens' claim bits
@@ -1899,6 +1902,9 @@ void gk_reset()
     gk_tc_end();
     gk_ib_t = 0;
     gk_svi(48, 0);                        // ice detonation v1: no blast request
+    SoundModule(0x2714, gk_is_sound());   // usmash spike v2 / trail dim v1: a detonation's sound stopped (its countdown
+    gk_svi(52, 0);                        // is off: the executable's reset), no play / stop pending
+    gk_svi(53, 0);
 }
 
 // ---- ice detonation v1 (fighters/gekkouga/README.md "Ice detonation v1"): an ice hit on a burning fighter clears its burns
@@ -1906,7 +1912,27 @@ void gk_reset()
 // executable asks a Greninja for it (the burns' owner, else the first who can): his gk_vi(48) = type 4 + the burn amount /
 // 100, 49 / 50 the place, 51 the way. He makes a fire trail (article 9), which the executable's claim gives that request
 // first (no burn context): weapons/firetrail.c's blast mode (the hitbox, its explosion). Not claimed (no room): made once
-// more; the request dropped after gk_ib_frames(). The explosion's sound from him (his bank: the skeleton's)
+// more; the request dropped after gk_ib_frames(). (Its sound: gk_is_tick, from the arming on; the blast plays none: ice
+// detonation v1's skeleton explosion sound here is gone, the user's "Replace what the old sound was")
+// usmash spike v2 / trail dim v1 (the user: "Can you make this sound time with the ice detonation's timer and explosion?"):
+// the executable (tools/gekkouga_clone_cave.py ice_snd, feature icesnd) asks him, on the ice hit that arms a countdown,
+// to play the detonation's sound (gk_vi(52) = 1): its boom is cut to come ICE_SND_LEAD (52) frames on, with the blast;
+// a cancelled countdown (a KO, no Greninja to make the blast) asks him to stop it (gk_vi(53) = 1). Stop first: a new
+// arming the same frame still plays
+void gk_is_tick()
+{
+    if (WorkModuleF(0, 0x0f0003b5) > 0.5f)
+    {
+        SoundModule(0x2714, gk_is_sound());
+        gk_svi(53, 0);
+    }
+    if (WorkModuleF(0, 0x0f0003b4) > 0.5f)
+    {
+        SoundModule(0x2710, gk_is_sound());
+        gk_svi(52, 0);
+    }
+}
+
 void gk_ib_tick()
 {
     if (WorkModuleF(0, 0x0f0003b0) < 0.5f)
@@ -1917,10 +1943,6 @@ void gk_ib_tick()
     if (gk_ib_t == 0 || gk_ib_t == gk_ib_retry())
     {
         ArticleModule(0x2710, 0x9);
-    }
-    if (gk_ib_t == 0)
-    {
-        SoundModule(0x2710, gk_ib_sound());
     }
     gk_ib_t += 1;
     if (gk_ib_t > gk_ib_frames())
