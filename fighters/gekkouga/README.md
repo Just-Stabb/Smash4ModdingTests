@@ -1676,3 +1676,62 @@ size of the fighter emblem (pokeball), slightly smaller. Also it's appearing on 
   - Tests: `invuln_tests` (the vl bytes, only 4 changed; the stance's MSC over 40 held frames: `HitModule(0, 0)` each
     frame, nothing intangible, no shield).
 - Not confirmed in game.
+
+## Clone moves v1 (`greninja_clone_moves_v1.zip`, over round gauge v1.1; data only, exe_v46z_gkb12)
+
+The user: "Can you make split clones able to use the other moves they're unable to do? Also please allow clones to do
+grabs and throws", "And pummels", "the water shuriken effect doesn't appear for clones while charging"; side special:
+"the clones can share one shadow since one side special should spawn one skeleton for each clone, stacked".
+
+**Mirroring** (`clones.c` `gk_mir_*`; split, mode 2):
+- **Joining:** a clone free to act (action 0 on the ground, 10 in the air) joins his move when his status is in a
+  family (`gk_mir_family`):
+  - 1 shield (0x1B - 0x1E);
+  - 2 spot dodge / rolls (0x1F - 0x21);
+  - 3 air dodge (0x22);
+  - 4 grab / pummel / throws (0x35 - 0x3E);
+  - 5 neutral special (0x152, 0x157 - 0x15A);
+  - 6 side special (0x153, 0x15B, 0x15C);
+  - 7 up special (0x154, 0x15D - 0x15F).
+  Families 1 / 2 / 4 need the clone on the ground, 3 in the air.
+- **Mirroring** (action 6 ground / 16 air):
+  - his motion (from his frame when it changes) and facing;
+  - his movement this frame (`gk_mir_track`: body 3's k 2 - 5, jumps over 20 ignored) from its own place: along its
+    floor (`gk_fmove`; off a ledge it falls), in the air with walls / floors; his rise takes it off the ground.
+- **Leaving:** when his status leaves the family, its own control again.
+- **Down special:** none. **Ledges:** none (the user's original spec).
+- **Copies:** `gk_art_clones` in split returns the mirroring clones, so his shot's shuriken copies and his side
+  special's skeleton stack (one shadow) include them.
+- **Shield:** `gk_shielding`: a hit report for a clone while he shields (family 1: mirroring, or formation) is kept,
+  not a removal (diag 711 / 712). The clone (`weapons/clone.c` `cl_moves`) lets its latched hit check (VAR_4) go after
+  `cl_guard_rearm()` 12 frames.
+- **Dodges:** the clone latches its own hit check in his vl group 1 windows (EscapeN 2 - 17, EscapeF / B 4 - 15,
+  EscapeAir 2 - 27); the executable's hit check skips a latched clone.
+
+**Grabs** (`gekkouga_build.py` `clone_grab`; formation and split, the clones play his grab):
+- Hitboxes, the clone's hits his (an article can't use the game's capture):
+  - his grab boxes (catch / catchdash / catchturn Extended_Grab_Collision) as Extended_Special_Hitbox holds: 0 %,
+    361, BKB 40, hitlag 0, not shieldable, `Hitbox_Hold(ID, 2)`;
+  - CatchWait: the hold at (0, 6, 12) x 7, rehit 12;
+  - CatchAttack: his 2 % pummel at his frame 6 (not shieldable, held), the hold around it;
+  - Throw F / B / Hi / Lw: the hold, then at his Throw_Applier frame a hitbox with his Throw_Specifier kind 0 (5 % 50 /
+    8 % 140 / 5 % 93 / 5 % 65, KBG / WBKB as FKB / BKB).
+- The hold lasts his grab (his timer, the victim's mash on him).
+- Differences:
+  - the victim's hurt pose, not the held one;
+  - no mash on the clone;
+  - his whiff ends theirs;
+  - a hold can hit a second fighter at the hand.
+
+**Effects** (`cl_moves`):
+- the neutral special's hold (0x215 / 0x229): his orb 0x3300003 on its hand (0x7E8) every 10 frames, 1 -> 1.6 over 60;
+  dust every 6;
+- the run (0x12): his dust at frames 1 / 10. The walk's effect id 0: not done.
+
+**Tests:** `clone_moves_tests`:
+- mirroring shield / roll / grab / pummel / neutral / up special, down special not, the copies' bits;
+- the shield's block (711) and a hit without it (201);
+- the shield re-arm, the dodge windows, the orb's sizes, the run's dust;
+- the grab scripts' values against his scripts.
+
+Not confirmed in game (Hitbox_Hold on an article in particular).
