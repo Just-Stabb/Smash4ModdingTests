@@ -39865,6 +39865,10 @@ int gk_tc_kind;        // the move now: 0 none, 1 forward / 2 up / 3 down tilt, 
 int gk_tc_hit;         // frames since this move hit an opponent (0: not yet)
 int gk_tc_req;         // 1: the next tilt start is a chain's (the chain kept)
 int gk_tr_req_t;       // burn v2: frames his trail requests (VAR_0 - VAR_11) stay up for the executable's claims
+int gk_fp_slot;        // smash tune v1: the fighter his forward smash hit or was shielded by (its slot + 1; 0 none
+                       // yet, -1 the pursuit over for this forward smash)
+int gk_fp_t;           // ... frames pursued (after his hitlag)
+float gk_fp_v;         // ... his pursuit speed last frame
 
 int gk_lw_full() { return 300; }          // 5 seconds held (the user)
 int gk_ability_frames() { return 720; }   // 12 seconds
@@ -39943,6 +39947,10 @@ void gekkouga_frame()
     if (st != gk_tr_done)
     {
         gk_tr_done = 0;                   // burn v2: out of that attack: the next one asks again
+    }
+    if (st != 0x2d)
+    {
+        gk_fp_end();                      // smash tune v1: out of forward smash (Wait, a chain, a hit...): no pursuit
     }
     if (st != 0x25 && st != 0x28 && st != 0x29 && st != 0x2a)
     {
@@ -41333,7 +41341,12 @@ int gk_sm_start_loop(int t)
     return 0x1;
 }
 
-// the attack at full charge: the hold's exit values (ratio 1, charged), the stored charge used (not a chain's)
+// the attack at full charge: the hold's exit values (charged), the stored charge used (not a chain's). Smash tune v1
+// (the user: "Please make all of the smash attacks do the same damage as if they were uncharged"): the charge ratio 0
+// (was 1): the attack's power (func_345: 1 + (0x0200003E 1.4 - 1) x the ratio, AttackModule 0x2728) is 1.0, the
+// uncharged damage, at any charge; the charge still decides when it releases (gk_smash_full) and the x5 sizes
+float gk_sm_ratio() { return 0; }
+
 void gk_sm_release(int t)
 {
     if (gk_sm_auto == 0x1)
@@ -41341,7 +41354,7 @@ void gk_sm_release(int t)
         gk_sm_set(t, 0);
     }
     gk_chain = gk_chain | t;
-    WorkModule(0, 1.0f + 0, 0x1000000);
+    WorkModule(0, gk_sm_ratio() + 0, 0x1000000);
     WorkModule(0x2710, 0x21000002);
     func_16(gk_sm_attack_status(t), 0x1);
 }
@@ -41397,6 +41410,7 @@ int gk_chain_try(int cur)
 {
     int t;
     gk_trail_tick(cur);                   // burn v2: its fire trail at the smash's hit
+    gk_fp_tick(cur);                      // smash tune v1: forward smash's pursuit of the fighter it hit / was shielded by
     if (gk_sm_type(global4) != cur || global18 != 0)
     {
         return 0;
@@ -41423,6 +41437,7 @@ int gk_chain_try(int cur)
         return 0;
     }
     gk_chain_req = t;
+    gk_fp_end();                          // smash tune v1: a chain ends the pursuit (the next smash starts from here)
     if (t == 0x1 && ControlModuleF(0) * PostureModuleF(0) < -0.25f)
     {
         PostureModule(0x1);               // a forward smash the other way: turned first
@@ -41430,6 +41445,217 @@ int gk_chain_try(int cur)
     }
     func_16(gk_sm_start_status(t), 0x1);
     return 0x1;
+}
+
+// ---- smash tune v1: forward smash pursuit (the user: "make it so when hitting forward smash, Greninja gains a fast burst
+// of speed towards the hit opponent and slows down near them so that up smash connects easier"; "Also make the forward
+// smash pursuit happen if shielded"). When his forward smash (status 0x2D: its hitboxes IDs 0 - 3, the reach box 3
+// included) hits or is shielded (AttackModule 0x2727 kinds 2 | 4), the fighter it met is found (target 12, this attack's
+// hit record: docs/position-variables.md, its place matched to a player slot's) and, after his hitlag, he runs at it along
+// the ground: each frame his speed is min(gk_fp_vmax(), the last frame's + gk_fp_acc(), gk_fp_k() x (the gap along his
+// facing - gk_fp_stop())), the gap from the fighter's live place (a slot's X), so he bursts out and slows smoothly as he
+// closes in, and stops gk_fp_stop() short of it (never past it; nothing when it is behind or closer). His place moves by
+// the game's set_pos (the position variables), on his floor (its height at the new X: slopes, steps); a ledge (no floor
+// under his new X + gk_fp_edge()) or a wall (a stage wall line within 3) stops him at it and ends the pursuit. It ends too
+// after gk_fp_frames() frames, when the fighter is KO'd, when he leaves the ground or forward smash (Wait at its end, a
+// hit...) and when he chains into another smash (gk_chain_try: the chain works during and after the burst). The trails'
+// hitboxes (another object's attack) and the clones' hits don't start it; the clones in formation stand at his X + their
+// offsets every frame, so they come with him; split clones act on their own (fighters/gekkouga/README.md "Smash tune v1")
+float gk_fp_vmax() { return 8.0f; }       // the burst's top speed (units a frame; his run is 2.08)
+float gk_fp_acc() { return 4.0f; }        // ... reached in 2 frames (4, 8)
+float gk_fp_k() { return 0.4f; }          // the slow-down: 40 % of what is left to the stop point a frame
+float gk_fp_stop() { return 12.0f; }      // where he stops: this far from the fighter's centre (up smash's first hit, 25
+                                          // across at his Y 27, reaches 16 out at a standing fighter's height 8)
+int gk_fp_frames() { return 30; }         // the pursuit's longest (frames after his hitlag)
+float gk_fp_edge() { return 1.0f; }       // a ledge: no floor this far past his new X
+float gk_fp_wall() { return 3.0f; }       // a wall: he stops this far from it
+
+void gk_fp_end()
+{
+    gk_fp_slot = 0;
+    gk_fp_t = 0;
+    gk_fp_v = 0;
+}
+
+// the fighter forward smash met: target 12's place (this attack's newest hit record, hit or shield: 0 0 when nobody)
+// from his, the slot standing there (not his own place); 0 none
+int gk_fp_find()
+{
+    float ox;
+    float oy;
+    float x;
+    float y;
+    float tx;
+    float ty;
+    float sx;
+    float sy;
+    float d;
+    float best;
+    int s;
+    int k;
+    ox = WorkModuleF(0, 0x0f0002cd);      // ATKHIT_OFFSET_X: its X - his along his facing
+    oy = WorkModuleF(0, 0x0f0002ce);      // ATKHIT_OFFSET_Y
+    if (gk_abs(ox) < 0.01f && gk_abs(oy) < 0.01f)
+    {
+        return 0;
+    }
+    x = PostureModuleF(0x1);
+    y = PostureModuleF(0x2);
+    tx = x + ox * PostureModuleF(0);
+    ty = y + oy;
+    k = 0;
+    best = 1.0f;
+    s = 0;
+    while (s < 8)
+    {
+        sx = WorkModuleF(0, 0x0f000020 + 4 * s);
+        sy = WorkModuleF(0, 0x0f000021 + 4 * s);
+        if (gk_abs(sx - x) >= 0.01f || gk_abs(sy - y) >= 0.01f)
+        {
+            d = gk_abs(sx - tx) + gk_abs(sy - ty);
+            if (d < best)
+            {
+                best = d;
+                k = s + 1;
+            }
+        }
+        s += 1;
+    }
+    return k;
+}
+
+// his floor's height under x near y (gk_floor_y), 1 found (reach: a slope's rise for this step, as the clones')
+int gk_fp_floor(float x, float y, float step)
+{
+    float reach;
+    reach = gk_snap() + gk_slope() * gk_abs(step);
+    return gk_floor(x, y + reach, y - reach);
+}
+
+// how far he may move along dx (signed, world): the whole step, or up to a ledge / wall (then gk_fp_t = -1: over)
+float gk_fp_step(float x, float y, float dx, float dir)
+{
+    float lo;
+    float hi;
+    float mid;
+    int n;
+    if (gk_line(x, y + gk_wall_y(), x + dx + dir * gk_fp_wall(), y + gk_wall_y()) == 0x2)
+    {
+        gk_fp_t = -1;
+        dx = gk_hit_x - x - dir * gk_fp_wall();
+        if (dx * dir < 0)
+        {
+            dx = 0;
+        }
+    }
+    if (gk_fp_floor(x + dx + dir * gk_fp_edge(), y, dx))
+    {
+        return dx;
+    }
+    gk_fp_t = -1;                         // a ledge ahead: up to it
+    lo = 0;
+    hi = dx;
+    n = 0;
+    while (n < 6)
+    {
+        mid = (lo + hi) * 0.5f;
+        if (gk_fp_floor(x + mid + dir * gk_fp_edge(), y, mid))
+        {
+            lo = mid;
+        }
+        else
+        {
+            hi = mid;
+        }
+        n += 1;
+    }
+    return lo;
+}
+
+// forward smash's loop (gk_chain_try, every frame of status 0x2D)
+void gk_fp_tick(int cur)
+{
+    int s;
+    int st;
+    float x;
+    float y;
+    float dir;
+    float gap;
+    float v;
+    float dx;
+    if (cur != 0x1 || global4 != 0x2d || gk_fp_slot < 0)
+    {
+        return;
+    }
+    if (gk_fp_slot == 0)
+    {
+        if (AttackModule(0x2727, 0x6) == 0)
+        {
+            return;                       // not met anyone yet (2 a hurtbox, 4 a shield)
+        }
+        gk_fp_slot = gk_fp_find();
+        if (gk_fp_slot == 0)
+        {
+            return;                       // its record not readable yet: next frame
+        }
+    }
+    if (StopModule(0x1))
+    {
+        return;                           // his hitlag: after it
+    }
+    if (global18 != 0)
+    {
+        gk_fp_slot = -1;                  // in the air: over
+        return;
+    }
+    s = gk_fp_slot - 1;
+    st = (int)WorkModuleF(0, 0x0f0000a2 + 8 * (s + 3));
+    if (st == 0xb1 || st == 0xb2)
+    {
+        gk_fp_slot = -1;                  // KO'd: over
+        return;
+    }
+    gk_fp_t += 1;
+    if (gk_fp_t > gk_fp_frames())
+    {
+        gk_fp_slot = -1;
+        return;
+    }
+    x = PostureModuleF(0x1);
+    y = PostureModuleF(0x2);
+    dir = PostureModuleF(0);
+    gap = (WorkModuleF(0, 0x0f000020 + 4 * s) - x) * dir - gk_fp_stop();
+    v = 0;
+    if (gap > 0)
+    {
+        v = gap * gk_fp_k();
+    }
+    if (v > gk_fp_vmax())
+    {
+        v = gk_fp_vmax();
+    }
+    if (v > gk_fp_v + gk_fp_acc())
+    {
+        v = gk_fp_v + gk_fp_acc();
+    }
+    gk_fp_v = v;
+    if (v < 0.05f)
+    {
+        return;                           // there (or it is behind him): he waits, still following
+    }
+    dx = gk_fp_step(x, y, v * dir, dir);
+    if (dx * dir > 0)
+    {
+        WorkModule(0x2, dx + 0, 0x0f000000);
+        if (gk_fp_floor(x + dx, y, dx))
+        {
+            WorkModule(0x2, gk_floor_y - y + 0, 0x0f000001);   // on his floor (a slope / step)
+        }
+    }
+    if (gk_fp_t < 0)
+    {
+        gk_fp_slot = -1;                  // a ledge / wall: there, over
+    }
 }
 
 // ---- skeleton v1: a reset of the battle (the executable's clear-all count changed: training reset, restart): the
@@ -42931,7 +43157,7 @@ void gk_fg(int c, float sx, int cmd, int held, float sy)
         gk_fsmh(c, held);
         return;
     }
-    if (cmd & 0x300000)
+    if (gk_jump_cmd(cmd))
     {
         gk_bsi(c, 0, 0x1);                // jump (button or stick): the squat
         gk_fcmd(c, 0x18, 0);
@@ -42944,12 +43170,32 @@ void gk_fg(int c, float sx, int cmd, int held, float sy)
     gk_fwalk(c, sx);
 }
 
+// smash tune v1 (the user: "please make the clones check if the player has tap jump enabled. I don't play with tap jump
+// and I've noticed that the clones respond as if I do"): his command bits' stick jump (0x100000: a flick up) is made
+// by the game's command builder (0x02E71774, at 0x02E72248 - 0x02E722B4) whatever the setting (it only skips it while
+// the C-stick is in use); the setting is the held-buttons bit 0x8000 of his input frame (Tap Jump on), which the game's
+// own jump checks read through ControlModule(0x271C) (op 0x271C -> 0x02C1D3CC: [cm +0xA0] +0x3C & 0x8000, 0 while the
+// C-stick bit 0x80 is held), always with the stick bit (func_43, func_68, func_1245 ...). The clones did not: now a
+// stick jump only with the setting on; the jump button (0x200000) always
+int gk_jump_cmd(int cmd)
+{
+    if (cmd & 0x200000)
+    {
+        return 0x1;
+    }
+    if ((cmd & 0x100000) && ControlModule(0x271c))
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
 void gk_jump(int c, float sx, float sy)
 {
     float vy;
     float vx;
     vy = gk_hop_vy();
-    if (ControlModule(0x2712, 0x2) || sy > 0.5f)
+    if (ControlModule(0x2712, 0x2) || (sy > 0.5f && ControlModule(0x271c)))
     {
         vy = gk_jump_vy();                // jump still held at the squat's end: a full jump
     }
@@ -43251,7 +43497,7 @@ void gk_fa(int c, float sx, int cmd, float hlr)
         gk_fdrift(c, sx);
         return;
     }
-    if ((cmd & 0x300000) && gk_bvi(c, 9) == 0)
+    if (gk_jump_cmd(cmd) && gk_bvi(c, 9) == 0)
     {
         gk_bsi(c, 9, 0x1);                // its double jump
         gk_set_vy(c, gk_ajump_vy());

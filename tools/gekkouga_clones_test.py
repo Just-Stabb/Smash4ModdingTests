@@ -4355,7 +4355,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
 
 
 def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False, gkb5=False, gkb6=False,
-                gkb7=False, gkb8=False, gkb9=False, gkb10=False, gkb11=False, gkb12=False):
+                gkb7=False, gkb8=False, gkb9=False, gkb10=False, gkb11=False, gkb12=False, gkb13=False):
     """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
     release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
@@ -4379,6 +4379,8 @@ def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=
         # gauge v1.1's gkb12)
         drop |= {'gready', 'skbot'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 or gkb11 or gkb12 \
             else set()   # (tuning v1's gkb13)
+        drop |= {'shalf'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 or gkb11 or gkb12 or gkb13 \
+            else set()   # (smash tune v1's gkb14)
         variants = C.VARIANTS if not (sk12 or b2 or gkb5 or gkb6 or gkb7) else \
             C.VARIANTS + (('G_pose', (C.RELEASE - {'sway'}) | {'pose'}),)       # (up to v1.5: + G_pose)
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE - drop)] + \
@@ -4415,7 +4417,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
                                                 len(earlier) in (22, 23, 24, 25), len(earlier) in (26, 27, 28, 29),
                                                 len(earlier) == 30, len(earlier) in (31, 32), len(earlier) == 33,
                                                 len(earlier) in (34, 35), len(earlier) in (36, 37, 38, 39),
-                                                len(earlier) in (40, 41)):
+                                                len(earlier) in (40, 41), len(earlier) in (42, 43)):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')

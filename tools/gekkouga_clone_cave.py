@@ -105,7 +105,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
                       'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2',
-                      'gready', 'skbot'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'gready', 'skbot', 'shalf'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -131,6 +131,9 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', '
 #           hydrant's update template runs it (the collision attempt: Mario's pump's template never updates +0x2C)
 #   hitcheck v12: the clone hit from his side (w_hitchk: other fighters' attack boxes against the clone's box)
 #   sway    v11: the clone's swing step every frame (w_sway: his MotionModule's swing update, as his frame calls it)
+#   shalf   smash tune v1: his smash attacks' shield damage x 0.5 (SH_HOOK: a Greninja's attack in a smash motion, his or a
+#           clone's, or the fire trail's (its hitboxes' Type SH_TYPE): this hit's shield damage halved before the game's
+#           multiplier)
 #   bstart  v8: the clone's start (specializer +0x34) runs bunshin's own (0x02AF6738: black overlay, LinkModule link 3
 #           attributes 0 / 0xD, EffectModule +0xB4 / +0xA4), then clears the black (ColorBlendModule vt +0x44(0), as
 #           Terminate_Overlays' handler 0x02BE37B8 does); without it the start does nothing (v7)
@@ -535,6 +538,100 @@ def btint_ref(tier, fade):
     return t[:3] + (t[3] * w,), sh[:3] + (sh[3] * w, sh[4])
 
 
+def shalf_src():
+    """smash tune v1 (feature shalf): SH_HOOK's `b sh_half` (r26 the attack data, r30 the event; f8 this hit's shield damage
+    before the multiplier: halved for a Greninja's smash; back at SH_BACK with only f8 changed: the caller's next words
+    use f8 and set the rest)"""
+    kinds = ''.join('\n        cmpwi r0, %d\n        beq sh_halve' % k for k in SH_KINDS)
+    src = r'''
+# ==== smash tune v1 (shalf): a shield hit's shield damage x %(scale)s for a Greninja's smash (his, a clone's, his trail's)
+sh_half:
+        fmadds f8, f29, f28, f13        # the game's word
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stfs f8, 0x8(r1)
+        stw r31, 0x2C(r1)
+        stw r30, 0x28(r1)
+        lwz r3, 0x10(r30)               # the collision record
+        lis r0, 0x1000
+        cmplw r3, r0
+        blt sh_out
+        lis r0, 0x8000
+        cmplw r3, r0
+        bge sh_out
+        lwz r31, 0x18(r3)               # the attacker's object id
+        lis r3, 0x%(mgr_hi)04X
+        lwz r3, %(mgr_lo)d(r3)          # the battle object manager
+        cmpwi r3, 0
+        beq sh_out
+        mr r4, r31
+        lis r12, 0x%(look_hi)04X
+        ori r12, r12, 0x%(look_lo)04X
+        mtctr r12
+        bctrl                           # its record (out of a bl's reach)
+        cmpwi r3, 0
+        beq sh_out
+        lbz r0, 0x1E(r3)                # live
+        cmplwi r0, 4
+        blt sh_out
+        lwz r30, 0xC(r3)                # its accessor (r30, the event's, restored at the end)
+        lis r0, 0x1000
+        cmplw r30, r0
+        blt sh_out
+        lis r0, 0x8000
+        cmplw r30, r0
+        bge sh_out
+        lwz r3, %(team)d(r30)           # its owner: TeamModule vt +0x64 (0x50000000: none -> itself)
+        cmpwi r3, 0
+        beq sh_out
+        lwz r12, 0(r3)
+        lwz r12, 0x64(r12)
+        mtctr r12
+        bctrl
+        lis r0, 0x5000
+        cmplw r3, r0
+        bne sh_own
+        mr r3, r31
+sh_own: srwi r0, r3, 28
+        cmpwi r0, 0
+        bne sh_out                      # not a fighter's
+        rlwinm r3, r3, 16, 20, 31       # its slot
+        addi r3, r3, 1
+        bl gk_entry
+        cmpwi r3, 0
+        beq sh_out
+        lwz r0, 4(r3)
+        cmpwi r0, %(gkind)d
+        bne sh_out                      # not a Greninja's
+        lbz r0, 0x55(r26)               # the hitbox's Type: the trail's
+        cmpwi r0, %(stype)d
+        beq sh_halve
+        lwz r3, %(wmotion)d(r30)        # the attacker's motion kind (him, a clone)
+        cmpwi r3, 0
+        beq sh_out
+        lwz r0, %(mm_kind)d(r3)KINDS
+        b sh_out
+sh_halve:
+        lis r0, 0x%(half)04X
+        stw r0, 0xC(r1)
+        lfs f0, 0xC(r1)
+        lfs f8, 0x8(r1)
+        fmuls f8, f8, f0
+        stfs f8, 0x8(r1)
+sh_out: lfs f8, 0x8(r1)
+        lwz r30, 0x28(r1)
+        lwz r31, 0x2C(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        b 0x%(back)08X
+'''
+    return (src % dict(scale=SH_SCALE, mgr_hi=ha(SH_MANAGER), mgr_lo=K.slo(SH_MANAGER), look_hi=SH_LOOKUP >> 16, look_lo=SH_LOOKUP & 0xFFFF, team=TEAM_MOD,
+                       gkind=GK_KIND, stype=SH_TYPE, wmotion=W_MOTION, mm_kind=MM_KIND,
+                       half=struct.unpack('>I', struct.pack('>f', SH_SCALE))[0] >> 16, back=SH_BACK)).replace('KINDS', kinds)
+
+
 def btint_src(D):
     return r'''
 # ==== burn tint v1: (r3 a victim 0-7, r4 his slot) its tint / outline from its fire's tier (bfx_lvl). Only the first live
@@ -839,17 +936,39 @@ TR_ROW = (TR_BURN_KEY, 0.25, 15, 180)   # 0.25 % every 15 frames for 3 s = 3 % (
                                         # 0.5 % x 6 = 3 % under the 3 % floor)
 GK_VAR_TR = 0x0F000300            # his VAR_0 + 4 k: request k's type, + 1 x, + 2 y, + 3 way
 TR_VAR_SLOT, TR_VAR_TYPE, TR_VAR_X, TR_VAR_Y, TR_VAR_DIR, TR_VAR_CTX = (0x0F000300 + i for i in range(6))
+
+# ---- smash tune v1 (feature shalf; the user: "reduce the shield damage of all of the smash attacks by 50%"). A hit on a
+# shield: the victim's shield hit handler (0x02E35A..., before the shield event 0x02E35EE4: r26 the hitbox's attack data,
+# r30 the event, its +0x10 collision record: +0x18 the attacker's object id) adds damage x f28 + the hitbox's shield
+# damage (lhz +0x58: unsigned, never negative) x f30 (both 1.0 but for the Smash Tour items' fighter flag) to the victim's
+# pending shield damage (+0x7564) at SH_HOOK (fmadds f8, f29, f28, f13; then lfs / fadds / stfs +0x7564); the shield's
+# update takes HP - that x 0x020000CA (1.19) x the equipment's x + 0x020000CB (0) (0x02E36050 - 0x02E3606C). The hook
+# halves f8 when the attacker is a Greninja's: its record (0x02BF205C(the battle object manager [0x102F6C30], id): +0x1E
+# live >= 4, +0xC its accessor), its owner through its TeamModule (accessor +0x6C, vt +0x64: 0x50000000 none -> itself,
+# as the game's 0x02BEFB40), a fighter (id >> 28 = 0) in the fighter table (slot (id >> 16) & 0xFFF) of kind GK_KIND;
+# and the attack a smash: the attacker's motion kind (MotionModule accessor +0x44, +0x38) one of SH_KINDS (him, and his
+# clones, which play his motion kinds), or the hitbox's Type (attack data +0x55, the Hitbox command's parameter 23)
+# SH_TYPE (his fire trail's: gekkouga_build.TR_HIT). Half before the multiplier = half the total (the base 0).
+SH_HOOK = 0x02E35C48
+SH_ORIG = 0xED1D6F3A              # fmadds f8, f29, f28, f13
+SH_BACK = SH_HOOK + 4
+SH_LOOKUP = 0x02BF205C            # (manager, id) -> the object's record (or 0)
+SH_MANAGER = 0x102F6C30           # [it]: the battle object manager (the ACMD Hitbox handler's 0x02BDB2C4)
+SH_KINDS = (95, 99, 101)          # his motion.mtable: attacks4, attackhi4, attacklw4 (BURN_MOVES' smash rows)
+SH_TYPE = 0x16                    # the trail's hitboxes' Type (Water: no Smash 4 hitbox uses it)
+SH_SCALE = 0.5
 assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW, SK_TOUCH_ROW) for sh in (False, True)
            for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
 RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd', 'skbody',
-                     'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2', 'gready', 'skbot'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+                     'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2', 'gready', 'skbot', 'shalf'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
 # + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
 # v2.1: + floor1 (the burn floor 1 %, the user; burn v2's exe_v46z_gkb4 is RELEASE - floor1); skeleton v1.3: + tiers,
 # gmupd (exe_v46z_gkb6; burn v2.1 - aerial chain v1's exe_v46z_gkb5 is RELEASE - tiers - gmupd - skbody); skeleton v1.5:
 # + skbody, sktouch (exe_v46z_gkb7; v1.3 / v1.4's gkb6 is RELEASE - skbody - sktouch); skeleton v1.6: + skdist
-# (exe_v46z_gkb8; gkb7 is RELEASE - skdist); burn tint v1: + btint (exe_v46z_gkb9; gkb8 is RELEASE - btint)
+# (exe_v46z_gkb8; gkb7 is RELEASE - skdist); burn tint v1: + btint (exe_v46z_gkb9; gkb8 is RELEASE - btint); smash tune v1:
+# + shalf (exe_v46z_gkb14; tuning v1's gkb13 is RELEASE - shalf)
 VARIANTS = (('A_release', RELEASE),)
 # skeleton v1.6 (the user: "Please stop packaging G_pose. It has no use anymore."): A_release only. The pose feature
 # stays (the exes shipped with it up to v1.5 still rebuild from this script); v1.5 and before: + ('G_pose', (RELEASE -
@@ -5963,7 +6082,7 @@ w_dcase:
         lis r3, %(sk_desc_hi)d
         addi r3, r3, %(sk_desc_lo)d
         blr
-''' if skel else '')
+''' if skel else '') + (shalf_src().replace('%', '%%') if 'shalf' in feats else '')
     a = Asm(code_at)
     a.asm(src % p)
     words = a.words()
@@ -6008,6 +6127,10 @@ w_dcase:
         out.blob(A['sk_dist'], struct.pack('>f', SK_DIST), 'his side special shadow\'s cap (SK_DIST)')
         for at, orig, text, note in SK_DIST_PATCH:
             out.put(at, asm1(at, text % dict(hi=ha(A['sk_dist']), lo=K.slo(A['sk_dist']))), note, orig)
+    if 'shalf' in feats:                           # smash tune v1: the shield damage add -> sh_half
+        assert img.w(SH_HOOK) == SH_ORIG and SH_HOOK not in img.relocs(), 'the shield damage add at 0x%08X' % SH_HOOK
+        out.put(SH_HOOK, asm1(SH_HOOK, 'b 0x%X' % lab['sh_half']), 'the shield damage add -> sh_half (smash tune v1)',
+                SH_ORIG)
     if 'mark' in feats:                            # skeleton v1.7: new hit records' +0x2E cleared (burn_scan marks)
         for x in range(MARK_TRAMP, MARK_TRAMP + 12, 4):
             assert img.w(x) == 0, 'mark trampoline word 0x%08X not free' % x

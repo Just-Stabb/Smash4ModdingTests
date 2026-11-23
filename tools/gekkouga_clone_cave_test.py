@@ -2744,6 +2744,114 @@ def skdist_checks(e, info):
         info['A']['sk_dist'], 4)))[0], 3), C.SK_DIST)
 
 
+def shalf_checks(e, info):
+    """smash tune v1 (feature shalf): SH_HOOK (the shield hit's `fmadds f8, f29, f28, f13`, the pending shield damage before
+    the 1.19 multiplier) -> sh_half, run from the hooked word to SH_BACK on fake objects: a Greninja's attack (his own:
+    a fighter id; a clone / his trail: a weapon id whose TeamModule owner is his) in a smash motion (95 / 99 / 101) or
+    with the trail's Type (attack data +0x55 = SH_TYPE): f8 x 0.5; anything else (another move, another fighter's, an
+    unknown / dead object) the game's f8; the registers the caller keeps (r14 - r31, f28 / f29, r1) as they were"""
+    from unicorn.ppc_const import UC_PPC_REG_FPR8, UC_PPC_REG_FPR13, UC_PPC_REG_FPR28, UC_PPC_REG_FPR29
+    if 'shalf' not in info['feats']:
+        check('shalf off: the shield damage add is the game\'s', '%08X' % e.w(C.SH_HOOK), '%08X' % C.SH_ORIG)
+        return
+    lab = info['labels']
+    check('shalf: the shield damage add (0x%08X) -> b sh_half' % C.SH_HOOK, K.branch_target(C.SH_HOOK, e.w(C.SH_HOOK)),
+          lab['sh_half'])
+    mgr = e.alloc(0x40, b'\0')
+    e.setw(C.SH_MANAGER, mgr)
+    recs = {}
+    looked = []
+
+    def lookup(e_):
+        looked.append((e_.r(3), e_.r(4)))
+        return recs.get(e_.r(4), 0)
+    e.stub(C.SH_LOOKUP, lookup)
+    owners = {}
+    team_fn = e.alloc(4)
+
+    def team(e_):
+        return owners.get(e_.r(3), 0x50000000)
+    e.stub(team_fn, team)
+    team_vt = e.alloc(0x80, b'\0')
+    e.setw(team_vt + 0x64, team_fn)
+
+    def obj(oid, motion, live=4, owner=None):
+        acc = e.alloc(0x100, b'\0')
+        tm = e.alloc(0x20, b'\0')
+        e.setw(tm, team_vt)
+        e.setw(acc + C.TEAM_MOD, tm)
+        mm = e.alloc(0x60, b'\0')
+        e.setw(mm + C.MM_KIND, motion)
+        e.setw(acc + C.W_MOTION, mm)
+        rec = e.alloc(0x40, b'\0')
+        e.setw(rec, oid)
+        e.setw(rec + 0xC, acc)
+        e.mu.mem_write(rec + 0x1E, bytes([live]))
+        recs[oid] = rec
+        if owner is not None:
+            owners[tm] = owner
+        return acc
+    him = e.fighter(2)
+    e.mu.mem_write(him['f'] + 0x1E, b'\x04')
+    other = e.fighter(5)
+    e.mu.mem_write(other['f'] + 0x1E, b'\x04')
+    e.setw(other['f'] + 4, 0x3)                      # Mario
+    gk_id, mario_id = 0x00020000, 0x00050000
+    data = e.alloc(0x68, b'\0')
+    ev = e.alloc(0x40, b'\0')
+    col = e.alloc(0x40, b'\0')
+    e.setw(ev + 0x10, col)
+
+    def run(attacker, damage, sd=0.0, typ=0xA):
+        e.setw(col + 0x18, attacker)
+        e.mu.mem_write(data + 0x55, bytes([typ]))
+        for i in range(14, 32):
+            e.mu.reg_write(REGS[i], 0x5A5A0000 + i)
+        e.mu.reg_write(REGS[26], data)
+        e.mu.reg_write(REGS[30], ev)
+        e.mu.reg_write(UC_PPC_REG_FPR29, f2d(damage))
+        e.mu.reg_write(UC_PPC_REG_FPR28, f2d(1.0))
+        e.mu.reg_write(UC_PPC_REG_FPR13, f2d(sd))
+        e.mu.reg_write(UC_PPC_REG_FPR8, f2d(-1.0))
+        e.mu.reg_write(UC_PPC_REG_MSR, e.mu.reg_read(UC_PPC_REG_MSR) | 0x2000)
+        e.call(C.SH_HOOK, until=C.SH_BACK)
+        kept = all(e.r(i) == 0x5A5A0000 + i for i in range(14, 32) if i not in (26, 30)) and e.r(26) == data and \
+            e.r(30) == ev and e.mu.reg_read(UC_PPC_REG_1) == 0x70000000 + 0xF0000 and \
+            round(d2f(e.mu.reg_read(UC_PPC_REG_FPR29)), 3) == round(damage, 3) and \
+            d2f(e.mu.reg_read(UC_PPC_REG_FPR28)) == 1.0
+        return round(d2f(e.mu.reg_read(UC_PPC_REG_FPR8)), 4), kept
+    acc_him = obj(gk_id, 95)
+    got = []
+    for mk in (95, 99, 101, 104, 105, 0x50):
+        e.setw(e.w(acc_him + C.W_MOTION) + C.MM_KIND, mk)
+        got.append(run(gk_id, 14.0))
+    check('shalf: his attack on a shield, 14 %: forward / up / down smash (motions 95 / 99 / 101) 7.0 (x 0.5); neutral / '
+          'forward air, a jab (104 / 105 / 0x50) 14.0 (the game\'s); the caller\'s registers kept',
+          got, [(7.0, True)] * 3 + [(14.0, True)] * 3)
+    e.setw(e.w(acc_him + C.W_MOTION) + C.MM_KIND, 95)
+    check('shalf: the shield damage field added in (10 % + 4: 14 -> 7) and an uncharged up smash hit (5 %: 2.5)',
+          [run(gk_id, 10.0, 4.0)[0], run(gk_id, 5.0)[0]], [7.0, 2.5])
+    obj(mario_id, 95)
+    check('shalf: another fighter (Mario, kind 3) in his motion 95: 14.0', run(mario_id, 14.0)[0], 14.0)
+    clone_id, trail_id, foe_trail = 0x10004000, 0x10007000, 0x10009000
+    acc_cl = obj(clone_id, 99, owner=gk_id)
+    obj(trail_id, 0, owner=gk_id)
+    obj(foe_trail, 0, owner=mario_id)
+    got = [run(clone_id, 11.0)[0]]
+    e.setw(e.w(acc_cl + C.W_MOTION) + C.MM_KIND, 104)
+    got.append(run(clone_id, 11.0)[0])
+    got += [run(trail_id, 0.1, typ=C.SH_TYPE)[0], run(trail_id, 0.1, typ=9)[0], run(foe_trail, 0.1, typ=C.SH_TYPE)[0]]
+    check('shalf: a clone (a weapon owned by him) in his up smash 11 -> 5.5, in his neutral air 11; his trail (Type 0x16) '
+          '0.1 -> 0.05, Type 9 0.1; a weapon of Mario\'s with Type 0x16 0.1', got, [5.5, 11.0, 0.05, 0.1, 0.1])
+    obj(0x0002FFFF, 95, live=2)
+    check('shalf: an attacker not found (no record: 14.0), not live (+0x1E 2: 14.0), no collision record (14.0)',
+          [run(0x00020099, 14.0)[0], run(0x0002FFFF, 14.0)[0]], [14.0, 14.0])
+    e.setw(ev + 0x10, 0)
+    check('shalf: ... no collision record on the event: 14.0', run(gk_id, 14.0)[0], 14.0)
+    e.setw(ev + 0x10, col)
+    check('shalf: the lookup called with the battle object manager and the attacker\'s id', looked[0], (mgr, gk_id))
+
+
 def col_on_checks(patched):
     """skeleton v1.2: the game's own GC_ON / GC_ENABLE (0x02AC2EF0 / 0x02AC2E54) and the ground's enable 0x02D5D6E0 run
     unstubbed on a fake GroundModule / handle / ground: the words they leave are the hydrant's in the user's log
@@ -2826,6 +2934,7 @@ def main():
         col_on_checks(patched)
     pose_checks(e, info, diag)
     skdist_checks(e, info)
+    shalf_checks(e, info)
     fighter_desc_checks(e, img, info)
     g1_checks(e, info)
     s13_checks(e, info)

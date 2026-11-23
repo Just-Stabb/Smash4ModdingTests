@@ -180,8 +180,10 @@ SWORD_BONES = (24, 25)     # v4: his water sword's bones: a hitbox on them also 
 EFFECT_GROW = 5.0          # v3 (the user): its effects x5 (clones.c gk_smash_fx_max()); its trails' (Sword_Glow) points too
 HOLD_SCRIPTS = ('attacks4hold', 'attackhi4hold', 'attacklw4hold')   # v3: their effects at size 0 (his MSC draws them, gk_sm_fx)
 HOLD_EFFECTS = ('External_Graphic', 'Graphic_Effect', 'Graphic_Effect2')
-CHARGE_DAMAGE = 1.4        # Smash 4's full smash charge (the attack's 0x1000000 ratio 1.0): x1.4 damage. The clones'
-                           # copies of his smash hitboxes get it in the script (an article's attack has no charge ratio)
+CHARGE_DAMAGE = 1.0        # the clones' copies of his smash hitboxes: x this damage. Clones v1 - nair / fair v1: 1.4 (Smash
+                           # 4's full charge, the attack's 0x1000000 ratio 1.0, which an article's attack doesn't get);
+                           # smash tune v1 (the user: "make all of the smash attacks do the same damage as if they were
+                           # uncharged"): 1.0, as his own (clones.c gk_sm_ratio 0)
 HITBOXES = ('Hitbox', 'Special_Hitbox', 'Extended_Hitbox', 'Extended_Special_Hitbox')
 CLONE_GAME = set(HITBOXES) | {'FRAME', 'WAIT', 'Remove_All_Hitboxes', 'Remove_Hitbox', 'Move_Hitbox', 'Script_End'}
 CLONE_EFFECT = {'FRAME', 'WAIT', 'Script_End', 'Graphic_Effect2', 'External_Graphic', 'EFFECT_FLIP', 'EFFECT_FOLLOW_FLIP',
@@ -714,20 +716,35 @@ NAIR_LATE = 14.0                  # its late hit's size (6 %, frames 14-17; tuni
 NAIR_FX_FRAME = 11                # the burst / ring's call frame (his effect script)
 NAIR_FX_Y = 8.5                   # ... at joint 0, Y 8.5 (the ring's centre)
 NAIR_FX_SIZE = 1.8125             # ... its size (tuning v1)
-NAIR_RING_PART = 1                # the ring's hitboxes: Part 1, their own hit record (the strong / late hits are Part 0):
-                                  # set_attack (0x02C08848) keeps a Part's record while an ID set again is still out on
-                                  # it, and clears it when a new ID is set on that Part (docs/native-notes.md)
+NAIR_RING_PART = 0                # the ring's boxes: Part 0, the burst's (smash tune v1; nair ring v1: Part 1, their own hit
+                                  # record): one record for the burst and the ring, so a fighter the burst hit is never touched
+                                  # by the ring (its launch kept) and the ring pushes anyone else once. set_attack (0x02C08848)
+                                  # keeps a Part's record while an ID set again is still out on it and clears it when a new ID
+                                  # is set on that Part: the ring's IDs are all set at 12 with the burst's (NAIR_RING_START),
+                                  # then only moved (docs/native-notes.md)
 NAIR_RING_IDS = (1, 2, 3, 4, 5, 6)   # 6 capsules (a hexagon round the ring): the clone (a weapon: IDs 0-6, Parts 0-1)
                                   # plays this script too
-NAIR_RING_FRAMES = (14, 16, 18, 20, 22)   # the ring boxes set at 14 (all six at once: Part 1's record starts empty), moved
-NAIR_RING_END = 24                # out every 2 frames (the same IDs, still out: the record kept), gone at 24 (the ring's
-                                  # flames: called at 11, 14 frames, under 15 % alpha by 24)
+NAIR_RING_START = 12              # smash tune v1: set with the burst's first hit (12), tucked inside it (NAIR_RING_TUCK) until
+NAIR_RING_TUCK = 8.0              # 14: corners 8 from the ring's centre (joint 0, Y 8.5), + the capsules' 2.5: inside the
+                                  # burst's 12 round joint 3 (at Z 0.9, Y 8.5 - 8.7 at 12 - 13 in his motion: at most 11.4
+                                  # from it): whatever they touch the burst (ID 0, the lower ID: it wins a shared frame)
+                                  # touches too
+NAIR_RING_FRAMES = (14, 16, 18, 20, 22)   # out along the ring from 14, moved every 2 frames (the same IDs, still out: the
+NAIR_RING_END = 24                # record kept), gone at 24 (the ring's flames: called at 11, 14 frames, under 15 % alpha by 24)
 NAIR_RING_TIP = 4.5               # the ring's flames' lit tips past their centres (fx_render: 4.3 - 4.7 at frames 14-19)
 NAIR_RING_MIN = 2.5               # the capsules' least radius
-NAIR_RING_HIT = dict(Damage=2.5, Angle=60, KBG=25, FKB=0, BKB=25, Effect=5, Trip=0.0, Hitlag=0.5, SDI=1.0, Clang=1,
-                     Rebound=1, ShieldDamage=0, SFXLevel=0, SFXType=8)
-                                  # weak: 2.5 %, the burst's own angle 60 (it carries on the way the burst sent them), KBG /
-                                  # BKB 25, fire (element 5, the burn sound 8, small), half hitlag, no shield damage
+NAIR_RING_HIT = dict(Damage=0.0, Angle=361, KBG=100, FKB=10, BKB=0, Effect=5, Trip=0.0, Hitlag=0.0, SDI=0.0, Clang=0,
+                     Rebound=0, ShieldDamage=0, SFXLevel=0, SFXType=0, Type=0, HitBits=0x3F, Unk41=0, CollisionPart=0xF,
+                     NoScale=0, Shieldable=1, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0, HitAllStates=0,
+                     FacingRestrict=0, NoGrabRelease=0, TeamDamage=0, DisableHitlag=1, NoGFX=1, Flinchless=1)
+                                  # smash tune v1 (the user: "Please remove any knockback from the fire ring and turn it into a
+                                  # very weak windbox"): Smash 4's windbox, as F.L.U.D.D.'s water (Mario's pumpwater game.bin:
+                                  # Special_Hitbox, 0 %, KBG 100, set knockback (FKB) 50 / 58, BKB 0, Flinchless 1 (no
+                                  # reaction: a push, no hitstun / tumble), NoGFX 1): 0 %, set knockback 10 (KB ((1 + 10 / 2) x
+                                  # 1.4 + 18) x 1 = 26.4 at weight 100: about 0.8 a frame, F.L.U.D.D.'s 54.4), angle 361 by
+                                  # position (FacingRestrict 0: away from him either side), DisableHitlag 1 (no hitlag either
+                                  # side), no clank, no sound, fire (element 5), shieldable (as F.L.U.D.D.: 0 shield damage).
+                                  # Nair ring v1: 2.5 %, angle 60, KBG / BKB 25, hitlag 0.5
 
 
 def ring_radius(frame, ring=None):
@@ -748,11 +765,12 @@ def ring_stage(frame):
 
 
 def ring_boxes(frame):
-    """the 6 Extended_Hitbox capsules (Part 1, joint 0) of the ring at frame: hexagon edges round (0, NAIR_FX_Y)"""
+    """the 6 Extended_Special_Hitbox windbox capsules (Part 0, joint 0) of the ring at frame: hexagon edges round (0,
+    NAIR_FX_Y); at NAIR_RING_START tucked inside the burst (NAIR_RING_TUCK)"""
     import acmd
     by = {v['name']: k for k, v in acmd.INFO.items()}
-    ident = by['Extended_Hitbox']
-    rv, sz = ring_stage(frame)
+    ident = by['Extended_Special_Hitbox']
+    rv, sz = (NAIR_RING_TUCK, NAIR_RING_MIN) if frame == NAIR_RING_START else ring_stage(frame)
     out = []
     for k, hid in enumerate(NAIR_RING_IDS):
         a0, a1 = math.radians(60 * k), math.radians(60 * (k + 1))
@@ -765,8 +783,9 @@ def ring_boxes(frame):
 
 
 def nair_ring(game):
-    """neutral air: the strong / late hits NAIR_STRONG / NAIR_LATE, and the ring's weak capsules (Part 1) from frame 14 to
-    24 on absolute FRAMEs; his WAITs become FRAMEs (the same frames), the end Remove_All_Hitboxes (19) Remove_Hitbox(0)"""
+    """neutral air: the strong / late hits NAIR_STRONG / NAIR_LATE, and the ring's windbox capsules (smash tune v1: Part 0,
+    set at 12 inside the burst, out along the ring from 14 to 24; nair ring v1: weak hits, Part 1, 14 - 24) on absolute
+    FRAMEs; his WAITs become FRAMEs (the same frames), the end Remove_All_Hitboxes (19) Remove_Hitbox(0)"""
     import acmd
     by = {v['name']: k for k, v in acmd.INFO.items()}
     s = game.scripts[acmd.crc('attackairn')]
@@ -779,7 +798,8 @@ def nair_ring(game):
     assert int(tr.params[0]) == 2 + 1 + len(hb[2].params), 'the True block: the re-hit only'
     fr = lambda n: acmd.Command(by['FRAME'], [float(n)])
     rm = acmd.Command(by['Remove_Hitbox'], [0])
-    new = [fr(10), on, fr(12), hb[0], fr(14), hb[1]] + ring_boxes(14) + [fr(16)] + ring_boxes(16) + \
+    new = [fr(10), on, fr(12), hb[0]] + ring_boxes(NAIR_RING_START) + [fr(14), hb[1]] + ring_boxes(14) + [fr(16)] + \
+          ring_boxes(16) + \
           [fr(17), cmp_, tr, hb[2], fr(18)] + ring_boxes(18) + [fr(19), rm, fr(20)] + ring_boxes(20) + [fr(22)] + \
           ring_boxes(22) + [fr(NAIR_RING_END), acmd.Command(by['Remove_All_Hitboxes'], []), fr(40), off,
                             acmd.Command(by['Script_End'], [])]
@@ -823,6 +843,49 @@ def fair_reach(game, effect):
             c.params[param(c, 'Y2')] = -(FAIR_BLADE + FAIR_EXTRA)
 
 
+# ---------------------------------------------------------------- smash tune v1: up smash's weak spike (the user: "Please make
+# up smash do a weak spike if they are on the inner hit of the part with both swords going downwards"; "The up smash spike
+# should send at a diagonal angle away from Greninja"). His AttackHi4 (motion 99, the user's script): at 18 the geyser (ID
+# 0, Y 27, 14 %, until 19) and both swords as they sweep down from overhead to his sides (his motion: the hands' -Y, the
+# swords, from straight up at 15 to level at 18 and below level at 19 - 20; out until 21): on each sword (bones 0x19 /
+# 0x18) an outer hit 20 along it (size 23.5) and an inner one at the hand (Y 0, size 17.5: nearer his body), 11 %, 44
+# degrees. Smash 4 gives an overlap to the lowest ID, and the outer spheres covered most of the inner ones (the inner
+# hits were IDs 3 / 4): now the inner ones are IDs 1 / 2 (the outer ones 3 / 4, their ATK_RESERVEs too), so whoever is
+# in an inner sphere at 19 - 20 is spiked (at 18 the geyser, ID 0, still wins), and the inner hits are the spike:
+USMASH_SPIKE = dict(Angle=300, KBG=50, FKB=0, BKB=25)
+                                  # 300 degrees: down and away at 60 below level, by position (a plain Hitbox's facing
+                                  # restriction is the AttackModule's default, +0x11A = 0: Ultimate's LR_CHECK_POS, the
+                                  # victim's side of him), so behind him it goes down and back (240 on screen); weak: KBG 50
+                                  # / BKB 25 (11 %, weight 100: KB 39 at 0 %, 80 at 100 %, 107 at 150 %: no tumble under
+                                  # about 100 %; was 44 degrees, KBG 100, BKB 30)
+USMASH_SPIKE_FRAME = 18
+
+
+def usmash_spike(game):
+    import acmd
+    s = game.scripts[acmd.crc('attackhi4')]
+    at, fr, hits = 0.0, {}, []
+    for c in s:
+        if c.name == 'FRAME':
+            at = float(c.params[0])
+        if c.name in HITBOXES and at == USMASH_SPIKE_FRAME and int(c.params[param(c, "Bone")]) in SWORD_BONES:
+            hits.append(c)
+    assert len(hits) == 4 and sorted(int(c.params[param(c, 'ID')]) for c in hits) == [1, 2, 3, 4], hits
+    inner = sorted((c for c in hits if abs(float(c.params[param(c, 'Y')])) < 1e-6), key=lambda c: -int(c.params[param(c, 'Bone')]))
+    outer = sorted((c for c in hits if abs(float(c.params[param(c, 'Y')])) >= 1e-6), key=lambda c: -int(c.params[param(c, 'Bone')]))
+    assert len(inner) == 2 and len(outer) == 2
+    new_id = {}
+    for k, c in enumerate(inner + outer):            # inner 1 (0x19), 2 (0x18); outer 3 (0x19), 4 (0x18)
+        new_id[(int(c.params[param(c, 'Bone')]), k < 2)] = k + 1
+        c.params[param(c, 'ID')] = k + 1
+    for c in inner:
+        for nm, v in USMASH_SPIKE.items():
+            c.params[param(c, nm)] = v
+    for c in s:                                      # the reserves at 15 (unscaled offsets: inner Y 0, outer Y -4)
+        if c.name == 'ATK_RESERVE' and int(c.params[0]) in (1, 2, 3, 4):
+            c.params[0] = new_id[(int(c.params[param(c, 'Bone')]), abs(float(c.params[param(c, 'Y')])) < 1e-6)]
+
+
 def remove_cmds(cmds, keep):
     """cmds without those keep() refuses, every True / Else / False block that held one shorter by its words"""
     while True:
@@ -854,6 +917,7 @@ def tune(game, effect):
             c.params[param(c, 'Size')] = round(float(c.params[param(c, 'Size')]) * NAIR_SCALE, 4)
     nair_ring(game)
     fair_reach(game, effect)
+    usmash_spike(game)
     g = game.scripts[acmd.crc('attacks4')]
     h0 = next(c for c in g if c.name in HITBOXES and int(c.params[param(c, 'ID')]) == 0)
     h3 = acmd.Command(h0.ident, list(h0.params))
@@ -1374,7 +1438,12 @@ TR_BOXES = {'FireTrailS4': tuple((12.0 + 12.0 * i, 5.0, 7.0) for i in range(7)),
             'FireTrailLw4': tuple((sg * z, 5.0, 8.0) for z in (12.0, 26.0, 40.0, 52.0) for sg in (1.0, -1.0))}
 TR_REHIT = 35
 TR_HIT = dict(Damage=0.1, Angle=361, KBG=0, FKB=0, BKB=0, Effect=5, Hitlag=0.0, SDI=0.0, Clang=0, Rebound=0,
-              ShieldDamage=0, SFXLevel=0, SFXType=0, Rehit=TR_REHIT, DisableHitlag=1, NoGFX=1, Flinchless=1)
+              ShieldDamage=0, SFXLevel=0, SFXType=0, Rehit=TR_REHIT, DisableHitlag=1, NoGFX=1, Flinchless=1,
+              Type=0x16)
+# smash tune v1: Type 0x16 (Water: no Smash 4 hitbox uses it, the community sheet's Type tab; burn v2 - nair / fair v1: 9,
+# Weapon) marks the trail's hitboxes for the executable's shield damage halving (tools/gekkouga_clone_cave.py feature
+# shalf: a Greninja's attack with this Type at its attack data +0x55, as his and the clones' smash motions: x 0.5). They
+# draw nothing (NoGFX) and make no sound, which is where a hitbox's Type could show
 
 
 def tr_hitbox(i, z, y, size):
