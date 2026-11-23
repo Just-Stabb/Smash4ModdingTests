@@ -86,6 +86,10 @@ MSC_EDITS = [
     # clone articles v1: his shot's shuriken copies (one per clone out) right after his own shot
     ('func_2271', '        ArticleModule(0x2719, 0);\n', '        ArticleModule(0x2719, 0);\n        gk_sh_copies(); // Greninja mod: clone articles (clones.c)\n'),
     ('func_2279', '        ArticleModule(0x2719, 0);\n', '        ArticleModule(0x2719, 0);\n        gk_sh_copies(); // Greninja mod: clone articles (clones.c)\n'),
+    # parabeetle v1: his up special's stance ends in gk_pb_end (a Parabeetle and Fall, or on cooldown a boost into special
+    # fall) in place of the jet (SpecialHiJet 0x15D: the water, its effects and sounds)
+    ('func_2303', '    if (MotionModule(0x2712))\n    {\n        func_16(0x15d, 0);\n        return 0x1;\n    }',
+     '    if (MotionModule(0x2712))\n    {\n        gk_pb_end(); // Greninja mod: parabeetle v1 (clones.c)\n        return 0x1;\n    }'),
     ('func_2383', '    if (func_56())\n    {\n        return 0x1;\n    }\n',
      '    if (func_56())\n    {\n        return 0x1;\n    }\n    if (gk_ac_try()) // Greninja mod: aerial chains (clones.c)\n'
      '    {\n        return 0x1;\n    }\n'),

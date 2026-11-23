@@ -105,7 +105,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
                       'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2',
-                      'gready', 'skbot', 'shalf', 'ice', 'ice2', 'bgrav'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'gready', 'skbot', 'shalf', 'ice', 'ice2', 'bgrav', 'pbeetle'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -137,6 +137,9 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', '
 #   ice     ice detonation v1 (needs btint): an ice (Effect 4) hit on a burning fighter clears its burns and arms a blast
 #           52 frames later (ICE_HOOK in the victim hit handler, ice_arm / ice_vic / ice_req; the flashing in the burn tint's
 #           slot; the blast is a fire trail article in its blast mode, asked of a Greninja through ICE_VAR)
+#   pbeetle parabeetle v1 (needs burn2): the Parabeetle article (kind PB_KIND, his article 10): its claim (his VAR_12),
+#           its collision (parabeetle.lvd: one drop-through floor line on its top, the skeleton's GroundModule route) made,
+#           moved with it every frame (riders carried) and removed (pb_frame)
 #   bstart  v8: the clone's start (specializer +0x34) runs bunshin's own (0x02AF6738: black overlay, LinkModule link 3
 #           attributes 0 / 0xD, EffectModule +0xB4 / +0xA4), then clears the black (ColorBlendModule vt +0x44(0), as
 #           Terminate_Overlays' handler 0x02BE37B8 does); without it the start does nothing (v7)
@@ -1701,6 +1704,364 @@ ICE_SND_VAR = 0x0F0003B4          # his gk_vi(52): play; gk_vi(53): stop
 ICE_SND_ID = 0x07680061           # his row 0x768, label 97 (tools/gekkouga_sound.py ICE_SOUND)
 
 
+# ---- parabeetle v1 (feature pbeetle; fighters/gekkouga/README.md "Parabeetle v1"; the user: "spawn a parabeetle under him
+# after doing the hydro pump stance ... a rising platform with collision that can be dropped through"): a new weapon kind
+# PB_KIND (his article PB_ARTICLE, PB_MAX at once: his and his two clones'), folder "parabeetle": model/parabeetle/c00 (the
+# user's Wii model, tools/mdl0_to_nud.py) + parabeetle.lvd, motion/parabeetle/main.pac (its CHR0s, tools/chr0_to_omo.py:
+# PB_MOTIONS, motion kinds 0 wait / 1 rise / 2 ridden), script/animcmd/weapon/parabeetle, script/msc/parabeetle (its MSC:
+# fighters/gekkouga/weapons/parabeetle.c, which flies it). The executable (pb_frame, its specializer +0x94): the claim
+# (its VAR_0 0: the first live Greninja whose VAR_12, his request code, is set: copied to its VAR_1, cleared; its VAR_0 =
+# his slot), its collision while its MSC's phase (VAR_5) is 1: made once (pb_col_make: as sk_col_make, its own kind's
+# bundle and PB_LVD), every frame its GroundModule's frame update and its 2 vertices moved to its place + PB_VERTS
+# (GC_MOVEV: last = where they were, so whoever stands on it is carried; the commit; kept on); gone (something removed
+# it): made again (PB_REMAKE a life, then VAR_6 4); phase 2 (leaving): removed (GC_FREE: anyone on it falls). The lvd's
+# collision is drop-through: the article ground maker 0x02AC2B84 ORs 0x2000 (the passable bit the line tests leave out
+# with mask 0x102000) into every line's attribute when the collision's flag word +0xE8 has bit 0 (the .lvd's 4th flag
+# byte; 0x02AC2D18 - 0x02AC2D30), as the stages' soft platforms. Its specializer: the moon's with the skeleton's +0x34
+# (sk_start: grounds of a last life removed, VARs 0) / +0xAC (sk_hit) and +0x94 pb_94; its module row the skeleton's (the
+# hydrant's GroundModule, the SoundModule); base kind Mario's pump (as the skeleton: its template); loaded with him
+PB_KIND = 0x1A4
+PB_NAME = 'parabeetle'
+PB_ARTICLE = 10                   # his list: 6 articles, clones 6 / 7, skeleton 8, fire trail 9, the Parabeetle 10
+PB_MAX = 3
+PB_LVD = 'parabeetle.lvd'
+PB_MOTIONS = ('FitGekkougaParabeetleMainA00Wait', 'FitGekkougaParabeetleMainA01Rise', 'FitGekkougaParabeetleMainA02Ridden')
+PB_TOP = 11.4                     # its line over its origin (the shell's top at the model's scale PB_SCALE, 0.5 under its
+PB_HALF = 10.0                    # highest point) and its half length: 20 wide (Greninja ~12: his clones' boxes x +- 6)
+PB_VERTS = ((-PB_HALF, PB_TOP), (PB_HALF, PB_TOP))   # the .lvd's vertices (a floor: left to right, normal up)
+PB_SCALE = 1.25                   # the model's scale (tools/gekkouga_build.py parabeetle: the source's units x this)
+PB_REMAKE = 3
+GK_VAR_PBREQ = 0x0F00030C         # his VAR_12: the request code (his facing x (1 his, 2 / 3 a clone's, + 4 grounded))
+PB_VAR_SLOT, PB_VAR_CODE, PB_VAR_PHASE, PB_VAR_COL, PB_VAR_REMADE = (0x0F000300, 0x0F000301, 0x0F000305, 0x0F000306,
+                                                                     0x0F000307)
+
+
+def pb_hashes():
+    """its motion info's entries: the pack loader's key of each animation (tools/mtable.py anim_hash)"""
+    import zlib
+    return [zlib.crc32(n.encode(), 0xFFFFFFFF) & 0xFFFFFFFF for n in PB_MOTIONS]
+
+
+PB_SRC = r'''
+# ==== parabeetle v1: the Parabeetle (weapon kind PB_KIND, his article 10; its MSC fighters/gekkouga/weapons/parabeetle.c).
+# Its VARs: 0 its owner's slot (the claim), 1 his request code, 5 its phase (its MSC: 1 flying, 2 leaving), 6 its
+# collision (0 none, 1 made, 2 removed, 3 failed, 4 lost), 7 its grounds made again
+pb_94:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r3, 0x08(r1)
+        stw r4, 0x0C(r1)
+        stw r5, 0x10(r1)
+        stw r6, 0x14(r1)
+        stw r7, 0x18(r1)
+        stw r8, 0x1C(r1)
+        stw r9, 0x20(r1)
+        stw r10, 0x24(r1)
+        mr r3, r4
+        bl pb_frame
+        lwz r3, 0x08(r1)
+        lwz r4, 0x0C(r1)
+        lwz r5, 0x10(r1)
+        lwz r6, 0x14(r1)
+        lwz r7, 0x18(r1)
+        lwz r8, 0x1C(r1)
+        lwz r9, 0x20(r1)
+        lwz r10, 0x24(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40@@TAIL94@@
+
+# (r3 the weapon): its frame
+pb_frame:
+        stwu r1, -0x60(r1)
+        mflr r0
+        stw r0, 0x64(r1)
+        stmw r26, 0x40(r1)
+        lwz r31, %(wacc)d(r3)
+        cmpwi r31, 0
+        beq pbf_out
+        lwz r30, %(wwork)d(r31)
+        cmpwi r30, 0
+        beq pbf_out@@GET_SLOT_R29@@
+        cmpwi r29, 0
+        bne pbf_owned
+        bl pb_claim                     # whose it is (his VAR_12 asked for it): its VAR_0 / 1
+        mr. r29, r3
+        beq pbf_out
+pbf_owned:
+        addi r12, r29, -1
+        cmplwi r12, %(slots)d
+        bge pbf_out@@GET_PHASE_R28@@@@GET_COL_R27@@
+        cmpwi r28, 1
+        bne pbf_notfly
+        cmpwi r27, 0
+        bne pbf_have
+        bl pb_col_make                  # its first flying frame: the line made and placed
+        b pbf_out
+pbf_have:
+        cmpwi r27, 1
+        bne pbf_out
+        mr r3, r31
+        li r4, 0
+        bl pb_col_place                 # moved with it (riders carried)
+        cmpwi r3, 0
+        bne pbf_out@@GET_REMADE_R26@@
+        cmpwi r26, %(pb_remake)d        # its ground gone (something removed it): made again next frame
+        bge pbf_lost
+        addi r26, r26, 1@@SET_REMADE_R26@@
+        li r27, 0@@SET_COL_R27@@
+        b pbf_out
+pbf_lost:
+        li r27, 4@@SET_COL_R27@@
+        b pbf_out
+pbf_notfly:
+        cmpwi r28, 2
+        blt pbf_out
+        cmpwi r27, 1
+        bne pbf_out
+        mr r3, r31                      # leaving: the line removed (anyone on it falls)
+        bl sk_col_free
+        li r27, 2@@SET_COL_R27@@@@DIAG_PF@@
+pbf_out:
+        lmw r26, 0x40(r1)
+        lwz r0, 0x64(r1)
+        mtlr r0
+        addi r1, r1, 0x60
+        blr
+
+# (r30 its WorkModule) -> r3 its owner's slot (1-8) or 0: the first live Greninja whose VAR_12 (a Parabeetle asked for:
+# his request code) is set: copied to its VAR_1 and cleared, its VAR_0 = his slot
+pb_claim:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r27, 0x20(r1)
+        li r29, 1
+pbc_slot:
+        cmpwi r29, %(slots)d
+        bgt pbc_none
+        mr r3, r29
+        bl gk_entry
+        mr. r28, r3
+        beq pbc_next
+        lwz r0, 4(r28)
+        cmpwi r0, %(gkind)d
+        bne pbc_next
+        lwz r12, %(acc)d(r28)
+        cmpwi r12, 0
+        beq pbc_next
+        lwz r27, %(work)d(r12)
+        cmpwi r27, 0
+        beq pbc_next@@GET_REQ@@
+        stfs f1, 0x10(r1)
+        fabs f0, f1
+        lis r12, %(half_hi)d
+        lfs f2, %(half_lo)d(r12)
+        fcmpu cr0, f0, f2
+        ble pbc_next
+        lis r12, %(zero_hi)d
+        lfs f1, %(zero_lo)d(r12)@@SET_REQ@@
+        lfs f1, 0x10(r1)@@SET_CODE@@@@SET_SLOT_R29@@@@DIAG_PB@@
+        mr r3, r29
+        b pbc_out
+pbc_next:
+        addi r29, r29, 1
+        b pbc_slot
+pbc_none:
+        li r3, 0
+pbc_out:
+        lmw r27, 0x20(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
+# (r31 its accessor, r30 its WorkModule): its collision (VAR_6 = 1 made, 3 failed), as sk_col_make: its kind's bundle,
+# PB_LVD in it, the GroundModule's +0xEC, the grounds made, placed at it, on; the stack handles released
+pb_col_make:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r28, 0x30(r1)
+        li r28, 3
+        mr r3, r31
+        bl sk_gm
+        mr. r29, r3
+        beq pbm_done
+        lis r12, %(resmgr_hi)d
+        lwz r12, %(resmgr_lo)d(r12)
+        cmpwi r12, 0
+        beq pbm_done
+        li r0, 0
+        stw r0, 0x10(r1)
+        stw r0, 0x14(r1)
+        lwz r3, 0x30(r12)
+        addi r4, r1, 0x10
+        li r5, %(pb_kind)d
+        li r6, 0
+        li r7, 0@@CALL_RES_GET@@
+        addi r3, r1, 0x10
+        addi r4, r1, 0x14
+        lis r5, %(pb_lvd_hi)d
+        addi r5, r5, %(pb_lvd_lo)d
+        li r6, 1@@CALL_RES_FIND@@
+        lwz r0, 0x14(r1)
+        cmpwi r0, 0
+        beq pbm_free
+        addi r3, r29, 0xEC
+        addi r4, r1, 0x14@@CALL_RES_ASSIGN@@
+        mr r3, r29
+        li r4, 1
+        li r5, 0
+        li r6, 0@@CALL_GC_MAKE@@
+        lwz r0, 0xF0(r29)
+        cmpwi r0, 0
+        beq pbm_free
+        mr r3, r31
+        li r4, 1
+        bl pb_col_place
+        cmpwi r3, 0
+        beq pbm_free
+        mr r3, r29
+        li r4, 1@@CALL_GC_ON@@
+        mr r3, r29@@CALL_GC_ENABLE@@
+        li r28, 1
+pbm_free:
+        addi r3, r1, 0x14
+        li r4, 2@@CALL_RES_FREE@@
+        addi r3, r1, 0x10
+        li r4, 2@@CALL_RES_FREE@@
+pbm_done:@@SET_COL_R28@@@@DIAG_PC@@
+        mr r3, r28
+        lmw r28, 0x30(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
+# (r3 its accessor, r4 1 placed / 0 moved) -> r3 1, or 0 when its ground is gone or isn't the 2-vertex line: its 2
+# vertices at its place + PB_VERTS (moved: its GroundModule's own frame update first, the hydrant's order), the line
+# recomputed, kept on
+pb_col_place:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r25, 0x24(r1)
+        mr r31, r3
+        mr r30, r4
+        li r26, 0
+        bl sk_gm
+        mr. r29, r3
+        beq pbp_out
+        lwz r12, 0xF0(r29)              # its ground still there (+0x160 its id, -1 none)
+        cmpwi r12, 0
+        beq pbp_out
+        lhz r0, 0x160(r12)
+        cmplwi r0, 0xFFFF
+        beq pbp_out
+        lwz r12, 0(r12)
+        lis r0, 0x1000
+        cmplw r12, r0
+        blt pbp_out
+        lwz r25, 0x34(r12)              # its vertex count: parabeetle.lvd's 2 (another .lvd: not ours to move)
+        cmpwi r25, 2
+        bne pbp_out
+        cmpwi r30, 0
+        bne pbp_nofr
+        mr r3, r29@@CALL_GC_FRAME@@
+pbp_nofr:
+        lwz r12, %(wpost)d(r31)
+        cmpwi r12, 0
+        beq pbp_out
+        lfs f0, 0x10(r12)
+        stfs f0, 0x18(r1)
+        lfs f0, 0x14(r12)
+        stfs f0, 0x1C(r1)
+        lis r27, %(pb_verts_hi)d
+        addi r27, r27, %(pb_verts_lo)d
+        li r28, 0
+pbp_v:  lfs f0, 0(r27)
+        lfs f1, 0x18(r1)
+        fadds f0, f0, f1
+        stfs f0, 0x10(r1)
+        lfs f0, 4(r27)
+        lfs f1, 0x1C(r1)
+        fadds f0, f0, f1
+        stfs f0, 0x14(r1)
+        mr r3, r29
+        mr r4, r28
+        addi r5, r1, 0x10
+        cmpwi r30, 0
+        beq pbp_mv@@CALL_GC_SETV@@
+        b pbp_n
+pbp_mv:@@CALL_GC_MOVEV@@
+pbp_n:  addi r27, r27, 8
+        addi r28, r28, 1
+        cmpw r28, r25
+        blt pbp_v
+        mr r3, r29@@CALL_GC_COMMIT@@
+        cmpwi r30, 0
+        bne pbp_one
+        mr r3, r29@@CALL_GC_ENABLE@@
+pbp_one:
+        li r26, 1
+pbp_out:
+        mr r3, r26
+        lmw r25, 0x24(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
+pb_dcase:
+        lis r3, %(pb_desc_hi)d
+        addi r3, r3, %(pb_desc_lo)d
+        blr
+'''
+
+
+def pb_source(D, orig94):
+    """parabeetle v1: the Parabeetle's native part (its claim and collision): PB_SRC with its calls / variable reads"""
+    sub = {'@@TAIL94@@': tail(orig94),
+           '@@GET_SLOT_R29@@': vint('r30', PB_VAR_SLOT, 'r29'), '@@GET_PHASE_R28@@': vint('r30', PB_VAR_PHASE, 'r28'),
+           '@@GET_COL_R27@@': vint('r30', PB_VAR_COL, 'r27'), '@@GET_REMADE_R26@@': vint('r30', PB_VAR_REMADE, 'r26'),
+           '@@SET_REMADE_R26@@': vnum('r30', PB_VAR_REMADE, 'r26'), '@@SET_COL_R27@@': vnum('r30', PB_VAR_COL, 'r27'),
+           '@@SET_COL_R28@@': vnum('r30', PB_VAR_COL, 'r28'), '@@SET_SLOT_R29@@': vnum('r30', PB_VAR_SLOT, 'r29'),
+           '@@GET_REQ@@': var_get('r27', GK_VAR_PBREQ), '@@SET_REQ@@': var_set('r27', GK_VAR_PBREQ),
+           '@@SET_CODE@@': var_set('r30', PB_VAR_CODE),
+           '@@DIAG_PF@@': D('''
+        lis r3, %(gk_fpf_hi)d
+        addi r3, r3, %(gk_fpf_lo)d
+        mr r4, r29''' + osr()),
+           '@@DIAG_PB@@': D('''
+        lfs f1, 0x10(r1)
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r5, 0x1C(r1)
+        mr r4, r29
+        lis r3, %(gk_fpb_hi)d
+        addi r3, r3, %(gk_fpb_lo)d''' + osr()),
+           '@@DIAG_PC@@': D('''
+        li r5, 0
+        cmpwi r29, 0
+        beq pbm_log
+        lwz r5, 0xF0(r29)
+pbm_log:
+        mr r4, r28
+        lis r3, %(gk_fpc_hi)d
+        addi r3, r3, %(gk_fpc_lo)d''' + osr())}
+    for nm, fn in (('RES_GET', RES_GET), ('RES_FIND', RES_FIND), ('RES_ASSIGN', RES_ASSIGN), ('RES_FREE', RES_FREE),
+                   ('GC_MAKE', GC_MAKE), ('GC_ON', GC_ON), ('GC_ENABLE', GC_ENABLE), ('GC_FRAME', GC_FRAME),
+                   ('GC_SETV', GC_SETV), ('GC_MOVEV', GC_MOVEV), ('GC_COMMIT', GC_COMMIT)):
+        sub['@@CALL_%s@@' % nm] = call(fn)
+    src = PB_SRC
+    for k, v in sub.items():
+        src = src.replace(k, v)
+    assert '@@' not in src
+    return src
+
+
 def tr_motions(feats):
     """the fire trail article's motion kinds: forward / up / down (+ the ice blast, FireTrailIceBoom)"""
     return 4 if 'ice' in feats else 3
@@ -1757,7 +2118,7 @@ assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW, SK_TO
            for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
 RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd', 'skbody',
                      'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2', 'gready', 'skbot', 'shalf', 'ice',
-                     'ice2', 'bgrav'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+                     'ice2', 'bgrav', 'pbeetle'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
 # + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
@@ -1767,6 +2128,8 @@ RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 
 # (exe_v46z_gkb8; gkb7 is RELEASE - skdist); burn tint v1: + btint (exe_v46z_gkb9; gkb8 is RELEASE - btint); smash tune v1:
 # + shalf (exe_v46z_gkb14; tuning v1's gkb13 is RELEASE - shalf); ice detonation v1: + ice (exe_v46z_gkb15; gkb14 is
 # RELEASE - ice); usmash spike v2 / trail dim v1: + ice2 (exe_v46z_gkb16: the sound, the tripled countdown, the flash's slot priority; bgrav: his gravity / fall speeds in the burnout; gkb15 is RELEASE - ice2 - bgrav)
+# parabeetle v1: + pbeetle (exe_v46z_gkb17: the Parabeetle article, its claim and drop-through collision; gkb16 is
+# RELEASE - pbeetle)
 VARIANTS = (('A_release', RELEASE),)
 # skeleton v1.6 (the user: "Please stop packaging G_pose. It has no use anymore."): A_release only. The pose feature
 # stays (the exes shipped with it up to v1.5 still rebuild from this script); v1.5 and before: + ('G_pose', (RELEASE -
@@ -4124,6 +4487,9 @@ def layout(img, feats=None):
         rows += [[TR_KIND, TR_MAX + (ICE_SLOTS_EXTRA if 'ice' in feats else 0), 0, 0]]   # burn v2: article 9, the
         # fire trails (TR_MAX at once); ice detonation v1: + ICE_SLOTS_EXTRA for blasts (a trail with no burn context goes
         # at once: weapons/firetrail.c, so still TR_MAX burning trails)
+    if 'pbeetle' in feats:
+        assert 'burn2' in feats and 'gmupd' in feats, 'pbeetle needs burn2 (article 9 before it) and gmupd'
+        rows += [[PB_KIND, PB_MAX, 0, 0]]               # parabeetle v1: article 10, his and his clones' (3 at once)
     mrow = row_of(img, feats)
     assert img.w(img.w(svt + 0x1C)) == 0x4E800020, "the specializer's +0x1C: a blr"
     for j in (2, 6, 7, 20, 26):
@@ -4336,6 +4702,23 @@ def build(rpx, diag=False, feats=None):
         A[nm] = alloc((len(fs_) + 4) & ~3, 4) if on else 0
         if on:
             fmts.append((nm, fs_))
+    pb = 'pbeetle' in feats
+    A['pb_ents'] = alloc(8 * len(PB_MOTIONS)) if pb else 0     # parabeetle v1: its motion entries (wait / rise / ridden)
+    A['pb_minfo'] = alloc(W.MINFO_SIZE) if pb else 0
+    A['pb_desc'] = alloc(L['dsize']) if pb else 0
+    A['pb_vt'] = alloc(L['vsize']) if pb else 0
+    A['pb_single'] = alloc(8) if pb else 0
+    A['pb_row'] = alloc(0x70) if pb else 0
+    A['pb_str'] = alloc(12) if pb else 0                     # "parabeetle"
+    A['pb_lvd'] = alloc(16, 4) if pb else 0                  # "parabeetle.lvd"
+    A['pb_verts'] = alloc(8 * len(PB_VERTS), 4) if pb else 0
+    for nm, fs_ in (('gk_fpb', 'S4PB parabeetle claimed: owner slot=%d code=%d (his facing x (1 his, 2 / 3 a clone, + 4 '
+                               'grounded))\n'),
+                    ('gk_fpc', 'S4PC parabeetle collision: state=%d (1 made, 3 failed) grounds=%08X\n'),
+                    ('gk_fpf', 'S4PF parabeetle collision removed: owner slot=%d\n')):
+        A[nm] = alloc((len(fs_) + 4) & ~3, 4) if pb and diag else 0
+        if pb and diag:
+            fmts.append((nm, fs_))
     code_at = alloc(0, 4)
 
     # weapon motion entries / info / descriptor / vtable / singleton / row
@@ -4398,6 +4781,22 @@ def build(rpx, diag=False, feats=None):
             out.blob(A['bfx_tier'], struct.pack('>II', 0x43300000, 0x80000000) + struct.pack('>f', 0.0) +
                      struct.pack('>5I', *BFX_TIER_IDS) + b''.join(struct.pack('>2I2f', t, n, r, ps / 60.0)
                                                               for t, n, r, ps in BFX_TIERS), 'burn fire tiers')
+    if 'pbeetle' in feats:
+        out.blob(A['pb_ents'], b''.join(struct.pack('>II', h, 0) for h in pb_hashes()),
+                 'parabeetle motions (wait / rise / ridden: its own main.pac)')
+        mi4 = bytearray(img.blob(L['bminfo'], W.MINFO_SIZE))
+        struct.pack_into('>II', mi4, 0, A['pb_ents'], len(PB_MOTIONS))
+        out.blob(A['pb_minfo'], bytes(mi4), 'parabeetle motion info')
+        d4 = bytearray(img.blob(L['bdesc'], L['dsize']))
+        struct.pack_into('>I', d4, 8, A['pb_minfo'])
+        if struct.unpack_from('>I', d4, 0x1C)[0] == CLONE_BASE:
+            struct.pack_into('>I', d4, 0x1C, PB_KIND)
+        out.blob(A['pb_desc'], bytes(d4), 'parabeetle descriptor (bunshin copy)')
+        out.blob(A['pb_single'], struct.pack('>II', A['pb_vt'], 0), 'parabeetle singleton')
+        out.blob(A['pb_row'], b''.join(struct.pack('>I', w) for w in L['skrow']), 'parabeetle module row (the skeleton\'s)')
+        out.blob(A['pb_str'], PB_NAME.encode().ljust(12, b'\0'), '"parabeetle"')
+        out.blob(A['pb_lvd'], PB_LVD.encode().ljust(16, b'\0'), '"parabeetle.lvd"')
+        out.blob(A['pb_verts'], b''.join(struct.pack('>2f', *v) for v in PB_VERTS), 'parabeetle collision vertices')
     out.blob(A['gk_list'], struct.pack('>II', A['gk_list'] + 8, len(L['rows'])) +
              b''.join(struct.pack('>4I', *e) for e in L['rows']), 'his article list (+ clones 6 / 7, skeleton 8)')
     gd = bytearray(img.blob(GK_DESC, 0x38))
@@ -4515,6 +4914,10 @@ def build(rpx, diag=False, feats=None):
         p.update(hit_elem=HIT_ELEMENT, ice_elem=ICE_ELEMENT, ice_back=ICE_BACK, hit_att=HIT_ATTACKER, look_hi=SH_LOOKUP >> 16,
                  look_lo=SH_LOOKUP & 0xFFFF, ice_frames=ice_frames(feats), ice_ask=ice_frames(feats) - ICE_LEAD, ice_slot=BTINT_SLOT,
                  ice_var_hi=ICE_VAR >> 16, ice_var_lo=ICE_VAR & 0xFFFF, ice_stz=ICE_ST)
+    if 'pbeetle' in feats:
+        for nm in ('pb_desc', 'pb_lvd', 'pb_verts', 'gk_fpb', 'gk_fpc', 'gk_fpf'):
+            p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
+        p.update(pb_kind=PB_KIND, pb_remake=PB_REMAKE)
     if 'bgrav' in feats:
         for nm in ('bg_k', 'gk_fg'):
             p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
@@ -6850,7 +7253,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats, 'skbot' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats, 'ice' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (ice_src(D, snd='ice2' in feats) if 'ice' in feats else '') + (bg_src(D) if 'bgrav' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats, 'skbot' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats, 'ice' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (ice_src(D, snd='ice2' in feats) if 'ice' in feats else '') + (bg_src(D) if 'bgrav' in feats else '') + (pb_source(D, L['vt_orig'][0x94]) if 'pbeetle' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''
@@ -6982,6 +7385,12 @@ w_dcase:
         struct.pack_into('>I', vt3, 0x34, lab['sk_start'])       # its VARs 0 (no skeleton GroundModule: no collision)
         struct.pack_into('>I', vt3, 0x94, lab['tr_94'])
         out.blob(A['tr_vt'], bytes(vt3), 'fire trail vtable (the moon\'s, +0x34 / +0xAC the skeleton\'s, +0x94 ours)')
+    if 'pbeetle' in feats:
+        vt4 = bytearray(img.blob(L['svt'], L['vsize']))
+        struct.pack_into('>I', vt4, W.HIT_METHOD, lab['sk_hit'])
+        struct.pack_into('>I', vt4, 0x34, lab['sk_start'])       # its grounds of a last life removed, its VARs 0
+        struct.pack_into('>I', vt4, 0x94, lab['pb_94'])
+        out.blob(A['pb_vt'], bytes(vt4), 'parabeetle vtable (the moon\'s, +0x34 / +0xAC the skeleton\'s, +0x94 ours)')
 
     # ---- hooks in place (each asserted)
     def asm1(at, text):
@@ -7083,6 +7492,9 @@ w_dcase:
     if 'burn2' in feats:
         # burn v2: the fire trail, as the skeleton (loaded with him, c00 only, pump's template), the clone's row
         register(TR_KIND, A['tr_str'], CATEGORY_BITS | 0x10, lab['tr_dcase'], ATTACK_BASE, A['tr_single'], A['tr_row'])
+    if 'pbeetle' in feats:
+        # parabeetle v1: loaded with him, its model c00 only, the pump's template, the skeleton's row
+        register(PB_KIND, A['pb_str'], CATEGORY_BITS | 0x10, lab['pb_dcase'], ATTACK_BASE, A['pb_single'], A['pb_row'])
     info = dict(A=A, labels=lab, T=T, layout=L, end=end, owner_str=owner_str, feats=feats, diag=diag, clear_at=ct)
     return out, info
 

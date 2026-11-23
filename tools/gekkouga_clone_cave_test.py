@@ -603,10 +603,12 @@ def fighter_desc_checks(e, img, info):
           ' (clone articles v1: 9 shurikens, his and his clones\')' if cart else '',
           ', 8 the skeleton' if 'skeleton' in info['feats'] else '',
           ', 9 the fire trails (burn v2: 0x1A3, %d at once%s)' % (trn, ' (ice detonation v1: + 2 for blasts)' if ice else '')
-          if 'burn2' in info['feats'] else ''), rows,
+          if 'burn2' in info['feats'] else '') + (', 10 the Parabeetle (parabeetle v1: 0x1A4, 3 at once)'
+                                                   if 'pbeetle' in info['feats'] else ''), rows,
           vrows + [[C.CLONE_KIND, 1, 0, 0], [C.CLONE_KIND, 1, 0, 0]] +
           ([[C.SK_KIND, C.SK_LEVELS if cart else 1, 0, 0]] if 'skeleton' in info['feats'] else []) +
-          ([[C.TR_KIND, trn, 0, 0]] if 'burn2' in info['feats'] else []))
+          ([[C.TR_KIND, trn, 0, 0]] if 'burn2' in info['feats'] else []) +
+          ([[C.PB_KIND, C.PB_MAX, 0, 0]] if 'pbeetle' in info['feats'] else []))
     check('the article instances in all (the ArticleModule holder\'s 64: docs/native-notes.md "Article instance cap")',
           sum(r[1] for r in rows) <= 64, True)
     others = []
@@ -1433,10 +1435,10 @@ def skeleton_checks(e, info, diag):
           (e.w(A['sk_single']), e.w(vt + 0x34), e.w(vt + 0x94), e.w(vt + W.HIT_METHOD)),
           (vt, lab['sk_start'], lab['sk_94'], lab['sk_hit']))
     lst = e.w(A['gk_desc'] + 8)
-    check('his article list: %d entries, article 8 the skeleton (%s)' % (10 if 'burn2' in F else 9, 'clone articles v1: 3, '
+    check('his article list: %d entries, article 8 the skeleton (%s)' % ((11 if 'pbeetle' in F else 10 if 'burn2' in F else 9), 'clone articles v1: 3, '
           'his and his clones\' stacked' if 'cart' in F else 'one at a time'),
           (e.w(lst + 4), [e.w(e.w(lst) + 16 * 8 + 4 * j) for j in range(4)]),
-          (10 if 'burn2' in F else 9, [C.SK_KIND, C.SK_LEVELS if 'cart' in F else 1, 0, 0]))
+          ((11 if 'pbeetle' in F else 10 if 'burn2' in F else 9), [C.SK_KIND, C.SK_LEVELS if 'cart' in F else 1, 0, 0]))
     # ---- the game's side, stubbed
     calls = []
     st = dict(file=1, ground=1)
@@ -3291,6 +3293,239 @@ def ice_checks(e, info, diag):
     put([])
 
 
+def pb_checks(patched, info, diag):
+    """parabeetle v1 (feature pbeetle): the Parabeetle's kind (tables, descriptor and its motions, singleton, row), its
+    claim (his VAR_12), its collision (parabeetle.lvd through the hydrant's GroundModule route: made, moved, made again,
+    removed) on a fresh emulator"""
+    lab, A, F, img = info['labels'], info['A'], info['feats'], info['img']
+    if 'pbeetle' not in F:
+        check('parabeetle: without "pbeetle": no parabeetle code', 'pb_frame' in lab, False)
+        return
+    e = Run(patched)
+    if diag:
+        e.osr_full = []
+        e.stub(C.OSREPORT_VENEER, lambda e_: (e_.rec('osr', 3, 4, 5, 6),
+                                               e_.osr_full.append(tuple(e_.r(i) for i in range(3, 11))))[1])
+    T = info['T']
+    k = C.PB_KIND - W.OLD_N
+    check('parabeetle tables: name / folder "parabeetle", owner "gekkouga"',
+          [e.cstr(e.w(T[nm] + 4 * C.PB_KIND)) for nm in ('owner', 'name', 'folder')], ['gekkouga', 'parabeetle', 'parabeetle'])
+    check('parabeetle tables: base kind Mario\'s pump (the skeleton\'s), its own singleton / row',
+          (e.w(T['bt'] + 4 * k), e.w(T['st'] + 4 * k), e.w(T['rt'] + 4 * k) + W.MODULE_TABLE & 0xFFFFFFFF),
+          (C.ATTACK_BASE, A['pb_single'], A['pb_row']))
+    u16 = e.mu.mem_read(T['u16'] + 2 * C.PB_KIND, 2)
+    bun = img.h(W.STATIC_TABLES[2][1] + 2 * C.CLONE_BASE)
+    check('parabeetle tables: u16 flags bunshin\'s without the Final Smash categories and the owner\'s colour (loaded with '
+          'him, c00 only)', struct.unpack('>H', bytes(u16))[0], bun & ~(C.CATEGORY_BITS | 0x10))
+    row = [e.w(A['pb_row'] + 4 * j) for j in range(28)]
+    check('parabeetle row: the skeleton\'s (slot 5 the hydrant\'s GroundModule: grounds from an .lvd; slot 11 a '
+          'SoundModule)', (row, row[5], row[C.SND_SLOT]), ([e.w(A['sk_row'] + 4 * j) for j in range(28)], C.SK_GM_CTOR,
+                                                            C.SND_CTOR))
+    e.call(e.w(T['dt'] + 4 * k))
+    d = e.r(3)
+    mi = e.w(d + 8)
+    bd = W.descriptor_of(img, C.CLONE_BASE)
+    check('parabeetle descriptor: a bunshin copy, 3 motions: anim_hash of FitGekkougaParabeetleMainA00Wait / A01Rise / '
+          'A02Ridden (its main.pac)', (d, e.w(d + 0x1C), e.w(mi + 4), [e.w(e.w(mi) + 8 * i) for i in range(3)]),
+          (A['pb_desc'], img.w(bd + 0x1C), 3, C.pb_hashes()))
+    import mtable
+    check('parabeetle motion hashes = tools/mtable.py anim_hash (the pack loader\'s key)',
+          C.pb_hashes(), [mtable.anim_hash(n) for n in C.PB_MOTIONS])
+    vt = A['pb_vt']
+    check('parabeetle singleton: +0x34 sk_start (a last life\'s grounds removed, VARs 0), +0x94 pb_94, +0xAC sk_hit, the '
+          'rest the moon\'s', (e.w(A['pb_single']), e.w(vt + 0x34), e.w(vt + 0x94), e.w(vt + W.HIT_METHOD)),
+          (vt, lab['sk_start'], lab['pb_94'], lab['sk_hit']))
+    lst = e.w(A['gk_desc'] + 8)
+    check('his article list: 11 entries, article 10 the Parabeetle (0x1A4, 3 at once: his and his two clones\')',
+          (e.w(lst + 4), [e.w(e.w(lst) + 16 * C.PB_ARTICLE + 4 * j) for j in range(4)]),
+          (11, [C.PB_KIND, C.PB_MAX, 0, 0]))
+    check('parabeetle strings: "parabeetle", "parabeetle.lvd"; its 2 vertices (x -10 / +10, y + 11.4: left to right)',
+          (e.cstr(A['pb_str']), e.cstr(A['pb_lvd']),
+           [round(x, 3) for x in struct.unpack('>4f', bytes(e.mu.mem_read(A['pb_verts'], 16)))]),
+          ('parabeetle', 'parabeetle.lvd', [-10.0, 11.4, 10.0, 11.4]))
+    # ---- the game's side, stubbed
+    calls = []
+    st = dict(file=1, ground=1)
+    mgr = e.alloc(0x40, b'\0')
+    e.setw(C.RES_MGR, mgr)
+    e.setw(mgr + 0x30, 0xABC0)
+    gm = e.alloc(0x200, b'\0')
+    e.setw(gm, C.SK_GM_VT)
+    ground = e.alloc(0x200, b'\0')
+    gobj = e.alloc(0x100, b'\0')
+    e.setw(ground, gobj)
+    e.setw(gobj + 0x34, 2)
+
+    def res_get(e_):
+        calls.append(('res_get', e_.r(3), e_.r(5), e_.r(6), e_.r(7)))
+        e_.setw(e_.r(4), 0x1111)
+
+    def res_find(e_):
+        calls.append(('res_find', e_.w(e_.r(3)), e_.cstr(e_.r(5)), e_.r(6)))
+        e_.setw(e_.r(4), 0x2222 if st['file'] else 0)
+
+    def gc_make(e_):
+        calls.append(('make', e_.r(3), e_.r(4), e_.r(5), e_.r(6)))
+        if st['ground']:
+            e_.setw(e_.r(3) + 0xF0, ground)
+
+    def vert(name):
+        def f(e_):
+            xy = bytes(e_.mu.mem_read(e_.r(5), 8))
+            calls.append((name, e_.r(3), e_.r(4)) + tuple(round(x, 3) for x in struct.unpack('>2f', xy)))
+        return f
+
+    def gc_free(e_):
+        calls.append(('col_free', e_.r(3)))
+        e_.setw(e_.r(3) + 0xF0, 0)
+    e.stub(C.RES_GET, res_get)
+    e.stub(C.RES_FIND, res_find)
+    e.stub(C.RES_ASSIGN, lambda e_: calls.append(('assign', e_.r(3), e_.w(e_.r(4)))))
+    e.stub(C.RES_FREE, lambda e_: calls.append(('res_free', e_.r(4))))
+    e.stub(C.GC_MAKE, gc_make)
+    e.stub(C.GC_ON, lambda e_: calls.append(('on', e_.r(3), e_.r(4))))
+    e.stub(C.GC_ENABLE, lambda e_: calls.append(('enable', e_.r(3))))
+    e.stub(C.GC_SETV, vert('setv'))
+    e.stub(C.GC_MOVEV, vert('movev'))
+    e.stub(C.GC_COMMIT, lambda e_: calls.append(('commit', e_.r(3))))
+    e.stub(C.GC_FREE, gc_free)
+    e.stub(C.GC_FRAME, lambda e_: calls.append(('gmframe', e_.r(3))))
+    # the beetle: its WorkModule (sv), place (30, 40), its GroundModule
+    sv = {}
+    svt = e.alloc(0x100, b'\0')
+    g, s_ = e.alloc(4), e.alloc(4)
+    e.setw(svt + 0x44, g)
+    e.setw(svt + 0x4C, s_)
+    e.stub(g, lambda e_: e_.mu.reg_write(UC_PPC_REG_FPR1, f2d(sv.get(e_.r(4), 0.0))))
+
+    def sset(e_):
+        sv[e_.r(4)] = round(d2f(e_.mu.reg_read(UC_PPC_REG_FPR1)), 3)
+    e.stub(s_, sset)
+    swm = e.alloc(0x10, b'\0')
+    e.setw(swm, svt)
+    bacc = e.alloc(0x100, b'\0')
+    e.setw(bacc + C.W_WORK, swm)
+    post = e.alloc(0x80, b'\0')
+    e.mu.mem_write(post + 0x10, struct.pack('>2f', 30.0, 40.0))
+    e.setw(bacc + C.W_POSTURE, post)
+    e.setw(bacc + 0x2C, gm)
+    weapon = e.alloc(0x40, b'\0')
+    e.setw(weapon + C.W_ACC, bacc)
+    for i in range(8):
+        e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
+
+    def frame():
+        del calls[:]
+        e.calls, e.osr_full = [], []
+        e.call(lab['pb_frame'], weapon)
+        return list(calls)
+
+    def logs(fmt):
+        return [x[1:6] for x in e.osr_full if x[0] == A[fmt]] if diag else []
+
+    # its start (the skeleton's +0x34)
+    sv.update({0x0F000300 + v: 9.0 for v in range(13)})
+    del calls[:]
+    e.call(lab['sk_start'], 0, weapon, 0)
+    check('parabeetle start (+0x34, the skeleton\'s): a last life\'s grounds removed, VARs 0-12 = 0',
+          (calls, [sv[0x0F000300 + v] for v in range(13)]), ([('col_free', gm)], [0.0] * 13))
+    # no request: nothing claimed
+    me = e.fighter(2)
+    e.mu.mem_write(me['f'] + 0x1E, b'\x04')
+    e.vars = {}
+    check('parabeetle: no request (his VAR_12 0): not claimed, nothing made', (frame(), sv[C.PB_VAR_SLOT]), ([], 0.0))
+    # slot 2 a Mario with VAR_12 set (shared test variables): skipped; slot 3 him
+    other = e.fighter(1)
+    e.setw(other['f'] + 4, 0x1)
+    e.mu.mem_write(other['f'] + 0x1E, b'\x04')
+    e.vars = {C.GK_VAR_PBREQ: -5.0}
+    c0 = frame()
+    check('parabeetle claim: its owner the Greninja that asked (slot 3; slot 2 is no Greninja): VAR_0 3, VAR_1 his code '
+          '-5 (facing left, his own, on the ground); his VAR_12 cleared',
+          ([sv[C.PB_VAR_SLOT], sv[C.PB_VAR_CODE]], e.vars[C.GK_VAR_PBREQ]), ([3.0, -5.0], 0.0))
+    check('parabeetle claim: phase 0 (its MSC not started): no collision yet', c0, [])
+    if diag:
+        check('parabeetle diag: S4PB (slot 3, code -5)', [x[:2] for x in logs('gk_fpb')], [(3, 0xFFFFFFFB)])
+    e.vars = {C.GK_VAR_PBREQ: 2.0}
+    frame()
+    check('parabeetle: claimed once: a later request is left for the next beetle', e.vars[C.GK_VAR_PBREQ], 2.0)
+    e.vars = {}
+    # flying: the line made from parabeetle.lvd and placed at it
+    sv[C.PB_VAR_PHASE] = 1.0
+    c1 = frame()
+    want_v = [(gm, i, 30.0 + vx, round(40.0 + vy, 3)) for i, (vx, vy) in enumerate(C.PB_VERTS)]
+    check('parabeetle collision: as the skeleton\'s (the hydrant\'s set-up): its kind\'s bundle (kind 0x1A4), '
+          '"parabeetle.lvd" in it, GroundModule +0xEC = the file, the grounds made (gm, 1, 0, 0), its 2 vertices placed at '
+          'it (x +- 10, y + 11.4), the line recomputed, on (then the grounds turned on), both handles released',
+          c1, [('res_get', 0xABC0, C.PB_KIND, 0, 0), ('res_find', 0x1111, 'parabeetle.lvd', 1), ('assign', gm + 0xEC, 0x2222),
+               ('make', gm, 1, 0, 0)] + [('setv',) + v for v in want_v] +
+              [('commit', gm), ('on', gm, 1), ('enable', gm), ('res_free', 2), ('res_free', 2)])
+    check('parabeetle collision: VAR_6 = 1 (made)', sv[C.PB_VAR_COL], 1.0)
+    if diag:
+        check('parabeetle diag: S4PC state 1, its ground', [x[:2] for x in logs('gk_fpc')], [(1, ground)])
+    # moved (forward 0.75, up 0.4): the vertices moved (riders carried), the GroundModule's frame update first
+    e.mu.mem_write(post + 0x10, struct.pack('>2f', 30.75, 40.4))
+    c2 = frame()
+    check('parabeetle collision: it moved (0.75, 0.4): its GroundModule\'s frame update, then its 2 vertices moved (the '
+          'move call: last = where they were, so riders are carried), the line recomputed, kept on; no new set-up',
+          c2, [('gmframe', gm)] + [('movev', gm, i, round(30.75 + vx, 3), round(40.4 + vy, 3))
+                                   for i, (vx, vy) in enumerate(C.PB_VERTS)] + [('commit', gm), ('enable', gm)])
+    for n in range(5):
+        frame()
+    check('parabeetle collision: every flying frame the same (5 more frames: 5 updates, 10 moves, no set-up)',
+          sum(1 for c in calls if c[0] == 'movev'), 2)
+    # a 4-vertex ground (another .lvd): not ours to move
+    e.setw(gobj + 0x34, 4)
+    check('parabeetle: a ground that isn\'t the 2-vertex line: nothing moved (made again: VAR_6 0, VAR_7 1)',
+          ([c for c in frame() if c[0] in ('movev', 'setv')], sv[C.PB_VAR_COL], sv[C.PB_VAR_REMADE]), ([], 0.0, 1.0))
+    e.setw(gobj + 0x34, 2)
+    check('parabeetle: ... made again the next frame', [c[0] for c in frame()][:4], ['res_get', 'res_find', 'assign', 'make'])
+    # its ground gone (id -1)
+    e.setw(ground + 0x160, 0xFFFF0000)
+    check('parabeetle: its ground gone (id -1): nothing moved, made again next frame (VAR_7 2)',
+          (frame(), sv[C.PB_VAR_COL], sv[C.PB_VAR_REMADE]), ([], 0.0, 2.0))
+    e.setw(ground + 0x160, 0)
+    frame()
+    e.setw(ground + 0x160, 0xFFFF0000)
+    frame()
+    e.setw(ground + 0x160, 0)
+    frame()
+    check('parabeetle: made again a 3rd time (VAR_7 3)', (sv[C.PB_VAR_COL], sv[C.PB_VAR_REMADE]), (1.0, 3.0))
+    e.setw(ground + 0x160, 0xFFFF0000)
+    frame()
+    check('parabeetle: gone a 4th time: lost (VAR_6 4: not made again)', (sv[C.PB_VAR_COL], [c[0] for c in frame()]),
+          (4.0, []))
+    e.setw(ground + 0x160, 0)
+    sv.update({C.PB_VAR_COL: 0.0, C.PB_VAR_REMADE: 0.0})
+    e.setw(ground + 0x160, 0xFFFF0000)
+    check('parabeetle: made but its line can\'t be placed (its ground gone at once): failed (VAR_6 3), not retried',
+          ([c[0] for c in frame()], sv[C.PB_VAR_COL], [c[0] for c in frame()]),
+          (['res_get', 'res_find', 'assign', 'make', 'res_free', 'res_free'], 3.0, []))
+    e.setw(ground + 0x160, 0)
+    sv.update({C.PB_VAR_COL: 1.0, C.PB_VAR_REMADE: 0.0})
+    frame()
+    # leaving: removed
+    sv[C.PB_VAR_PHASE] = 2.0
+    check('parabeetle leaving (its MSC\'s phase 2): the line removed (GC_FREE: anyone on it falls), VAR_6 2',
+          (frame(), sv[C.PB_VAR_COL]), ([('col_free', gm)], 2.0))
+    if diag:
+        check('parabeetle diag: S4PF (slot 3)', [x[:1] for x in logs('gk_fpf')], [(3,)])
+    check('parabeetle leaving: nothing more', frame(), [])
+    # a missing lvd: failed, no grounds made
+    sv.update({C.PB_VAR_PHASE: 1.0, C.PB_VAR_COL: 0.0})
+    st['file'] = 0
+    c3 = frame()
+    check('parabeetle: no parabeetle.lvd in its files: failed (VAR_6 3), no grounds made, the handles released',
+          ([c[0] for c in c3], sv[C.PB_VAR_COL]), (['res_get', 'res_find', 'res_free', 'res_free'], 3.0))
+    st['file'] = 1
+    # a GroundModule that isn't the hydrant's class: nothing
+    sv.update({C.PB_VAR_COL: 0.0})
+    e.setw(gm, 0x10001234)
+    check('parabeetle: a GroundModule that isn\'t the hydrant\'s class: failed (VAR_6 3), no call',
+          (frame(), sv[C.PB_VAR_COL]), ([], 3.0))
+    e.setw(gm, C.SK_GM_VT)
+
+
 def col_on_checks(patched):
     """skeleton v1.2: the game's own GC_ON / GC_ENABLE (0x02AC2EF0 / 0x02AC2E54) and the ground's enable 0x02D5D6E0 run
     unstubbed on a fake GroundModule / handle / ground: the words they leave are the hydrant's in the user's log
@@ -3368,6 +3603,7 @@ def main():
     clear_checks(e, info, diag)
     info['img'] = img
     skeleton_checks(e, info, diag)
+    pb_checks(patched, info, diag)
     burn2_checks(e, info, diag)
     if 'skeleton' in feats:
         col_on_checks(patched)
