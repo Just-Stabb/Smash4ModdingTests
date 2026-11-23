@@ -594,12 +594,18 @@ def fighter_desc_checks(e, img, info):
     rows = [[e.w(ents + 16 * i + 4 * j) for j in range(4)] for i in range(n)]
     van = img.w(C.GK_DESC + 8)
     vrows = [[img.w(img.w(van) + 16 * i + 4 * j) for j in range(4)] for i in range(6)]
-    check('his articles 0-5 as before, 6 / 7 the clones (0x1A1, max 1, no spawner)%s%s' % (
+    cart = 'cart' in info['feats']
+    if cart:
+        vrows[0] = [vrows[0][0], C.SH_MAX] + vrows[0][2:]
+    check('his articles 0-5 as before%s, 6 / 7 the clones (0x1A1, max 1, no spawner)%s%s' % (
+          ' (clone articles v1: 9 shurikens, his and his clones\')' if cart else '',
           ', 8 the skeleton' if 'skeleton' in info['feats'] else '',
           ', 9 the fire trails (burn v2: 0x1A3, %d at once)' % C.TR_MAX if 'burn2' in info['feats'] else ''), rows,
           vrows + [[C.CLONE_KIND, 1, 0, 0], [C.CLONE_KIND, 1, 0, 0]] +
-          ([[C.SK_KIND, 1, 0, 0]] if 'skeleton' in info['feats'] else []) +
+          ([[C.SK_KIND, C.SK_LEVELS if cart else 1, 0, 0]] if 'skeleton' in info['feats'] else []) +
           ([[C.TR_KIND, C.TR_MAX, 0, 0]] if 'burn2' in info['feats'] else []))
+    check('the article instances in all (the ArticleModule holder\'s 64: docs/native-notes.md "Article instance cap")',
+          sum(r[1] for r in rows) <= 64, True)
     others = []
     for k in (0x3, 0x10, 0x2F, 0x31, 0x41, 0x47):
         try:
@@ -1424,8 +1430,10 @@ def skeleton_checks(e, info, diag):
           (e.w(A['sk_single']), e.w(vt + 0x34), e.w(vt + 0x94), e.w(vt + W.HIT_METHOD)),
           (vt, lab['sk_start'], lab['sk_94'], lab['sk_hit']))
     lst = e.w(A['gk_desc'] + 8)
-    check('his article list: %d entries, article 8 the skeleton (one at a time)' % (10 if 'burn2' in F else 9),
-          (e.w(lst + 4), [e.w(e.w(lst) + 16 * 8 + 4 * j) for j in range(4)]), (10 if 'burn2' in F else 9, [C.SK_KIND, 1, 0, 0]))
+    check('his article list: %d entries, article 8 the skeleton (%s)' % (10 if 'burn2' in F else 9, 'clone articles v1: 3, '
+          'his and his clones\' stacked' if 'cart' in F else 'one at a time'),
+          (e.w(lst + 4), [e.w(e.w(lst) + 16 * 8 + 4 * j) for j in range(4)]),
+          (10 if 'burn2' in F else 9, [C.SK_KIND, C.SK_LEVELS if 'cart' in F else 1, 0, 0]))
     # ---- the game's side, stubbed
     calls = []
     st = dict(file=1, ground=1)

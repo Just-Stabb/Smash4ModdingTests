@@ -32,6 +32,7 @@ sys.path.insert(0, HERE)
 
 CLONES_C = os.path.join(ROOT, 'fighters', 'gekkouga', 'clones.c')
 CLONE_MSC = os.path.join(ROOT, 'fighters', 'gekkouga', 'weapons', 'clone.c')
+SHURIKEN_MSC = os.path.join(ROOT, 'fighters', 'gekkouga', 'weapons', 'shuriken.c')   # clone articles v1
 
 # ---------------------------------------------------------------- MSC
 # (function, old text, new text): each old text must be in that function exactly once
@@ -79,6 +80,9 @@ MSC_EDITS = [
     # aerial chain v1: the aerial status (AttackAir 0x34): its start notes the aerial (after func_314 picks its motion),
     # its loop tries a chain cancel first (after func_56's own interrupts)
     ('func_2382', '    func_314();\n', '    func_314();\n    gk_ac_start(); // Greninja mod: aerial chains (clones.c)\n'),
+    # clone articles v1: his shot's shuriken copies (one per clone out) right after his own shot
+    ('func_2271', '        ArticleModule(0x2719, 0);\n', '        ArticleModule(0x2719, 0);\n        gk_sh_copies(); // Greninja mod: clone articles (clones.c)\n'),
+    ('func_2279', '        ArticleModule(0x2719, 0);\n', '        ArticleModule(0x2719, 0);\n        gk_sh_copies(); // Greninja mod: clone articles (clones.c)\n'),
     ('func_2383', '    if (func_56())\n    {\n        return 0x1;\n    }\n',
      '    if (func_56())\n    {\n        return 0x1;\n    }\n    if (gk_ac_try()) // Greninja mod: aerial chains (clones.c)\n'
      '    {\n        return 0x1;\n    }\n'),
@@ -861,6 +865,8 @@ def cmd_all(vanilla_root, user_root, out):
     os.makedirs(os.path.join(msc, 'clone'), exist_ok=True)
     compile_msc(os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'), os.path.join(msc, 'gekkouga.mscsb'))
     compile_msc(CLONE_MSC, os.path.join(msc, 'clone', 'clone.mscsb'))
+    os.makedirs(os.path.join(msc, 'shuriken'), exist_ok=True)   # clone articles v1: his shuriken (the clones' copies)
+    compile_msc(SHURIKEN_MSC, os.path.join(msc, 'shuriken', 'shuriken.mscsb'))
     kirby = os.path.join(out, 'fighter', 'kirby', 'script', 'msc')
     os.makedirs(kirby, exist_ok=True)
     compile_msc(os.path.join(ROOT, 'fighters', 'kirby', 'kirby.c'), os.path.join(kirby, 'kirby.mscsb'))

@@ -629,6 +629,9 @@ float sk_x;            // its place, its way (1 right, -1 left), its vertical sp
 float sk_y;
 float sk_dir;
 float sk_vy;
+int sk_seated;         // clone articles v1: 1 while it sits on the skeleton below (its level > 0)
+int sk_seat_last;      // ... the one below's counter (its VAR_21) last seen
+int sk_seat_miss;      // ... frames it hasn't moved on
 float sk_hit_x;        // sk_line()'s point
 float sk_hit_y;
 
@@ -907,9 +910,55 @@ void sk_frame()
     }
     if (!StopModule(0x1))
     {
-        sk_move();
+        if (!sk_seat_step())
+        {
+            sk_move();
+        }
     }
     PostureModule(0x3, sk_x, sk_y, 0);
+}
+
+// ---- clone articles v1 (fighters/gekkouga/README.md "Clone articles v1"; the user: "clone skeletons should spawn on top of
+// each other, forming a stack of skeletons"): his clones' skeletons have a level (its VAR_20: 1 the first clone's, 2 the
+// next; 0 his own, at the bottom); while the one below runs (the executable: its VAR_17 1, its place in VAR_18 / 19, its
+// counter in VAR_21, moving on each of its frames) it sits on its top (y + sk_seat_h(): its collision's top line); the one
+// below gone (exploded, smoked, or its counter stale 2 frames: past the blast zone) it falls from there and runs on its own
+float sk_seat_h() { return 24.0f; }       // the skeleton's top (skeleton.lvd's floor line, y + 24)
+int sk_seat_stale() { return 2; }
+
+int sk_seat_step()
+{
+    int n;
+    if ((int)sk_var(20) <= 0)
+    {
+        return 0;
+    }
+    n = (int)sk_var(21);
+    if (n != sk_seat_last)
+    {
+        sk_seat_miss = 0;
+    }
+    else
+    {
+        sk_seat_miss += 1;
+    }
+    sk_seat_last = n;
+    if (sk_var(17) > 0.5f && sk_seat_miss < sk_seat_stale())
+    {
+        sk_x = sk_var(18);
+        sk_y = sk_var(19) + sk_seat_h();
+        sk_vy = 0;
+        sk_stand = 0;
+        sk_seated = 0x1;
+        return 0x1;
+    }
+    if (sk_seated)
+    {
+        sk_seated = 0;                    // the one below is gone: it falls from here (sk_move: his gravity), then runs
+        sk_vy = 0;
+        sk_stand = 0;
+    }
+    return 0;
 }
 
 // ---- skeleton v1.5 sounds (the user's clips in his se bank: tools/gekkouga_sound.py; ids row 0x768, labels 91 - 96).

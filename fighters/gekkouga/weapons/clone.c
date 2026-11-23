@@ -661,12 +661,13 @@ float cl_abs(float v)
 }
 
 // v2: his flags (VAR_31 - 4747000), 0x1000 when slot n isn't a Greninja with clones out (clone delay: up to 127: 64 he
-// is frozen; aligned kick v1: up to 511: 128 the clones are free, 256 the effects epoch)
+// is frozen; aligned kick v1: up to 511: 128 the clones are free, 256 the effects epoch; clone articles v1: up to 2047: 512 /
+// 1024 shuriken copies waiting for their claim)
 int cl_flags(int slot)
 {
     float v;
     v = cl_shared(slot, 7) - 4747000.0f;
-    if (v < -0.5f || v > 511.5f)
+    if (v < -0.5f || v > 2047.5f)
     {
         return 0x1000;
     }

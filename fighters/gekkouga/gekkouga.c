@@ -36831,6 +36831,7 @@ void func_2271()
         printf("Gekkouga status_SpecialNShoot_Main ShootAarticle");
         WorkModule(0x2711, 0x2100000d);
         ArticleModule(0x2719, 0);
+        gk_sh_copies(); // Greninja mod: clone articles (clones.c)
     }
     func_2283();
 }
@@ -36937,6 +36938,7 @@ void func_2279()
         printf("Gekkouga status_SpecialNShot_Main ShootAarticle");
         WorkModule(0x2711, 0x2100000d);
         ArticleModule(0x2719, 0);
+        gk_sh_copies(); // Greninja mod: clone articles (clones.c)
     }
     func_2283();
 }
@@ -39917,12 +39919,15 @@ void gekkouga_frame()
     gk_gen = gen;
     gk_gen_seen = 0x1;
     gk_sk_heartbeat();
+    gk_sk_queue();                        // clone articles v1: the clones' skeletons, one a frame after his
+    gk_sh_tick();                         // ... and their shurikens' claim bits
     if (gk_sk_req_t > 0)
     {
         gk_sk_req_t -= 1;
         if (gk_sk_req_t == 0)
         {
             WorkModule(0, 0 + 0, 0x0f00030f);   // not claimed: no skeleton was made (one is out already)
+            gk_svi(15, 0);
         }
     }
     if (gk_tr_req_t > 0)
@@ -39958,7 +39963,13 @@ void gekkouga_frame()
         }
         gk_chain = 0;
         gk_lw_charge = 0;                 // aligned kick v1 package (the user: "the clone charge gauge should reset when
-    }                                     // Greninja is KO'd"): the down special's charge (and its gauge / ready blink)
+                                          // Greninja is KO'd"): the down special's charge (and its gauge / ready blink)
+        gk_smash = 0;                     // clone articles v1 package (the user: a KO also clears the stored smash charge):
+        gk_sm_auto = 0;                   // the store, its auto release, a chain asked for; the split clones' own stores
+        gk_chain_req = 0;
+        gk_bsi(0x1, 10, 0);
+        gk_bsi(0x2, 10, 0);
+    }
     if (st == 0x14f)
     {
         gk_lw_charge = 0;                 // the match's start (Entry): every kept charge from 0
@@ -40678,6 +40689,7 @@ void gk_channel()
         flags = flags | 0x40;             // clone delay: he is frozen (hitlag): their playback pauses (no history kept)
     }
     flags = flags | gk_vi(13) * 256;      // aligned kick v1 package: the effects' epoch (a change: they fade theirs)
+    flags = flags | gk_vi(16) * 512;      // clone articles v1: their shuriken copies waiting for their claim (1 / 2)
     WorkModule(0, gk_lx + 0, 0x0f000318);
     WorkModule(0, gk_ly + 0, 0x0f000319);
     WorkModule(0, gk_rx + 0, 0x0f00031a);
@@ -41460,6 +41472,7 @@ int gk_ss_allowed()
 void gk_sk_spawn(float x, float y)
 {
     int r;
+    gk_sk_stack(x, y);                    // clone articles v1: his clones' skeletons queued (stacked on his)
     WorkModule(0, 1.0f + 0, 0x0f00030f);
     WorkModule(0, x + 0, 0x0f000310);
     WorkModule(0, y + 0, 0x0f000311);
@@ -41832,7 +41845,7 @@ int gk_cl_diag()
 // v1", the slot table). 0 - 15 his own: 0 gk_fx_t, 1 gk_cursor_t, 2 gk_cl_why, 3 gk_cl_t, 4 gk_gen_req, 5 gk_hold_first
 // (moved out of the globals), 8 the clones' mode (0 formation, 1 the aligned kick, 2 split, 3 regrouping), 9 the kick
 // used this airtime, 10 the kick's clock, 11 its variant (1 tapped, 2 held), 12 the regroup's clock, 13 the clones' effects
-// epoch (flags 256), 14 his situation last frame; 16 x b + k body b's
+// epoch (flags 256), 14 his situation last frame (clone articles v1: 6 / 7, 15 - 18: there); 16 x b + k body b's
 // (1 the left-spawned clone, 2 the right-spawned one, 3 him): k 0 action, 1 frames in it, 2 motion kind, 3 its start
 // frame, 4 the command's seq, 5 facing, 6 X speed, 7 Y speed (his; the clones' are gk_lvy / gk_rvy), 8 flight frames
 // left, 9 air jumps used, 10 smash charge, 11 smash chain, 12 tilted (the kick), 13 aux (smash type + 8 x auto / the
@@ -43381,4 +43394,125 @@ void gk_land_fx()
         gk_fx_flip();
     }
     gk_svi(14, s);
+}
+
+// ===================================================================
+// Clone articles v1 (fighters/gekkouga/README.md "Clone articles v1"; the user: "allow clones to spawn duplicate articles,
+// such as the skeletons, water shuriken and hydro pump (clone skeletons should spawn on top of each other, forming a stack
+// of skeletons)"). The clones in formation copy his moves; when his move makes an article, each clone out (alive, in
+// formation, not falling on its own) gets its own, his (his hits, his KO credit):
+// - his skeleton (side special): the clones' are asked for one a frame after his (each when the one before was claimed:
+//   his VAR_15 = 1 + the level, 1 the first clone's, 2 the next), at his skeleton's X, its Y + 24 x the level, his way;
+//   each sits on the one below (weapons/skeleton.c sk_seat_step; the executable's stack table, feature cart)
+// - his water shuriken (neutral special's shot, with its charge): right after his shot, one generated and shot per clone
+//   (ArticleModule 0x2710 / 0x2719 on article 0, as his); each copy (weapons/shuriken.c) claims a clone from the channel's
+//   bits 512 / 1024 (slot 16, kept 3 frames) and its claim bits in his VAR_30 (64 / 128), and moves by that clone's offset
+// Slots: 6 / 7 his skeleton's place, 15 the clones' skeletons still to ask for (1 / 2), 16 the shuriken copies waiting
+// (1 / 2), 17 their frames left, 18 the levels asked for so far
+// ===================================================================
+int gk_art_clones()
+{
+    int c;
+    int bits;
+    bits = 0;
+    if (gk_ability <= 0 || gk_vi(8) != 0 || gk_det)
+    {
+        return 0;
+    }
+    c = 0x1;
+    while (c <= 0x2)
+    {
+        if ((gk_alive & c) && gk_fall_t(c) <= 2)
+        {
+            bits = bits | c;
+        }
+        c += 1;
+    }
+    return bits;
+}
+
+void gk_sk_stack(float x, float y)
+{
+    float fx;
+    float fy;
+    int b;
+    b = gk_art_clones();
+    fx = x;
+    fy = y;
+    gk_svi(15, b);
+    gk_svi(18, 0);
+    WorkModule(0, fx + 0, 0x0f000386);
+    WorkModule(0, fy + 0, 0x0f000387);
+}
+
+// his request claimed (his VAR_15 back to 0 while it was up): the next clone's skeleton, one level up
+void gk_sk_queue()
+{
+    int b;
+    int c;
+    int lv;
+    float x;
+    float y;
+    int r;
+    b = gk_vi(15);
+    if (b == 0 || gk_sk_req_t <= 0 || WorkModuleF(0, 0x0f00030f) > 0.5f)
+    {
+        return;
+    }
+    c = 0x1;
+    if ((b & 0x1) == 0)
+    {
+        c = 0x2;
+    }
+    gk_svi(15, b - c);
+    lv = gk_vi(18) + 1;
+    gk_svi(18, lv);
+    x = WorkModuleF(0, 0x0f000386);
+    y = WorkModuleF(0, 0x0f000387) + 24.0f * (float)lv;
+    WorkModule(0, (float)(lv + 1) + 0, 0x0f00030f);
+    WorkModule(0, x + 0, 0x0f000310);
+    WorkModule(0, y + 0, 0x0f000311);
+    WorkModule(0, PostureModuleF(0) + 0, 0x0f000312);
+    gk_sk_req_t = gk_sk_req_frames();
+    r = ArticleModule(0x2710, 0x8);
+}
+
+// his shot (SpecialNShot / SpecialNMaxShot, right after his ArticleModule(0x2719, 0)): one shuriken per clone out, generated
+// and shot as his (his charge: the shot reads it), claimed by the copy (the channel's bits) and moved by that clone's offset
+void gk_sh_copies()
+{
+    int b;
+    int r;
+    b = gk_art_clones();
+    if (b == 0)
+    {
+        return;
+    }
+    gk_svi(16, b);
+    gk_svi(17, 3);
+    if (b & 0x1)
+    {
+        r = ArticleModule(0x2710, 0);
+        ArticleModule(0x2719, 0);
+    }
+    if (b & 0x2)
+    {
+        r = ArticleModule(0x2710, 0);
+        ArticleModule(0x2719, 0);
+    }
+}
+
+void gk_sh_tick()
+{
+    int t;
+    t = gk_vi(17);
+    if (t <= 0)
+    {
+        return;
+    }
+    gk_svi(17, t - 1);
+    if (t - 1 <= 0)
+    {
+        gk_svi(16, 0);
+    }
 }
