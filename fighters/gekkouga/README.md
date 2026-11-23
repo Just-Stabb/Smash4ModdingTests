@@ -1787,7 +1787,7 @@ solid collision from the bottom", "the smash attack charging star effect normal 
   - the earlier checks moved to the new values.
 - Not confirmed in game.
 
-## Trail lite v1 (in the next package, with the neutral air changes)
+## Trail lite v1 (in `greninja_nair_fair_v1.zip`, with the neutral air / forward air changes)
 
 The user: "make the smash attacks spawn less fire but cover the same area".
 
@@ -1805,3 +1805,57 @@ The user: "make the smash attacks spawn less fire but cover the same area".
   - `msc_stack_check` firetrail 0 problems, globals 30;
   - the opcode guard OK.
 - Not confirmed in game.
+
+## Neutral air ring v1 and forward air reach (`greninja_nair_fair_v1.zip`, over tuning v1; data only, exe_v46z_gkb13)
+
+The user: "increase neutral air's hitbox size, and make the outer fire ring into weak hitboxes that can connect from the
+stronger hit"; "Can you also extend forward air's length to hit Donkey Kong?". `gekkouga_build.py` `nair_ring` /
+`fair_reach` (from `tune`).
+
+- **Neutral air sizes**, measured on the burst as drawn (0x330000B at 1.8125, fx_render through
+  `tools/gekkouga_nair_preview.py`'s pipeline: the light's radial profile and energy radii at frames 11-23):
+  - strong 11 % (12-14, the connected re-hit 17-19) 9.375 -> **12** (`NAIR_STRONG`): the solid disc, light >= 80 % out
+    to 11.5 - 12.5 at frames 12-15;
+  - late 6 % (14-17) 12.5 -> **14** (`NAIR_LATE`): the visible edge, light ~0.6 at 13 - 14, 80 % of it inside 14.6 -
+    15.3 at frames 13-16.
+- **The ring's weak hitboxes** (`ring_boxes`): 6 Extended_Hitbox capsules on joint 0 (the ring's call: Y 8.5), the
+  edges of a hexagon (corners at 0, 60 ... 300 degrees), **Part 1, IDs 1-6**:
+  - set at 14 (the strong hit's end), moved out at 16 / 18 / 20 / 22, all removed at 24 (the ring: called at 11, 14
+    frames, under 15 % alpha by 24); the Part 0 hit removed alone at 19 (`Remove_Hitbox 0`; his WAITs became FRAMEs, the
+    same frames);
+  - each set covers the band from the burst boxes' edge (14) to the flames' tips at the next frame: FIRE_RING's flame
+    centres `ring_radius` (size x (r0 + v (1 - air^t) / (1 - air)), t = frames since the call - 1; fx_render's light
+    centre within ~1.5) + `NAIR_RING_TIP` 4.5 (the lit tips past the centres in the render, 4.3 - 4.7 at frames
+    14-19); capsule radius half the band, at least 2.5;
+  - corner radius / capsule size: 16.9 / 2.5 (14), 17.71 / 2.52 (16), 18.22 / 3.0 (18), 18.55 / 3.31 (20), 18.77 /
+    3.51 (22): about 12 - 19 from the centre at 14 to 13 - 22 at 22 (sides closer in than corners);
+  - weak: 2.5 %, angle 60 (the burst's), KBG 25, BKB 25, FKB 0, fire (element 5, sound 8 small), hitlag 0.5, no shield
+    damage (no shield break).
+- **The second connect**: each Part has its own hit record. set_attack (`0x02C08848`, read here from exe_v46z_ui10)
+  returns at once when the ID is out on the same Part (the record kept) and clears the Part's record when an ID not
+  out is set on it. So the ring's six IDs are all set together at 14 (Part 1's record cleared before it can hit) and
+  only moved after: someone hit by the burst (Part 0) can be hit by the ring once. The clone is a weapon (IDs 0-6,
+  Parts 0-1): the same script fits it.
+- **Burn**: no exe change. burn_scan reads every Part's hit log (AttackModule +0x18, the highest Part in use + 1; up to
+  `BURN_ENTS` 16) and feature `mark` burns each record not yet marked, so a ring hit is a new record and adds neutral
+  air's row (motion 104: 0.25 % / 15 f / 180 f = 3 %), the weakest burn. A per-hitbox weaker row would need an exe change.
+- **Forward air** (`FAIR_EXTRA` 10; as forward smash's in tuning v1):
+  - a second water sword (0x3300007, size 1, 11 long) and FireBlade (0x3300022) at Y -10 on joint 25: the blade 11 ->
+    21, the Sword_Glow trail to -21;
+  - hitbox ID 2 (ID 0's: 14 %, 5.4) at Y -17 with its ATK_RESERVE: reach 22.4 from the hand (was 12.4);
+  - the user's `$S/gk_in/clone_fx/fair_reach.png`: the blade as drawn (11 = ~122 px; his leg agrees) gives 11.1 px a
+    unit; DK's nearest point (his face) 221 px = 19.9 from the hand: 2.5 to spare.
+- The clones' copies follow (their scripts are his; the clone's game.bin / effect.bin change).
+- Previews: `$S/gk_preview/nair_ring_hitboxes.png` / `.gif` (`gekkouga_nair_preview.py --hitboxes --view --ppu`: the
+  game script's hitboxes over the effects, capsules drawn, Part 0 white, Part 1 orange), `$S/gk_preview/fair_reach_tuning.png`.
+- No new script, slot or ACMD command (Extended_Hitbox / Remove_Hitbox are vanilla): ModAnimNames and Sm4shCommand
+  unchanged.
+- Tests:
+  - `gekkouga_clones_test ... --vtu` 488 / 0 (`nair_fair_tests`: the sizes; the ring boxes' Part / IDs / damage / KB /
+    timing; each set's hexagon and band against FIRE_RING's own formula; the hit-record walk (Part 1 cleared only at
+    14, 24 moves kept); the burn route; forward air's ID 2, swords, flames and trail; the clones' copies);
+  - `gekkouga_fx_test` 51 / 0; msc_stack_check 0 problems (all five MSCs); the opcode guard OK; import_call_check 0 and the
+    cave test 274 / 306, 0 failures on tuning v1's exes (unchanged).
+- Not confirmed in game: the ring hit right after the burst (Smash 4 gives the victim the newer hit's knockback: the
+  ring's may shorten the burst's launch); the boxes / blade where the game draws them (forward air's joint 25 in the
+  preview is a stand-in hand).
