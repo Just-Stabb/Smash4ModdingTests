@@ -105,7 +105,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
                       'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2',
-                      'gready'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'gready', 'skbot'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -446,6 +446,8 @@ def sk_dims(feats):
 
 def sk_verts(feats):
     w, b, h = sk_dims(feats)
+    if 'skbot' in feats:                # tuning v1 (the user: "make it so skeletons have solid collision from the
+        return ((-w, b), (-w, h), (w, h), (w, b), (-w, b))   # bottom"): the box closed: a ceiling under it, right to left
     return ((-w, b), (-w, h), (w, h), (w, b))
 SK_HP = 25.0
 SK_SCALE = 1.0                    # its scale while it runs; 1.0 from its explosion / smoke on (its hitbox unscaled). v1 -
@@ -840,7 +842,7 @@ TR_VAR_SLOT, TR_VAR_TYPE, TR_VAR_X, TR_VAR_Y, TR_VAR_DIR, TR_VAR_CTX = (0x0F0003
 assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW, SK_TOUCH_ROW) for sh in (False, True)
            for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
 RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd', 'skbody',
-                     'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2', 'gready'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+                     'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2', 'gready', 'skbot'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
 # + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
@@ -1525,7 +1527,7 @@ tr_dcase:
 """
 
 
-def sk_source(D, old_hit, orig94, gmupd=False, sktouch=False, sksnd=False, cart=False):
+def sk_source(D, old_hit, orig94, gmupd=False, sktouch=False, sksnd=False, cart=False, skbot=False):
     """skeleton v1: the Running Skeleton's native part (fighters/gekkouga/README.md "Skeleton v1")"""
     zero = '''
         lis r12, %(zero_hi)d
@@ -1887,7 +1889,32 @@ skv_p:  lwz r12, 0x3C(r27)
 skv_log:
         mr r4, r27
         lis r3, %(gk_fsv_hi)d
-        addi r3, r3, %(gk_fsv_lo)d''' + osr() + '''
+        addi r3, r3, %(gk_fsv_lo)d''' + osr() + ('''
+        li r4, 0                        # tuning v1 (skbot): S4SB its bottom: vertex 4 (x10)
+        li r5, 0
+        lis r11, %(sk_k4_hi)d
+        lfs f13, %(sk_k4_lo)d(r11)
+        lis r0, 0x1000
+        lwz r12, 0x3C(r27)
+        cmplw r12, r0
+        blt skb_log''' + ''.join('''
+        lwz r12, 4(r12)
+        cmplw r12, r0
+        blt skb_log''' for _ in range(4)) + '''
+        lfs f1, 8(r12)
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r4, 0x1C(r1)
+        lfs f1, 0xC(r12)
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r5, 0x1C(r1)
+skb_log:
+        mr r6, r27
+        lis r3, %(gk_fsb_hi)d
+        addi r3, r3, %(gk_fsb_lo)d''' + osr() if skbot else '') + '''
         lis r12, %(gmgr_hi)d
         lwz r12, %(gmgr_lo)d(r12)
         li r4, -1
@@ -3245,7 +3272,7 @@ def build(rpx, diag=False, feats=None):
     A['sk_row'] = alloc(0x70) if skel else 0
     A['sk_str'] = alloc(12) if skel else 0                 # "skeleton"
     A['sk_lvd'] = alloc(16, 4) if skel else 0              # "skeleton.lvd"
-    A['sk_verts'] = alloc(8 * len(SK_VERTS), 4) if skel else 0
+    A['sk_verts'] = alloc(8 * len(sk_verts(feats)), 4) if skel else 0
     A['sk_box'] = alloc(0x1C, 4) if skel else 0             # (W, 0, H) + this frame's left / right / bottom / top
     A['sk_nums'] = alloc(4 * 10, 4) if skel else 0           # 0.0 - 9.0 (ints as floats)
     A['sk_k'] = alloc(20, 4) if skel else 0                  # SK_HP, 10.0, 8.0 (the hit point's height), 0.5, SK_SCALE
@@ -3343,6 +3370,8 @@ def build(rpx, diag=False, feats=None):
             ('gk_fy', 'S4GY clone hurt object 0: %08X %08X %08X %08X %08X %08X\n'),
             ('gk_fk', 'S4GK clone hurtboxes set: hitmodule=%08X groups=%d boxes %d -> %d group0=%d+%d objects=%d\n'),
             ('gk_fo', 'S4GO clone id=%d hurt: boxes=%d objects=%d first record %08X %08X %08X %08X\n')]
+    if 'skbot' in feats:
+        fmts += [('gk_fsb', 'S4SB skeleton collision: its bottom (a ceiling, v3 -> v4) v4 x10=%d,%d ground=%08X\n')]
     if 'sksnd' in feats:
         fmts += [('gk_fsn', 'S4SN skeleton sound: owner slot=%d request #%d label=%d (row 0x768) answer=%d its SoundModule=%08X\n')]
     if 'burn2' in feats:
@@ -3352,6 +3381,7 @@ def build(rpx, diag=False, feats=None):
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
     A.setdefault('gk_fsn', 0)
+    A.setdefault('gk_fsb', 0)
     A['sk_dist'] = alloc(4, 4) if 'skdist' in feats else 0   # skeleton v1.6: SK_DIST (its hold's cap)
     btint = 'btint' in feats
     assert not btint or 'tiers' in feats, 'btint needs tiers'
@@ -3485,11 +3515,11 @@ def build(rpx, diag=False, feats=None):
              dm_add=DM_ADD, sk_levels=SK_LEVELS, sk_levels1=SK_LEVELS - 1, mark_off=MARK_OFF, mark=MARK, fstatus=F_STATUS, st_kind=ST_KIND, st_dead=ST_DEAD, st_dead_n=ST_DEAD_N, ent_log=ENT_LOG, node_obj=NODE_OBJ, node_type=NODE_TYPE, mm_kind=MM_KIND, am_ents=AM_ENTS, am_count=AM_COUNT, am_max=AM_MAX, ent_size=ENT_SIZE,
              ent_nodes=ENT_NODES, node_max=NODE_MAX, node_on=NODE_ON, node_min_x=NODE_MIN_X, node_min_y=NODE_MIN_Y,
              node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD,
-             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, pm_scale=PM_SCALE, sk_remake=SK_REMAKE, npose=len(POSE_BONES), pose_min=POSE_MIN, mdl_mtx=MDL_MTX, mm_model=MM_MODEL, log_off=POSE_LOG_BONE * 0x30 + 0xC, nlatch=SLOTS * SK_LATCH * 2 * (SK_LEVELS if 'cart' in feats else 1), sk_bank=SLOTS * SK_LATCH * 8, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(SK_VERTS), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(burn_contexts(feats) * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
+             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, pm_scale=PM_SCALE, sk_remake=SK_REMAKE, npose=len(POSE_BONES), pose_min=POSE_MIN, mdl_mtx=MDL_MTX, mm_model=MM_MODEL, log_off=POSE_LOG_BONE * 0x30 + 0xC, nlatch=SLOTS * SK_LATCH * 2 * (SK_LEVELS if 'cart' in feats else 1), sk_bank=SLOTS * SK_LATCH * 8, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(sk_verts(feats)), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(burn_contexts(feats) * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
              hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4, rdy_shift=READY_STEP.bit_length() - 1)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'pose_tab', 'pose_last', 'gk_ftp', 'sk_desc', 'gk_fcd', 'gk_fce', 'gk_fcf', 'gk_fcg', 'gk_fch', 'hyd_t', 'gk_fsg', 'gk_fsd', 'gk_fsv', 'gk_fse', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'gk_fsn', 'sk_seat', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'pose_tab', 'pose_last', 'gk_ftp', 'sk_desc', 'gk_fcd', 'gk_fce', 'gk_fcf', 'gk_fcg', 'gk_fch', 'hyd_t', 'gk_fsg', 'gk_fsd', 'gk_fsv', 'gk_fsb', 'gk_fse', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'gk_fsn', 'sk_seat', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -5844,7 +5874,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats, 'skbot' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''
