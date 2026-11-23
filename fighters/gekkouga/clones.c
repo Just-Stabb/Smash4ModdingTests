@@ -119,6 +119,7 @@ void gekkouga_frame()
     int flags;
     int gen;
     st = global4;
+    gk_svi(61, 0);                        // clone fix v3 diag: no removal reason written this frame yet
     gen = (int)(WorkModuleF(0, 0x0f00030e) + 0.5f);   // skeleton v1: the executable's clear-all count & 7 (VAR_14)
     if (gk_gen_seen && gen != gk_gen)
     {
@@ -163,6 +164,7 @@ void gekkouga_frame()
         if (gk_ability > 0 || gk_alive != 0)
         {
             gk_end_ability(0);
+            gk_why(500, 0);               // clone fix v3 diag: ended by his KO / rebirth status (300: the timer)
         }
         if (gk_burnout > 0)
         {
@@ -1062,10 +1064,34 @@ void gk_heartbeat()
 // v5 diag: why a clone went (his VAR_23, logged by the TEST_ONLY exe as "gen="): 100 + id heartbeat lost (the game
 // removed it, or its script never ran), 200 + id hit, 300 + id the ability's end / a KO, 400 + id fell off (v13: also
 // a heartbeat lost while it was falling on its own: past the blast zone), or the fall fallback;
-// 1 = the last generate's answer otherwise
+// 1 = the last generate's answer otherwise. Clone fix v3: 500 his KO / rebirth status ended it (300 now only the
+// timer's end), 600 a battle reset; a heartbeat lost (100 / 400 + id) also gives the clone's last place (gk_why_at:
+// + 1000 x (X/10 + 40 + 81 x (Y/10 + 40)), each 0 - 80); slot 61 = 1 the frame a reason is written (the periodic diag
+// line, gk_cl_diag, doesn't overwrite it then)
 void gk_why(int code, int id)
 {
     WorkModule(0, (float)(code + id) + 0, 0x0f000317);
+    gk_svi(61, 0x1);
+}
+
+int gk_why_q(float v)
+{
+    int q;
+    q = (int)(v / 10.0f + 40.5f);
+    if (v < -405.0f)
+    {
+        q = 0;
+    }
+    if (q > 80)
+    {
+        q = 80;
+    }
+    return q;
+}
+
+void gk_why_at(int code, int id, float x, float y)
+{
+    gk_why(code + 1000 * (gk_why_q(x) + 81 * gk_why_q(y)), id);
 }
 
 // a clone the game already removed: off the books (its smoke where it was last, as a kill without a log). v13: one
@@ -1078,10 +1104,10 @@ void gk_gone(int id)
     gk_kill(id, 0);
     if (fell)
     {
-        gk_why(400, id);
+        gk_why_at(400, id, gk_cx(id), gk_cy(id));
         return;
     }
-    gk_why(100, id);
+    gk_why_at(100, id, gk_cx(id), gk_cy(id));
 }
 
 // a clone gone: removed, its smoke, and (hit) the Substitution log (rare: the doll) where it stood
@@ -1601,6 +1627,7 @@ void gk_reset()
     if (gk_ability > 0 || gk_alive != 0)
     {
         gk_end_ability(0);
+        gk_why(600, 0);                   // clone fix v3 diag: ended by a battle reset (the clear-all count)
         BattleObject(0xa, 0x1);           // the name tag back
     }
     if (gk_burnout > 0)
@@ -2068,7 +2095,7 @@ int gk_cl_diag()
     }
     t = gk_vi(3) + 1;                     // (gk_cl_t)
     gk_svi(3, t);
-    if (t % 10 == 0)
+    if (t % 10 == 0 && gk_vi(61) == 0)  // (clone fix v3: not over a clone's removal reason written this frame)
     {
         WorkModule(0, (float)(gk_vi(2) * 10000 + gk_cl_err(0x1) * 100 + gk_cl_err(0x2)) + 0, 0x0f000317);
         gk_svi(2, 0);                     // (gk_cl_why)
@@ -2084,7 +2111,7 @@ int gk_cl_diag()
 // (moved out of the globals), 8 the clones' mode (0 formation, 1 the aligned kick, 2 split, 3 regrouping), 9 the kick
 // used this airtime, 10 the kick's clock, 11 its variant (1 tapped, 2 held), 12 the regroup's clock, 13 the clones' effects
 // epoch (flags 256), 14 his situation last frame (clone articles v1: 6 / 7, 15, 57 - 59: there; clone fix v3: 60 the
-// kick armed); 16 x b + k body b's
+// kick armed, 61 a removal reason written this frame); 16 x b + k body b's
 // (1 the left-spawned clone, 2 the right-spawned one, 3 him): k 0 action, 1 frames in it, 2 motion kind, 3 its start
 // frame, 4 the command's seq, 5 facing, 6 X speed, 7 Y speed (his; the clones' are gk_lvy / gk_rvy), 8 flight frames
 // left, 9 air jumps used, 10 smash charge, 11 smash chain, 12 tilted (the kick), 13 aux (smash type + 8 x auto / the
@@ -2729,9 +2756,41 @@ void gk_free_frame()
     {
         gk_svi(8, 0x2);                   // both flights over: split
     }
+    if (m == 0x2)
+    {
+        gk_void_check();                  // clone fix v3: one falling over nothing: they float back (not lost)
+    }
     if (m == 0x3 && gk_vi(12) >= gk_rg_frames())
     {
         gk_free_end();                    // regrouped: formation again
+    }
+}
+
+// clone fix v3 (the user: "clones will sometimes despawn early when using down special"): split clones (after the
+// aligned kick) can't grab ledges or recover, so a clone the kick's flight / its carried speed / his mirrored inputs took
+// past the stage's edge fell to the blast zone and was gone (reason 401 / 402: the MSC interpreter, a kick 30 from a
+// 60-wide stage's edge). Now a split clone falling (in the air, going down) with no floor under it within
+// gk_void_depth() makes both float back to him (the regroup, without his pose), back in formation after it.
+float gk_void_depth() { return 400.0f; }
+
+void gk_void_check()
+{
+    int c;
+    float y;
+    c = 0x1;
+    while (c <= 0x2)
+    {
+        if ((gk_alive & c) && gk_fall_t(c) > 0 && gk_cvy(c) < 0)
+        {
+            y = gk_cy(c);
+            if (gk_floor(gk_cx(c), y, y - gk_void_depth()) == 0)
+            {
+                gk_rg_begin();
+                gk_cl_why_or(0x40);       // (diag: the S4GF periodic line's reasons: 64 an off-stage regroup)
+                return;
+            }
+        }
+        c += 1;
     }
 }
 
