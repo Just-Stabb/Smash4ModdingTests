@@ -1671,8 +1671,8 @@ size of the fighter emblem (pokeball), slightly smaller. Also it's appearing on 
   - Nothing else in the stance makes him intangible: its scripts only toggle the counter flag 0x2100000D, and the
     counter shield (`func_2339`) is out of the loop since clones v1.
   - The regroup (0x160) plays frames 0 - 7.6 of the same motion (never reaches the window either way).
-  - The aligned kick's motions (0x279 / 0x28D) keep their window 1 - 4 (the vanilla counter attack's); offered to the
-    user.
+  - The aligned kick's motions (0x279 / 0x28D) keep their window 1 - 4 (the vanilla counter attack's): the user, "The
+    kick having invincibility is fine".
   - Tests: `invuln_tests` (the vl bytes, only 4 changed; the stance's MSC over 40 held frames: `HitModule(0, 0)` each
     frame, nothing intangible, no shield).
 - Not confirmed in game.

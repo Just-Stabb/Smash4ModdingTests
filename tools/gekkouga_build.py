@@ -342,6 +342,9 @@ def clone_scripts(game, effect, mtable_hashes, bmap, joint25=None):
         eo = clone_effect(effect.scripts.get(crc), bmap, joint25)
         if eo:
             e_out[crc] = eo
+    for crc, gs in clone_grab(game, bmap).items():        # clone moves v1: grabs, the hold, pummels, throws
+        if crc in mtable_hashes:
+            g_out[crc] = gs
     for crc, (gs, es) in clone_kick(game, effect, bmap).items():
         if crc in mtable_hashes:
             g_out[crc] = gs
@@ -352,6 +355,78 @@ def clone_scripts(game, effect, mtable_hashes, bmap, joint25=None):
 KICK_SCRIPTS = ('speciallwattack', 'specialairlwattack')   # aligned kick v1: the counter's kick (motions 0x279 / 0x28D)
 KICK_FLAG = 0x2100001C            # ... its up-diagonal branch (13 %, 60 degrees; clones.c gk_ak_main sets it on him)
 KICK_FX_FLAGS = (0x21000018, 0x21000019)   # his effect script's branches the kick plays (False: the flags are off)
+
+
+# clone moves v1 (the user: "please allow clones to do grabs and throws", "And pummels"): an article can't catch (the
+# game's capture needs a fighter grabber), so the clone's grab is hitboxes (its hits are his): his grab boxes (catch,
+# catchdash, catchturn: Extended_Grab_Collision) as hold hitboxes (0 %, 361, BKB GRAB_HOLD_BKB: 16 frames of hitstun,
+# hitlag 0, not shieldable, Hitbox_Hold mode 2: the victim stays where it is), CatchWait the hold at its hand again every
+# GRAB_REHIT frames, his pummel (CatchAttack's 2 % hitbox) not shieldable and held, his throws (ThrowF / B / Hi / Lw:
+# their Throw_Specifier Kind 0 damage / angle / KBG / WBKB / BKB) a hitbox at the hold on their Throw_Applier frame.
+# The clones play these motions with him (formation; split: mirroring his grab), so the hold lasts his grab's time
+GRAB_HOLD_BKB = 40
+GRAB_REHIT = 12
+GRAB_AT = (0.0, 6.0, 12.0, 7.0)          # the hold's place (X, Y, Z) and size (his grab boxes reach Z 16 - 22 at Y 6)
+GRAB_SCRIPTS = ('catch', 'catchdash', 'catchturn')
+THROW_SCRIPTS = ('throwf', 'throwb', 'throwhi', 'throwlw')
+
+
+def clone_grab(game, bmap):
+    """{crc: [Command]}: the clone's catch / catchwait / catchattack / throw game scripts"""
+    import acmd
+    SPECIAL, EXT, HOLD = 0x14FCC7E4, 0x7075DC5A, 0xAB0FC57C
+    REMOVE, END, FRAME, WAIT = 0x9245E1A8, 0x5766F889, 0x42ACFE7D, 0x4B7B6E51
+    pum = next(c for c in game.scripts[acmd.crc('catchattack')] if c.ident == SPECIAL)
+
+    def box(hid, dmg, ang, kbg, fkb, bkb, at, rehit=0, hitlag=0.0, ext=None, src=pum, bone=0):
+        c = acmd.Command(SPECIAL, list(src.params))
+        for nm, v in (('ID', hid), ('Bone', bmap(bone)), ('Damage', dmg), ('Angle', ang), ('KBG', kbg), ('FKB', fkb),
+                      ('BKB', bkb), ('Size', at[3]), ('X', at[0]), ('Y', at[1]), ('Z', at[2]), ('Hitlag', hitlag),
+                      ('Shieldable', 0), ('Rehit', rehit), ('NoGrabRelease', 1)):
+            c.params[param(c, nm)] = v
+        if ext is not None:
+            c = acmd.Command(EXT, c.params[:40] + list(ext))
+        return [c, acmd.Command(HOLD, [hid, 2])]
+
+    def hold(hid, rehit=GRAB_REHIT):
+        return box(hid, 0.0, 361, 0, 0, GRAB_HOLD_BKB, GRAB_AT, rehit)
+    out = {}
+    for n in GRAB_SCRIPTS:
+        g = []
+        for c in game.scripts[acmd.crc(n)]:
+            if c.ident in (FRAME, WAIT):
+                g.append(acmd.Command(c.ident, list(c.params)))
+            elif c.name == 'Extended_Grab_Collision':
+                p_ = lambda nm: c.params[c.info['syntax'].index(nm)]
+                g += box(int(p_('ID')), 0.0, 361, 0, 0, GRAB_HOLD_BKB, (p_('X'), p_('Y'), p_('Z'), p_('Size')),
+                         ext=(p_('X2'), p_('Y2'), p_('Z2')), bone=int(p_('Bone')))
+            elif c.name == 'Remove_All_Grab_Collisions':
+                g.append(acmd.Command(REMOVE, []))
+        out[acmd.crc(n)] = g + [acmd.Command(END, [])]
+    out[acmd.crc('catchwait')] = hold(0) + [acmd.Command(END, [])]
+    ps = game.scripts[acmd.crc('catchattack')]
+    f = next(int(c.params[0]) for c in ps if c.ident == FRAME)
+    pm = acmd.Command(SPECIAL, list(pum.params))
+    pm.params[param(pm, 'Bone')] = bmap(int(pm.params[param(pm, 'Bone')]))
+    pm.params[param(pm, 'Shieldable')] = 0
+    pm.params[param(pm, 'ID')] = 1
+    out[acmd.crc('catchattack')] = hold(0, 0) + [acmd.Command(FRAME, [f]), pm, acmd.Command(HOLD, [1, 2]),
+                                                  acmd.Command(WAIT, [1]), acmd.Command(REMOVE, [])] + hold(0, 0) + \
+        [acmd.Command(END, [])]
+    for n in THROW_SCRIPTS:
+        ts = game.scripts[acmd.crc(n)]
+        sp = next(c for c in ts if c.name == 'Throw_Specifier' and int(c.params[0]) == 0)
+        q = lambda nm: sp.params[sp.info['syntax'].index(nm)]
+        rel = 0
+        for c in ts:
+            if c.name == 'FRAME':
+                rel = int(c.params[0])
+            if c.name == 'Throw_Applier':
+                break
+        th = box(0, q('Damage'), int(q('Angle')), int(q('KBG')), int(q('WBKB')), int(q('BKB')), GRAB_AT, hitlag=1.0)[:1]
+        out[acmd.crc(n)] = hold(1, 0) + [acmd.Command(FRAME, [rel]), acmd.Command(REMOVE, [])] + th + \
+            [acmd.Command(WAIT, [1]), acmd.Command(REMOVE, []), acmd.Command(END, [])]
+    return out
 
 
 def kick_branch(s, flag):

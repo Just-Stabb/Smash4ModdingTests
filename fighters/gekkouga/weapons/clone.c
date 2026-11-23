@@ -637,6 +637,10 @@ int cl_free_seen;      // ... the command applied last: its kind x 2 + its seq (
 int cl_tilt;           // ... its tilt now (1: turned along the kick's flight; -1 to set again)
 int cl_fx_ep;          // ... his effects epoch (flags 256) seen last (+ 1; 0 none yet)
 int cl_sm_v;           // clone fix v3: split, a smash's hold: the charge its effects were last drawn for (+ 1; 0 none)
+int cl_g_t;            // clone moves v1: frames its hit check has been latched while it shields
+int cl_xlu;            // ... its dodge made it untouchable (its hit check latched by it)
+int cl_nh_t;           // ... frames in the neutral special's hold (its charge effects)
+float cl_rd_f;         // ... its motion frame last frame (the run's dust)
 
 int cl_magic() { return 4747; }
 
@@ -788,6 +792,7 @@ void cl_frame()
     }
     cl_beat();
     cl_fx_epoch(flags);
+    cl_moves();                           // clone moves v1: shield, dodges, the neutral special's charge, the run's dust
     if (flags & 0x80)
     {
         cl_free(flags);                   // aligned kick v1: its own motion (the kick, split, the regroup)
@@ -943,6 +948,121 @@ void cl_fx_epoch(int flags)
 // paused: held on the start frame (the kick's startup, stepped by him). Tilted: turned back cl_tilt_deg() about its X
 // (relative to its facing: +X tilts it forward), its kick along its flight up toward the centre line.
 float cl_tilt_deg() { return -53.0f; }
+
+// ---- clone moves v1 (fighters/gekkouga/README.md "Clone moves v1"), every frame, formation or free, by the motion it
+// plays (cl_motion: his kinds):
+// - shield (GuardOn / Guard / GuardOff / GuardDamage 0x47 - 0x4A): his MSC doesn't remove it for a hit then
+//   (gk_shielding); the executable's hit check latched (its VAR_4) is let go after cl_guard_rearm() frames, so the next
+//   attack is checked again (one hit an attack, as a shield);
+// - dodges: their intangible frames from his vl (group 1 bytes 3 / 4: EscapeN 0x4B 2 - 17, EscapeF / B 0x4C / 0x4D 4 - 15,
+//   EscapeAir 0x4E 2 - 27): its VAR_4 latched there (the hit check skips a latched clone), let go after;
+// - the neutral special's hold (SpecialNHold / SpecialAirNHold 0x215 / 0x229; his effect script loops: no clone script):
+//   his water orb (0x3300003, at its hand 0x7E8 as his 25, following) made again every 10 frames, growing with the hold
+//   (1 to 1.6 over 60 frames: his shuriken grows as he charges; his own orb stays 1), the dust (0x1000019, its root, Z -10)
+//   every 6; faded with the motion (cl_move_end);
+// - the run (Run 0x12; his loops through Loop_Rest / JUMP: no clone script): his dust (0x1000019, size 0.9) at its frames
+//   1 (X 2) and 10.
+int cl_guard_rearm() { return 12; }
+
+int cl_dodge_from(int k)
+{
+    if (k == 0x4b)
+    {
+        return 2;
+    }
+    if (k == 0x4c || k == 0x4d)
+    {
+        return 4;
+    }
+    if (k == 0x4e)
+    {
+        return 2;
+    }
+    return 0;
+}
+
+int cl_dodge_to(int k)
+{
+    if (k == 0x4b)
+    {
+        return 17;
+    }
+    if (k == 0x4c || k == 0x4d)
+    {
+        return 15;
+    }
+    if (k == 0x4e)
+    {
+        return 27;
+    }
+    return 0;
+}
+
+void cl_moves()
+{
+    int k;
+    float f;
+    float sz;
+    k = cl_motion;
+    f = MotionModuleF(0x1);
+    if (k >= 0x47 && k <= 0x4a && WorkModuleF(0, 0x0f000304) > 0.5f && cl_xlu == 0)
+    {
+        cl_g_t += 1;
+        if (cl_g_t >= cl_guard_rearm())
+        {
+            WorkModule(0, 0 + 0, 0x0f000304);
+            cl_g_t = 0;
+        }
+    }
+    else
+    {
+        cl_g_t = 0;
+    }
+    if (cl_dodge_to(k) > 0 && f >= (float)cl_dodge_from(k) && f < (float)cl_dodge_to(k))
+    {
+        WorkModule(0, 1.0f + 0, 0x0f000304);
+        cl_xlu = 0x1;
+    }
+    else if (cl_xlu)
+    {
+        WorkModule(0, 0 + 0, 0x0f000304);
+        cl_xlu = 0;
+    }
+    if (k == 0x215 || k == 0x229)
+    {
+        if (cl_nh_t % 10 == 0)
+        {
+            sz = 1.0f + 0.6f * (float)cl_nh_t / 60.0f;
+            if (cl_nh_t > 60)
+            {
+                sz = 1.6f;
+            }
+            EffectModule(0x2723, 0x3300003, 0x1, 0x1);
+            EffectModule(0x2712, 0x3300003, cl_hand(), -0.00001f, 0, 0, 0, 0, 0, sz, 0x1);
+        }
+        if (cl_nh_t % 6 == 0)
+        {
+            EffectModule(0x2710, 0x1000019, 0, 0, 0, -10.0f, 0, 0, 0, 1.0f, 4.0f, 0, 15.0f, 0, 0, 0, 0);
+        }
+        cl_nh_t += 1;
+    }
+    else
+    {
+        cl_nh_t = 0;
+    }
+    if (k == 0x12)
+    {
+        if (f >= 1.0f && cl_rd_f < 1.0f)
+        {
+            EffectModule(0x2710, 0x1000019, 0, 2.0f, 0, 0, 0, 0, 0, 0.9f, 0, 0, 0, 0, 0, 0, 0);
+        }
+        if (f >= 10.0f && cl_rd_f < 10.0f)
+        {
+            EffectModule(0x2710, 0x1000019, 0, 0, 0, 0, 0, 0, 0, 0.9f, 0, 0, 0, 0, 0, 0, 0);
+        }
+    }
+    cl_rd_f = f;
+}
 
 // ---- clone fix v3 (the user: "after using the clone kick and landing, clones don't have some of their effects show (ex.
 // smash attack charging/release)"): his smash holds' effects are drawn by his MSC on him (clones.c gk_sm_fx; their effect

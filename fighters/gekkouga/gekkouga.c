@@ -40808,6 +40808,11 @@ void gk_check_hit()
         return;
     }
     id = (int)(h - 20000.0f + 0.5f);
+    if ((id == 0x1 || id == 0x2) && gk_shielding(id))
+    {
+        gk_why(700, id + 10);             // clone moves v1: a shielding clone blocks it (diag 711 / 712; the clone re-arms
+        return;                           // its hit check itself: weapons/clone.c cl_guard)
+    }
     if (id == 0x1 || id == 0x2)
     {
         gk_kill(id, 0x1);
@@ -42522,6 +42527,7 @@ void gk_free_frame()
     {
         return;                           // his hitlag: they freeze with him
     }
+    gk_mir_track();                       // clone moves v1: his movement this frame
     m = gk_vi(8);
     if (m == 0x1)
     {
@@ -42589,6 +42595,15 @@ void gk_fc(int c, float sx, float sy, int cmd, int held, float hlr)
     t = gk_bvi(c, 0x1) + 1;
     gk_bsi(c, 0x1, t);
     a = gk_bvi(c, 0);
+    if (a == 6 || a == 16)
+    {
+        gk_mir_step(c);                   // clone moves v1: mirroring his move
+        return;
+    }
+    if ((a == 0 || a == 10) && gk_mir_start(c, a))
+    {
+        return;
+    }
     if (a == 12)
     {
         gk_kick_step(c);
@@ -42608,6 +42623,176 @@ void gk_fc(int c, float sx, float sy, int cmd, int held, float hlr)
         gk_fa(c, sx, cmd, hlr);
     }
     gk_fmove(c, sy);
+}
+
+// ===================================================================
+// Clone moves v1 (the user: "make split clones able to use the other moves they're unable to do"; fighters/gekkouga/README.md
+// "Clone moves v1"). A split clone free to act (action 0: standing / walking / running; 10: in the air) joins his move
+// when he is in one of these families (the same input: his status answers it, in his situation): 1 shield (GuardOn -
+// GuardDamage 0x1B - 0x1E), 2 spot dodge / rolls (0x1F - 0x21), 3 air dodge (0x22), 4 grab / pummel / throws (0x35 -
+// 0x3E), 5 neutral special (0x152, 0x157 - 0x15A), 6 side special (0x153, 0x15B, 0x15C), 7 up special (0x154, 0x15D - 0x15F).
+// Down special stays his (swap / kick). Families 1, 2, 4 need the clone on the ground, 3 in the air; the specials either.
+// Mirroring (action 6 on the ground, 16 in the air): his motion (kind, from his frame when it changes) and facing, his
+// movement this frame (his X / Y change: rolls, dash grabs, Hydro Pump's jets) from its own place (on the ground along its
+// floor, off a ledge it falls; in the air with its walls and floors); when his move ends, its own control again. A
+// shielding clone (family 1, mirroring or in formation) blocks hits (gk_shielding); dodges' intangible frames, the grabs'
+// catch / hold / pummel / throw hitboxes and the charge effects are the clone's own (weapons/clone.c, its scripts).
+// Slots: his last X / Y (body 3's k 2 / 3), his change this frame (k 4 / 5).
+// ===================================================================
+int gk_mir_family(int st)
+{
+    if (st >= 0x1b && st <= 0x1e)
+    {
+        return 0x1;
+    }
+    if (st >= 0x1f && st <= 0x21)
+    {
+        return 0x2;
+    }
+    if (st == 0x22)
+    {
+        return 0x3;
+    }
+    if (st >= 0x35 && st <= 0x3e)
+    {
+        return 0x4;
+    }
+    if (st == 0x152 || (st >= 0x157 && st <= 0x15a))
+    {
+        return 0x5;
+    }
+    if (st == 0x153 || st == 0x15b || st == 0x15c)
+    {
+        return 0x6;
+    }
+    if (st == 0x154 || (st >= 0x15d && st <= 0x15f))
+    {
+        return 0x7;
+    }
+    return 0;
+}
+
+// his movement this frame (gk_free_frame, before the clones)
+void gk_mir_track()
+{
+    float x;
+    float y;
+    float dx;
+    float dy;
+    x = PostureModuleF(0x1);
+    y = PostureModuleF(0x2);
+    dx = x - gk_bv(3, 2);
+    dy = y - gk_bv(3, 3);
+    if (gk_abs(dx) > 20.0f || gk_abs(dy) > 20.0f)
+    {
+        dx = 0;                           // a jump in his place (a swap, the first frame): not a movement
+        dy = 0;
+    }
+    gk_bs(3, 4, dx);
+    gk_bs(3, 5, dy);
+    gk_bs(3, 2, x);
+    gk_bs(3, 3, y);
+}
+
+int gk_mir_start(int c, int a)
+{
+    int f;
+    f = gk_mir_family(global4);
+    if (f == 0 || gk_mirror_off(global4))
+    {
+        return 0;
+    }
+    if ((f == 0x1 || f == 0x2 || f == 0x4) && a != 0)
+    {
+        return 0;                         // a ground move: the clone on the ground
+    }
+    if (f == 0x3 && a != 10)
+    {
+        return 0;                         // the air dodge: the clone in the air
+    }
+    gk_bsi(c, 0, 6);
+    if (a == 10)
+    {
+        gk_bsi(c, 0, 16);
+    }
+    gk_bsi(c, 2, 0xffffffff);             // (its motion from his now)
+    gk_mir_step(c);
+    return 0x1;
+}
+
+void gk_mir_step(int c)
+{
+    int k;
+    float dx;
+    float dy;
+    float x;
+    float y;
+    float nx;
+    float ny;
+    if (gk_mir_family(global4) == 0)
+    {
+        if (gk_bvi(c, 0) == 6)
+        {
+            gk_idle(c);                   // his move over: its own control
+        }
+        else
+        {
+            gk_bsi(c, 0, 10);
+            gk_fcmd(c, 0x24, 0);
+        }
+        return;
+    }
+    gk_bs(c, 5, PostureModuleF(0));
+    k = MotionModule(0x7);
+    if (k != gk_bvi(c, 2))
+    {
+        gk_fcmd(c, k, (int)MotionModuleF(0x1));
+    }
+    dx = gk_bv(3, 4);
+    dy = gk_bv(3, 5);
+    if (gk_bvi(c, 0) == 6 && dy > 0.5f)
+    {
+        gk_bsi(c, 0, 16);                 // he leaves the ground (Hydro Pump's jet, a jump out of it): so does it
+    }
+    if (gk_bvi(c, 0) == 6)
+    {
+        gk_bs(c, 6, dx);
+        gk_fmove(c, 0);                   // along its floor (off a ledge: action 10, it falls)
+        if (gk_bvi(c, 0) == 10)
+        {
+            gk_bsi(c, 0, 16);             // (still his move: in the air now)
+        }
+        return;
+    }
+    x = gk_cx(c);
+    y = gk_cy(c);
+    nx = gk_fwall(x, y, dx);
+    ny = y + dy;
+    if (dy < 0 && gk_floor(nx, y + 0.5f, ny - 0.5f))
+    {
+        gk_set_c(c, nx, gk_floor_y, 0);
+        gk_set_fall_t(c, 0);
+        gk_bsi(c, 0, 6);                  // landed: on the ground, still his move
+        return;
+    }
+    gk_set_c(c, nx, ny, dy);
+    gk_set_fall_t(c, gk_fall_t(c) + 1);
+}
+
+// a hit on a clone while it shields with him (family 1: mirroring split, or copying him in formation): blocked
+int gk_shielding(int id)
+{
+    int a;
+    if (gk_mir_family(global4) != 0x1)
+    {
+        return 0;
+    }
+    if (gk_vi(8) == 0)
+    {
+        return gk_fall_t(id) <= 2;        // formation: it plays his shield (unless it fell on its own)
+    }
+    a = gk_bvi(id, 0);
+    return gk_vi(8) == 0x2 && a == 6;
 }
 
 void gk_face(int c, float sx)
@@ -43498,7 +43683,22 @@ int gk_art_clones()
 {
     int c;
     int bits;
+    int a;
     bits = 0;
+    if (gk_ability > 0 && gk_vi(8) == 0x2)
+    {
+        c = 0x1;                          // clone moves v1: split, the clones mirroring his move (his shot / his side
+        while (c <= 0x2)                  // special: theirs too; the skeletons on his stack, one shadow)
+        {
+            a = gk_bvi(c, 0);
+            if ((gk_alive & c) && (a == 6 || a == 16))
+            {
+                bits = bits | c;
+            }
+            c += 1;
+        }
+        return bits;
+    }
     if (gk_ability <= 0 || gk_vi(8) != 0 || gk_det)
     {
         return 0;

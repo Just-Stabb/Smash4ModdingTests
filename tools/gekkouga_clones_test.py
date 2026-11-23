@@ -1428,6 +1428,144 @@ def msc_ops_tests(out):
           bad, {})
 
 
+def clone_moves_tests(mscsb, src, cl_mscsb, out):
+    """clone moves v1 (README "Clone moves v1"): split clones join his shield / dodges / grab / specials (mirroring: his
+    motion, his movement from their own place); a shielding clone blocks hits; dodges' intangible frames; the grab
+    hitboxes (hold / pummel / throws from his scripts); the neutral special's charge orb and the run's dust on the clone"""
+    import acmd
+    m, g, tr = ak_run(mscsb, src, True, frames_=24)
+    g.y = 10.0
+    for _ in range(80):
+        ak_frame(m, g, st=0)
+    acts = lambda: (m('gk_bvi', 1, 0), m('gk_bvi', 2, 0))
+    check('clone moves: split, both standing (action 0)', (int(g.vars.get(0x0F000388)), acts()), (2, (0, 0)))
+    g.motion, g.frame = 0x48, 3.0
+    ak_frame(m, g, st=0x1C)
+    check('his shield (Guard 0x1C): both clones mirror it (action 6): his motion (Guard 0x48) from his frame 3',
+          (acts(), ak_cmd(g, 1)[:2], ak_cmd(g, 2)[:2]), ((6, 6), (0x48, 3), (0x48, 3)))
+    g.vars[0x0F000315] = 20000.0 + 1
+    ak_frame(m, g, st=0x1C)
+    check('... a hit on the left clone while it shields: blocked (it stays; diag VAR_23 711)',
+          (m.g('gk_alive'), g.vars.get(0x0F000317)), (3, 711.0))
+    g.motion, g.frame = 0, 0.0
+    ak_frame(m, g, st=0)
+    check('his shield let go: their own control again (Wait, action 0)', (acts(), ak_cmd(g, 1)[0]), ((0, 0), 0))
+    x0 = m.gf('gk_lx')
+    g.motion = 0x4C
+    for _ in range(5):
+        g.x += 2.0
+        ak_frame(m, g, st=0x20)
+    check('his forward roll (EscapeF 0x20, motion 0x4C), him 2 a frame: the clones roll with his movement from their '
+          'own place (+10 in 5 frames), on their floor', (ak_cmd(g, 1)[0], round(m.gf('gk_lx') - x0, 3), m.gf('gk_ly')),
+          (0x4C, 10.0, 10.0))
+    g.motion = 0
+    ak_frame(m, g, st=0)
+    g.motion = 0x72
+    ak_frame(m, g, st=0x35)
+    k1 = ak_cmd(g, 1)[0]
+    g.motion = 0x76
+    ak_frame(m, g, st=0x3B)
+    check('his grab (Catch 0x35: motion 0x72), his pummel (CatchAttack 0x3B: 0x76): the clones play them (their scripts\' '
+          'catch / pummel hitboxes)', (k1, ak_cmd(g, 1)[0], ak_cmd(g, 2)[0]), (0x72, 0x76, 0x76))
+    g.motion = 0
+    ak_frame(m, g, st=0)
+    g.motion = 0x211
+    ak_frame(m, g, st=0x152)
+    check('his neutral special (0x152: SpecialNStart 0x211): the clones play it; his shot\'s copies are theirs '
+          '(gk_art_clones: both), as his side special\'s skeletons (his stack, one shadow)',
+          (ak_cmd(g, 1)[0], m('gk_art_clones')), (0x211, 3))
+    g.motion = 0
+    ak_frame(m, g, st=0)
+    ly0 = m.gf('gk_ly')
+    g.motion = 0x25D
+    for _ in range(4):
+        g.y += 5.0
+        ak_frame(m, g, st=0x154)
+    check('his up special (0x154: SpecialHiStart 0x25D), him rising 5 a frame: the clones leave the ground with him (action '
+          '16) and rise by his movement (+20)', (acts(), round(m.gf('gk_ly') - ly0, 3)), ((16, 16), 20.0))
+    g.motion = 0
+    for _ in range(60):
+        g.y = max(10.0, g.y - 2.0)
+        ak_frame(m, g, st=0xE if g.y > 10.0 else 0)
+    ak_frame(m, g, st=0x155)
+    check('his down special (the charge stance 0x155 / swap / kick): the clones don\'t mirror it', acts()[0] in (6, 16), False)
+    ak_frame(m, g, st=0)
+    g.vars[0x0F000315] = 20000.0 + 1
+    ak_frame(m, g, st=0)
+    check('... a hit on a clone not shielding: removed as before (201)', (m.g('gk_alive'), g.vars.get(0x0F000317) % 1000),
+          (2, 201.0))
+    # ---- the clone article: shield re-arm, dodges, the charge orb, the run's dust
+    c = MSC(cl_mscsb, GB.CLONE_MSC)
+    cg = c.game
+
+    def cm(kind, f, latch=None):
+        c.setg('cl_motion', kind)
+        cg.frame = float(f)
+        if latch is not None:
+            cg.vars[0x0F000304] = latch
+        cg.log = []
+        c('cl_moves')
+        return cg.vars.get(0x0F000304, 0.0)
+    lat = [cm(0x48, 5, 1.0 if i == 0 else None) for i in range(13)]
+    check('the clone shielding (Guard 0x48) with its hit check latched (a blocked hit): let go after 12 frames (the next '
+          'attack is checked)', (lat[10], lat[11]), (1.0, 0.0))
+    win = {}
+    for k in (0x4B, 0x4C, 0x4D, 0x4E):
+        cm(0, 0, 0.0)
+        win[k] = [f for f in range(32) if cm(k, f) > 0.5]
+        win[k] = (win[k][0], win[k][-1] + 1) if win[k] else None
+    cm(0, 0)
+    check('the clone\'s dodges: its hit check off (latched) in his vl intangible frames: spot dodge 2 - 17, rolls 4 - 15, '
+          'air dodge 2 - 27; on again after', (win, cg.vars.get(0x0F000304)), ({0x4B: (2, 17), 0x4C: (4, 15), 0x4D: (4, 15),
+                                                                               0x4E: (2, 27)}, 0.0))
+    orbs = []
+    for t in range(61):
+        cm(0x215, t)
+        orbs += [(t, round(x[4], 2)) for x in cg.log if x[0] == 'fxsize' and x[2] == 0x3300003]
+    check('the neutral special\'s hold (0x215): his water orb (0x3300003) on its hand (0x7E8) again every 10 frames, '
+          'growing 1 -> 1.6 over 60 (the user: "the water shuriken effect doesn\'t appear for clones while charging")',
+          orbs, [(t, round(1.0 + 0.6 * t / 60.0, 2)) for t in range(0, 61, 10)])
+    cm(0, 0)
+    dust = []
+    for f in (0.0, 0.5, 1.0, 5.0, 10.0, 14.0, 0.0, 1.0):
+        cm(0x12, f)
+        dust += [f for x in cg.log if x[0] == 'fxsize' and x[2] == 0x1000019]
+    check('the run (0x12): his dust (0x1000019) at its frames 1 and 10, each loop', dust, [1.0, 10.0, 1.0])
+    # ---- the grab scripts (the clone's game.bin)
+    cgb = acmd.ACMDFile.load(os.path.join(out, 'fighter', 'gekkouga', 'script', 'animcmd', 'weapon', 'clone', 'game.bin'))
+    gb = acmd.ACMDFile.load(os.path.join(out, 'fighter', 'gekkouga', 'script', 'animcmd', 'body', 'game.bin'))
+    val = lambda c_, n: c_.params[c_.info['syntax'].index(n)]
+    BOXES = ('Special_Hitbox', 'Extended_Special_Hitbox')
+    hb = lambda n: [c_ for c_ in cgb.scripts[acmd.crc(n)] if c_.name in BOXES]
+    holds = lambda n: [tuple(c_.params) for c_ in cgb.scripts[acmd.crc(n)] if c_.name == 'Hitbox_Hold']
+    catch = hb('catch')
+    check('the clone\'s grab (catch): his grab box (frame 11, 2.5, Z 4 - 16) as a hold hitbox: 0 %, 361, BKB 40, not '
+          'shieldable, hitlag 0, Hitbox_Hold mode 2',
+          [(c_.name, val(c_, 'Size'), val(c_, 'Z'), val(c_, 'Z2'), val(c_, 'Damage'), val(c_, 'Angle'), val(c_, 'BKB'),
+            val(c_, 'Shieldable'), val(c_, 'Hitlag')) for c_ in catch] + holds('catch'),
+          [('Extended_Special_Hitbox', 2.5, 4.0, 16.0, 0.0, 361, 40, 0, 0.0), (0, 2)])
+    cw = hb('catchwait')
+    check('CatchWait: the hold at its hand (Z 12, 7) again every 12 frames (rehit), held', [(val(c_, 'Rehit'), val(c_, 'Z'))
+                                                                                          for c_ in cw] + holds('catchwait'),
+          [(12, 12.0), (0, 2)])
+    his_p = next(c_ for c_ in gb.scripts[acmd.crc('catchattack')] if c_.name == 'Special_Hitbox')
+    pm = [c_ for c_ in hb('catchattack') if val(c_, 'Damage') > 0]
+    check('pummel (CatchAttack): his 2 %% hitbox at his frame 6 (one a press: his pummel status), not shieldable, held',
+          [(val(c_, 'Damage'), val(c_, 'Angle'), val(c_, 'KBG'), val(c_, 'FKB'), val(c_, 'Shieldable')) for c_ in pm],
+          [(val(his_p, 'Damage'), val(his_p, 'Angle'), val(his_p, 'KBG'), val(his_p, 'FKB'), 0)])
+    got, want = {}, {}
+    for n in ('throwf', 'throwb', 'throwhi', 'throwlw'):
+        sp = next(c_ for c_ in gb.scripts[acmd.crc(n)] if c_.name == 'Throw_Specifier' and int(c_.params[0]) == 0)
+        fr = [c_ for c_ in gb.scripts[acmd.crc(n)] if c_.name == 'FRAME'][-1].params[0]
+        want[n] = (int(fr), val(sp, 'Damage'), val(sp, 'Angle'), val(sp, 'KBG'), val(sp, 'WBKB'), val(sp, 'BKB'))
+        sc = cgb.scripts[acmd.crc(n)]
+        t = next(c_ for c_ in sc if c_.name in BOXES and val(c_, 'Damage') > 0)
+        fr2 = [c_ for c_ in sc[:sc.index(t)] if c_.name == 'FRAME'][-1].params[0]
+        got[n] = (int(fr2), val(t, 'Damage'), val(t, 'Angle'), val(t, 'KBG'), val(t, 'FKB'), val(t, 'BKB'))
+    check('throws: at his release frame (Throw_Applier) a hitbox with his throw\'s values (Throw_Specifier kind 0: damage, '
+          'angle, KBG, WBKB as FKB, BKB), the hold before it', got, want)
+
+
 def invuln_tests(mscsb, src, out, vanilla_vl):
     """round gauge v1.1 package (the user: "please remove the invulnerability from the charge"): his vl's stance motions
     without their intangible window (the fighter update's, docs/native-notes.md), every other byte his; the stance's MSC
@@ -3232,10 +3370,12 @@ def script_tests(out, user):
     cg = acmd.ACMDFile.load(os.path.join(O, 'weapon', 'clone', 'game.bin'))
     ok = []
     kick = {acmd.crc(n) for n in getattr(GB, 'KICK_SCRIPTS', ())}
+    grab = {acmd.crc(n) for n in GB.GRAB_SCRIPTS + GB.THROW_SCRIPTS + ('catchwait', 'catchattack')} \
+        if hasattr(GB, 'GRAB_SCRIPTS') else set()
     for crc, s in cg.scripts.items():
-        if crc in kick:
-            continue                      # aligned kick v1: one branch of his kick (kick_data_tests)
-        o = pg.scripts[crc]
+        if crc in kick or crc in grab:
+            continue                      # aligned kick v1: one branch of his kick (kick_data_tests); clone moves v1: the
+        o = pg.scripts[crc]               # grabs (clone_moves_tests)
         hb0 = [c for c in o if c.name in GB.HITBOXES]
         hb1 = [c for c in s if c.name in GB.HITBOXES]
         same = len(hb0) == len(hb1)
@@ -3404,6 +3544,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (37, 38):   # round gauge v1: the damage panel's files; clone fix v3: his MSC
         want_top = ['INSTALL_TO_data', 'README.txt']
+    if len(earlier) == 41:   # clone moves v1: data only
+        want_top = ['INSTALL_TO_data', 'README.txt']
     if len(earlier) == 40:   # round gauge v1.1: the panel file and the exes
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 39:   # freeze fix v1: his MSC, v3's files reverted one at a time (test)
@@ -3452,7 +3594,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want and
                      n not in again and not (len(earlier) in (37, 40) and n.startswith('INSTALL_TO_data/ui/info/dmg/')) and
                      not (len(earlier) == 40 and n == 'INSTALL_TO_data/param/fighter/fighter_param_vl_gekkouga.bin')), [])
-        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40):
+        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -3521,6 +3663,13 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               ['ui/info/dmg/dmg.flx', 'ui/info/dmg/img-00135.nut', 'ui/info/dmg/texlist.lst'])
         if GAUGE_SRC and GAUGE_JPG:
             gauge_tests(z)
+    if z1 and len(earlier) == 41:
+        check('clone moves v1: INSTALL_TO_data: his MSC (the mirroring, the shield\'s block), the clone\'s MSC (dodges, the '
+              'shield\'s re-arm, the charge orb, the run\'s dust) and game scripts (grab / pummel / throws); the exe is '
+              'round gauge v1.1\'s', sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/')
+                                             and not n.endswith('/')),
+              ['fighter/gekkouga/script/animcmd/weapon/clone/game.bin', 'fighter/gekkouga/script/msc/clone/clone.mscsb',
+               'fighter/gekkouga/script/msc/gekkouga.mscsb'])
     if z1 and len(earlier) == 40:
         check('round gauge v1.1: INSTALL_TO_data: ui/info/dmg\'s dmg.flx (texlist / img-00135 as v1), his MSC and his vl '
               '(the charge\'s invulnerability removed); INSTALL_TO_code: exe_v46z_gkb12 (feature gauge2: the charge cyan, '
@@ -3825,7 +3974,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 41)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 42)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -3874,6 +4023,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'revert_3_clone_msc', 'revert_4_shuriken_msc', 'exe_v46z_gkb11', 'unconfirmed') if len(earlier) == 39 else \
         ('greninja_freeze_fix_v1', 'emblem', '0.87', 'hidden', 'Greninja', 'cyan', 'exe_v46z_gkb12', 'S4GB', 'clip',
          'preview', 'invulnerab', 'intangible', '8 - 19', 'fighter_param_vl_gekkouga', 'unconfirmed') if len(earlier) == 40 else \
+        ('greninja_round_gauge_v1_1', 'shield', 'dodge', 'grab', 'pummel', 'throw', 'neutral special', 'side special',
+         'up special', 'down special', 'ledge', 'dust', 'water shuriken', 'Hitbox_Hold', 'unconfirmed') if len(earlier) == 41 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -3971,7 +4122,7 @@ def main():
     GAUGE_VL = next((x[5:] for x in sys.argv[1:] if x.startswith('--vl=')), None)
     a = [x for x in sys.argv[1:] if not x.startswith('--v') and not x.startswith('--fx=') and not x.startswith('--gauge-')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff', 'rg11') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -3997,6 +4148,9 @@ def main():
         trail_data_tests(out)
     script_tests(out, user)
     msc_ops_tests(out)
+    if len(earlier) >= 41:
+        clone_moves_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'),
+                          os.path.join(msc, 'clone', 'clone.mscsb'), out)
     if len(earlier) >= 40:
         invuln_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'), out,
                      GAUGE_VL)
