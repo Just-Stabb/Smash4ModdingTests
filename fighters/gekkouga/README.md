@@ -1560,3 +1560,62 @@ Built on the update's (the one the game loads). Its img-00133 / 00134 are not th
   for byte from the user's folder and the art, the new slot 135 and its 16 cells, every existing entry / slot / sprite /
   image kept, the clip in panels 1 - 4 with the exe's GAUGE_NAMES and 11 fill frames, no overlap with the trait badge.
   Not confirmed in game.
+
+## Clone fixes v3 (`greninja_clonefix_v3.zip`, over clone articles v1; independent of round gauge v1; data only, exe_v46z_gkb11)
+
+Four user reports.
+- **"make it so the use of down special just activates the clones. Please disable clone kick for the first 10 frames of
+  clones existing"**:
+  - The cause: the full gauge's press stayed in the game's command buffer and was read again on the next frames as
+    the ability's down special, which is now the aligned kick (`gk_lw_press` -> `gk_ak_try`). That could start a kick
+    before the clones were made, with no flight for a clone not made yet (the MSC interpreter: a kick at frame 1 / 3).
+  - Now `gk_activate` clears the specials' buffer and the frame's special bits (`gk_lw_eat`) and locks the kick (slot 60
+    = 0).
+  - `gk_ak_arm` (each ability frame) arms it once `gk_seq >= gk_ak_lock()` (11: the left clone is made on the ability's
+    2nd frame, so its first 10 frames) **and** special is not held.
+  - Until then `gk_ak_try` refuses, and `gk_input` drops any stick-down press (`gk_lw_eat`, not buffered past the
+    lockout). Swaps aren't locked.
+  - Tests (`clonefix_v3_tests`):
+    - activation held 30 frames (the input site asked on every held frame): no kick, armed at the release;
+    - a press at frame 5 (even if it reached the site through frame 10): no kick;
+    - frame 11: no kick;
+    - a fresh press at 12, at 20, or after a held activation: the kick.
+- **"articles spawned from clones spawn from the main body"** (the skeletons excepted, unchanged):
+  - The copies' one move (v1) is most likely undone by the game placing the shot at his hand after it (the shuriken's
+    MSC never sets its place; my reading, not seen).
+  - `weapons/shuriken.c` `sh_frame` now sets the copy at the clone's **live** place (the channel's VAR_24-27, wherever it
+    stands) + his hand's offset.
+  - For `sh_fix_frames()` (8) frames it compares where the game left it with where it was set and with that minus the
+    offset (his path). Nearer his path: set again.
+  - The claim window is 3 frames (was 2).
+  - Facing: copies are only made in formation (`gk_art_clones`), where the clones face his way.
+  - Diag: each set is reported once a frame in his VAR_30 (`256 x (clone + 4 x set-again + 8 x (place - the clone's, in
+    2s))`, `sh_report`). His `gk_sh_report` turns it into VAR_23 = 701 / 702 (set) or 801 / 802 (set again) + 1000 x
+    the place, and flips the flags' 1048576 bit (slot 62), so A_release's S4GF line logs it.
+- **"after using the clone kick and landing, clones don't have some of their effects show (ex. smash attack
+  charging/release)"**:
+  - Charging: his hold effects are his MSC's (`gk_sm_fx`, on him; the hold scripts loop: no clone script).
+    - A split clone's hold command (action 4) now carries its own charge in the start frame's field (`gk_fpack`).
+    - `weapons/clone.c` `cl_sm_fx` draws his hold effects on the clone (hold kinds 0x62 / 0x64 / 0x67, from frame 0):
+      every 5 of its charge the dust / sparkle at 1, every 10 the sword at `1 + 4 x charge / 120`. Its hand is 0x7E8,
+      as its scripts'. Nothing while the charge doesn't change.
+  - Release: an automatic / chained split smash restarted its start motion at the hold frame (`gk_fsms`), which
+    skipped the scripts' hold-frame swords and fire. It now plays on from 0.
+  - Audit (`gekkouga_build.py` `effect_jump`): every split kind plays the same clone script as formation. His scripts
+    that only JUMP to another (the double jumps, the aerials' landings: 15) had no clone script in either mode; they
+    now get the target's.
+  - Still none: Walk / Run dust (loops).
+- **"clones will sometimes despawn early when using down special"** (the user couldn't reproduce it):
+  - No behaviour change for it.
+  - Every removal now has its own reason in VAR_23 (A_release's S4GF `gen=`):
+    - 100 + id heartbeat lost and 400 + id fell off, both + 1000 x the clone's last place (`gk_why_at`: X/10 + 40 + 81
+      x (Y/10 + 40));
+    - 200 + id hit;
+    - 300 + id the timer;
+    - 500 his KO / rebirth status;
+    - 600 a battle reset.
+  - The periodic diag line no longer overwrites a reason written that frame (slot 61).
+  - Found offline: a kick 30 from a 60-wide stage's edge left a split clone past the edge; it fell and was gone (401 /
+    402). An off-stage float-back was offered, not done.
+- Tests: `gekkouga_clones_test` (see the report's counts); `clonefix_v3_tests`, `split_tests`, `clone_free_tests`,
+  `clone_articles_tests`, `clone_fx_tests`. Not confirmed in game.

@@ -4012,6 +4012,14 @@ MSC on a bunshin-based kind, the 4-shape group.
   floats, whole numbers exact under 2^24, 0 until written, cleared at a KO. Greninja's MSC (127 of 128 globals) keeps its
   aligned kick / split clone state there. MSC gotcha met on the way: `(int)(x + 0.5f)` of a float past 2^23 rounds the
   sum to even first (9437289 + 0.5 -> 9437290): read an exact whole number with `(int)x`.
+- **A fighter's down special press outlives its use (Greninja clone fix v3)**: a press his MSC consumes without a status
+  (the full gauge's activation) stays in the game's command buffer and reaches the input sites again on the next frames.
+  Clear it where it is used: `WorkModule(0, 32.0f, 0x0F0003C9)` (Buffer_Clear, the specials) and the frame's special
+  bits in `global24` (`& 0xF000`, the status loop reads them after the frame hook).
+- **An ACMD script that is only `JUMP(Hash)` (Greninja clone fix v3)**: his double jumps (JumpAerialF / B -> JumpF's)
+  and his aerials' landings (LandingAirN / F / B / Hi / Lw -> the landing's) are a lone JUMP to another script's hash. A
+  copier that skips scripts with a JUMP (the clone's, `CLONE_EFFECT_SKIP`) loses their effects; resolve the target
+  (`gekkouga_build.py effect_jump`).
 - **Hit records are freed by every new hitbox (skeleton v1.7, read from exe_v46z_ui10)**: AttackModule's set_attack
   (`0x02C08848`, every Hitbox command) frees the Part's records of the current round (`0x02C10660` on [entry +0x130] and
   +0x124) before the slot is live again, and the collision pass appends the next hit (`0x02C10F40`, from the record

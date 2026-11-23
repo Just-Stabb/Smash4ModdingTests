@@ -1271,18 +1271,25 @@ def split_tests(mscsb, src):
         ak_frame(m, g, st=0x2C, atk=True)
     check('split, ground: a forward smash, attack held: its start (0x5F) to its hold frame (8), then the hold (0x62)',
           (k_start, ak_cmd(g, 1)[0], m('gk_bvi', 1, 0)), (0x5F, 0x62, 4))
+    c8 = (ak_cmd(g, 1)[1], m('gk_bvi', 1, 10))
     for _ in range(30):
         ak_frame(m, g, st=0x2C, atk=True)
+    check('clone fix v3: the hold\'s command carries its own charge in the start frame\'s place (the clone draws its charge '
+          'effects): %s at the hold\'s start, then 30' % (c8,), (c8[0] == c8[1], ak_cmd(g, 1)[1], m('gk_bvi', 1, 10)),
+          (True, 30, 30))
     ak_frame(m, g, st=0)
     check('... released before full (31 frames of 120): no attack, Wait1; its charge kept (31)',
           (ak_cmd(g, 1)[0], m('gk_bvi', 1, 10)), (0, 31))
     m('gk_bsi', 1, 10, 120)
     ak_frame(m, g, st=0x2B, cmd=0x20)
+    s0 = ak_cmd(g, 1)
     for _ in range(9):
         ak_frame(m, g, st=0x31)
-    check('split, ground: with a full stored charge an up smash (0x63) releases at its hold frame on its own: the start '
-          'motion from 9 (an attack), the charge used, the chain started (up)',
-          (ak_cmd(g, 1)[:2], m('gk_bvi', 1, 0), m('gk_bvi', 1, 10), m('gk_bvi', 1, 11)), ((0x63, 9), 2, 0, 2))
+    check('split, ground: with a full stored charge an up smash (0x63) releases at its hold frame on its own: an attack, '
+          'the charge used, the chain started (up); clone fix v3: its start motion plays on from 0 (no restart at the hold '
+          'frame 9, which skipped his frame-9 swords / fire: same command, same seq)',
+          (s0, ak_cmd(g, 1), m('gk_bvi', 1, 0), m('gk_bvi', 1, 10), m('gk_bvi', 1, 11), m('gk_bvi', 1, 0x1) + m('gk_bvi', 1, 3)),
+          (s0, s0, 2, 0, 2, 9))
     for _ in range(14):
         ak_frame(m, g, st=0x33)
     ak_frame(m, g, st=0x33, cmd=0x40)
@@ -1524,6 +1531,43 @@ def clone_free_tests(mscsb, src):
     check('back in formation (no 128), the effects epoch flipped (256): its effects faded; upright; his motion (the channel\'s '
           'kind x 1024 + frame) from its frame', [c for c in g.calls2 if c[0] in ('fade', 'motion') or c[1] == 4][:4],
           [('fade',), ('posture', 4, 0.0, 0.0, 0.0), ('fade',), ('motion', 1, 0x5F, 4.0, 1.0)])
+    # ---- clone fix v3 (the user: "after using the clone kick and landing, clones don't have some of their effects show
+    # (ex. smash attack charging/release)"): a split clone's hold draws its own charge effects
+    def fx(op=None):
+        return [(x[1], x[2], x[3], round(x[4], 3)) for x in g.log if x[0] == 'fxsize'] + \
+            [('kill', x[2]) for x in g.log if x[0] == 'effect' and x[1] == 0x2723]
+    g.log, g.calls2 = [], []
+    chan(3 + 128, 0x62 + 1024 * 30 + (1 << 23))               # forward smash's hold, its charge 30
+    m('cl_frame')
+    check('clone fix v3: split, a forward smash hold (0x62) with its charge 30: the hold motion from 0 (not from 30), its '
+          'old move\'s effects faded; its charge effects as his: dust (0x1000019, root, 1), sparkle at the sword (0x1000010, '
+          'its hand 0x7E8, 1), the water sword made again at the charge\'s size (1 + 4 x 30 / 120 = 2)',
+          ([c for c in g.calls2 if c[0] in ('fade', 'motion')][-2:], sorted(fx(), key=str)),
+          ([('fade',), ('motion', 1, 0x62, 0.0, 1.0)],
+           sorted([(0x2710, 0x1000019, 0, 1.0), (0x2712, 0x1000010, 0x7E8, 1.0), (0x2712, 0x3300007, 0x7E8, 2.0),
+                   ('kill', 0x3300007)], key=str)))
+    seen = []
+    for v in (31, 32, 35, 35, 40):
+        g.log = []
+        chan(3 + 128, 0x62 + 1024 * v + (1 << 23))
+        m('cl_frame')
+        seen.append((v, sorted(fx(), key=str)))
+    check('... its charge growing: every 5 the dust and sparkle, every 10 the sword at the new size (40: 2.333); nothing '
+          'while it doesn\'t change (35 twice: frozen) or between',
+          seen, [(31, []), (32, []), (35, sorted([(0x2710, 0x1000019, 0, 1.0), (0x2712, 0x1000010, 0x7E8, 1.0)], key=str)),
+                 (35, []), (40, sorted([(0x2710, 0x1000019, 0, 1.0), (0x2712, 0x1000010, 0x7E8, 1.0),
+                                        (0x2712, 0x3300007, 0x7E8, 2.333), ('kill', 0x3300007)], key=str))])
+    for kind, t, spark in ((0x64, 'up', (0x2710, 0x1000010, 0, 1.0)), (0x67, 'down', (0x2710, 0x1000010, 0, 1.0))):
+        g.log = []
+        chan(3 + 128, kind + 1024 * 120 + (1 << 20))
+        m('cl_frame')
+        check('... %s smash\'s hold (0x%X), full: the sparkle over it / at its feet (root), the sword at 5' % (t, kind),
+              (spark in fx(), (0x2712, 0x3300007, 0x7E8, 5.0) in fx()), (True, True))
+    g.log, g.calls2 = [], []
+    chan(3 + 128, 0x5F + (1 << 23))
+    m('cl_frame')
+    check('... any other motion (the release: forward smash 0x5F from 0): no charge effects of its own (its effect script\'s)',
+          ([c for c in g.calls2 if c[0] == 'motion'], fx()), ([('motion', 1, 0x5F, 0.0, 1.0)], []))
 
 
 def kick_data_tests(out, user):
@@ -2241,13 +2285,19 @@ def clone_fx_tests(mscsb, src, out):
         if crc not in pe.scripts:
             bad.append((hex(crc), 'not his'))
             continue
-        if req(cmds) != req([c for c in GB.flatten(pe.scripts[crc]) if mappable(c)]):
+        if req(cmds) != req([c for c in GB.flatten(GB.effect_jump(pe, crc)) if mappable(c)]):
             bad.append(hex(crc))
     check('clone fixes v1: every clone effect script (%d) requests his own effects in his order (the joints remapped; '
           'a request on a joint past his model.jtb tables left out)' %
           len(ce.scripts), bad, [])
     check('clone fixes v1: at least the motions his scripts give effects without loops / calls (%d)' % len(ce.scripts),
           len(ce.scripts) >= 90, True)
+    jumps = [crc for crc in ce.scripts if [c.name for c in pe.scripts.get(crc, []) if c.name != 'Script_End'] == ['JUMP']]
+    named = sorted(n for n in ('jumpaerialback', 'landingairf', 'landingairb', 'landingairhi', 'landingairlw')
+                   if _acmd.crc(n) in jumps)
+    check('clone fix v3: his effect scripts that only JUMP to another (his double jumps, his aerials\' landings: their dust; '
+          '15) copied from their target: the clones\' (in formation and split) as his', (len(jumps), named),
+          (15, ['jumpaerialback', 'landingairb', 'landingairf', 'landingairhi', 'landingairlw']))
 
 def ground_move_tests(mscsb, src, out):
     """clone fixes v2 (the user: the clones "follow grounded movement incorrectly", "clip back to a set position
@@ -3369,9 +3419,11 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
             gauge_tests(z)
     if z1 and len(earlier) == 38:
         check('clone fix v3: INSTALL_TO_data: his MSC (the activating press used up, the kick\'s lockout, the removal reasons, '
-              'the copies\' reports) and his shuriken\'s (the copies held on their clone\'s place); the exe is clone articles '
-              'v1\'s', sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
-              ['fighter/gekkouga/script/msc/gekkouga.mscsb', 'fighter/gekkouga/script/msc/shuriken/shuriken.mscsb'])
+              'the copies\' reports, the split holds\' charge), his shuriken\'s (the copies held on their clone\'s place), the '
+              'clone\'s MSC (its split holds\' charge effects) and effect scripts (the JUMP-only ones); the exe is clone '
+              'articles v1\'s', sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              ['fighter/gekkouga/script/animcmd/weapon/clone/effect.bin', 'fighter/gekkouga/script/msc/clone/clone.mscsb',
+               'fighter/gekkouga/script/msc/gekkouga.mscsb', 'fighter/gekkouga/script/msc/shuriken/shuriken.mscsb'])
     if z1 and len(earlier) == 36:
         check('clone articles v1: INSTALL_TO_data: his MSC (the clones\' skeletons / shuriken copies, the KO\'s smash charge), '
               'the clone\'s (its hitboxes cleared on a new motion), the skeleton\'s (its seat), his shuriken\'s (new: the '
@@ -3685,7 +3737,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clone_articles_v1', 'round', 'gauge', 'img-00135', 'texlist', 'KO meter', 'badge', 'ring', 'fill',
          'cyan', 'blue', 'grey', 'preview', 'unconfirmed') if len(earlier) == 37 else \
         ('greninja_clone_articles_v1', 'round gauge', 'exe_v46z_gkb11', 'activates', '10 frames', 'fresh press', 'held',
-         'kick', 'shuriken', 'clone\'s place', 'S4GF', 'gen=', '500', '600', '701', '801', 'unconfirmed') if len(earlier) == 38 else \
+         'kick', 'shuriken', 'clone\'s place', 'S4GF', 'gen=', '500', '600', '701', '801', 'charging', 'landing', 'double jump',
+         'unconfirmed') if len(earlier) == 38 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \

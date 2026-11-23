@@ -42452,6 +42452,10 @@ int gk_fpack(int c)
         f0 = gk_vi(10) * gk_ak_kick_mf() / gk_ak_startup();
         v = v + 4194304;
     }
+    if (gk_bvi(c, 0) == 0x4)
+    {
+        f0 = gk_bvi(c, 10);               // clone fix v3: a smash's hold: its own charge (the clone draws its effects)
+    }
     v = v + f0 * 1024;
     if (gk_bv(c, 5) < 0)
     {
@@ -42885,8 +42889,11 @@ void gk_fsms(int c, int held)
         gk_bsi(c, 0, 0x2);
         gk_bsi(c, 13, t);
         k = gk_sm_start_kind(t);
-        gk_fcmd(c, k, f);
-        return;
+        if (gk_bvi(c, 2) != k)
+        {
+            gk_fcmd(c, k, f);
+        }                                 // clone fix v3: already playing it from 0 (no restart at the hold frame: its
+        return;                           // script's frame-8 sword / its release effects play on as his)
     }
     if (held)
     {

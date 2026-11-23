@@ -319,7 +319,7 @@ def clone_scripts(game, effect, mtable_hashes, bmap, joint25=None):
     for crc in sorted(set(mtable_hashes) - final):
         s = game.scripts.get(crc)
         if not s or not any(c.name in HITBOXES for c in s) or any(c.name in NO_CLONE for c in s):
-            eo = clone_effect(effect.scripts.get(crc), bmap, joint25)   # clone fixes v1: no hitbox (a grab, a throw, ...):
+            eo = clone_effect(effect_jump(effect, crc), bmap, joint25)   # clone fixes v1: no hitbox (a grab, a throw, ...):
             if eo:                                                # its effects anyway
                 e_out[crc] = eo
             continue
@@ -399,6 +399,15 @@ def clone_kick(game, effect, bmap):
         e.append(c2)
     assert e[-1].name == 'Script_End'
     return {acmd.crc(n): (g, e) for n in KICK_SCRIPTS}
+
+
+def effect_jump(effect, crc):
+    """clone fix v3 (the user: split clones' effects missing): his effect script for crc, or, when it is only a JUMP to
+    another script (his double jumps -> JumpF's, the aerials' landings -> the landing's: their dust), that script"""
+    e = effect.scripts.get(crc)
+    if e and [c.name for c in e if c.name != 'Script_End'] == ['JUMP']:
+        return effect.scripts.get(int(e[0].params[0]))
+    return e
 
 
 def clone_effect(e, bmap, joint25=None):

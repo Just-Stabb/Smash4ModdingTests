@@ -636,6 +636,7 @@ int cl_free_on;        // aligned kick v1: his channel's free mode (flags 128) s
 int cl_free_seen;      // ... the command applied last: its kind x 2 + its seq (-1 none)
 int cl_tilt;           // ... its tilt now (1: turned along the kick's flight; -1 to set again)
 int cl_fx_ep;          // ... his effects epoch (flags 256) seen last (+ 1; 0 none yet)
+int cl_sm_v;           // clone fix v3: split, a smash's hold: the charge its effects were last drawn for (+ 1; 0 none)
 
 int cl_magic() { return 4747; }
 
@@ -943,9 +944,68 @@ void cl_fx_epoch(int flags)
 // (relative to its facing: +X tilts it forward), its kick along its flight up toward the centre line.
 float cl_tilt_deg() { return -53.0f; }
 
+// ---- clone fix v3 (the user: "after using the clone kick and landing, clones don't have some of their effects show (ex.
+// smash attack charging/release)"): his smash holds' effects are drawn by his MSC on him (clones.c gk_sm_fx; their effect
+// scripts loop, so the clone has none). Split, the clone's hold command carries its own charge (0 - 120, in the start
+// frame's place: a hold starts at 0) and it draws them itself as his: every 5 of its charge the dust (0x1000019) and
+// sparkle (0x1000010: at the sword / over it / at its feet) at size 1, every 10 the water sword (0x3300007) made again at
+// the charge's size (1 at 0 to 5 at full: gk_sm_size); its joints as its scripts' (his hands 24 / 25: 0x7E8, the root 0)
+int cl_sm_hold_type(int kind)
+{
+    if (kind == 0x62)
+    {
+        return 0x1;                       // AttackS4Hold
+    }
+    if (kind == 0x64)
+    {
+        return 0x2;                       // AttackHi4Hold
+    }
+    if (kind == 0x67)
+    {
+        return 0x4;                       // AttackLw4Hold
+    }
+    return 0;
+}
+
+int cl_hand() { return 0x7e8; }
+float cl_sm_size(int v) { return 1.0f + 4.0f * (float)v / 120.0f; }   // (clones.c gk_sm_size: gk_smash_fx_max 5, full 120)
+
+void cl_sm_fx(int t, int v, int first)
+{
+    if (!first && v + 1 == cl_sm_v)
+    {
+        return;                           // its charge unchanged (frozen, full): nothing new
+    }
+    cl_sm_v = v + 1;
+    if (first || v % 5 == 0)
+    {
+        EffectModule(0x2710, 0x1000019, 0, -2.0f, 0, 0, 0, 0, 0, 1.0f, 0, 0, 0, 0, 0, 0, 0);
+        if (t == 0x1)
+        {
+            EffectModule(0x2712, 0x1000010, cl_hand(), 0, -5.5f, 0, 0, 0, 0, 1.0f, 0);
+        }
+        else if (t == 0x2)
+        {
+            EffectModule(0x2710, 0x1000010, 0, 0, 18.0f, 0, 0, 0, 0, 1.0f, 0, 0, 0, 0, 0, 0, 0);
+        }
+        else
+        {
+            EffectModule(0x2710, 0x1000010, 0, 0, 3.0f, 0, 0, 0, 0, 1.0f, 0, 0, 0, 0, 0, 0, 0);
+        }
+    }
+    if (first || v % 10 == 0)
+    {
+        EffectModule(0x2723, 0x3300007, 0x1, 0x1);
+        EffectModule(0x2712, 0x3300007, cl_hand(), -0.00001f, 0, 0, 180.0f, -90.0f, 0, cl_sm_size(v), 0x1);
+    }
+}
+
 void cl_free(int flags)
 {
     int v;
+    int t;
+    int charge;
+    int first;
     int kind;
     int f0;
     int tilt;
@@ -970,6 +1030,13 @@ void cl_free(int flags)
     tilt = (v / 2097152) % 2;
     paused = (v / 4194304) % 2;
     seq = (v / 8388608) % 2;
+    t = cl_sm_hold_type(kind);
+    charge = 0;
+    if (t != 0)
+    {
+        charge = f0;                      // clone fix v3: a smash's hold: its own charge (not a start frame: from 0)
+        f0 = 0;
+    }
     if (PostureModuleF(0) != lr)
     {
         PostureModule(0, lr);
@@ -993,12 +1060,14 @@ void cl_free(int flags)
     {
         r = 0;
     }
+    first = 0;
     if (kind != cl_motion || kind * 2 + seq != cl_free_seen)
     {
         cl_move_end(kind);
         MotionModule(0x1, kind, (float)f0, r);
         cl_motion = kind;
         cl_free_seen = kind * 2 + seq;
+        first = 0x1;
     }
     else
     {
@@ -1007,6 +1076,14 @@ void cl_free(int flags)
         {
             MotionModule(0x2713, (float)f0);
         }
+    }
+    if (t != 0)
+    {
+        cl_sm_fx(t, charge, first);
+    }
+    else
+    {
+        cl_sm_v = 0;
     }
     cl_hn = 0;
     cl_last_f = 0;
