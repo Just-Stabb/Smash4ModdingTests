@@ -1402,6 +1402,32 @@ def cf3_run(mscsb, src, held_to=0, presses=(), n=40, site_at=()):
     return m, g, kick, answers, armed
 
 
+# freeze fix v1 (clone fixes v3 froze the game at his load: its gekkouga.mscsb had MSC op 0x19, bitXor, from a `^`): the
+# opcodes in the game's own Greninja MSCs (gekkouga, its articles) and in clone articles v1's (loaded in game); a compiled
+# MSC with any other is refused
+MSC_GAME_OPS = frozenset((0x2, 0x3, 0x6, 0x7, 0xA, 0xB, 0xD, 0xE, 0xF, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x1A,
+                          0x1C, 0x1D, 0x1E, 0x23, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30,
+                          0x31, 0x34, 0x35, 0x36, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x41, 0x42, 0x43, 0x44, 0x45,
+                          0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B))
+
+
+def msc_ops_tests(out):
+    """freeze fix v1: every compiled MSC of the package uses only opcodes the game's own MSCs use"""
+    sys.path.insert(0, os.path.join(HERE, 'mscdec'))
+    from msc import MscFile
+    bad = {}
+    for root, _ds, fs in os.walk(os.path.join(out, 'fighter')):
+        for f in fs:
+            if f.endswith('.mscsb'):
+                m = MscFile()
+                m.readFromFile(open(os.path.join(root, f), 'rb'))
+                ops = {c.command for s in m.scripts for c in s} - MSC_GAME_OPS
+                if ops:
+                    bad[os.path.relpath(os.path.join(root, f), out)] = sorted(hex(o) for o in ops)
+    check('freeze fix v1: every MSC built uses only opcodes the game\'s own MSCs use (v3\'s bitXor 0x19 froze his load)',
+          bad, {})
+
+
 def clonefix_v3_tests(mscsb, src):
     """clone fix v3 (the user: "make it so the use of down special just activates the clones. Please disable clone kick for
     the first 10 frames of clones existing. Right now if down special is pressed with max gauge, it activates the kick")"""
@@ -3305,6 +3331,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (37, 38):   # round gauge v1: the damage panel's files; clone fix v3: his MSC
         want_top = ['INSTALL_TO_data', 'README.txt']
+    if len(earlier) == 39:   # freeze fix v1: his MSC, v3's files reverted one at a time (test)
+        want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA']
     if len(earlier) == 36:   # clone articles v1: the exes and the MSCs
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 35:   # aligned kick v1: data only
@@ -3348,7 +3376,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                                                                           if len(earlier) == 37 else ''),
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want and
                      n not in again and not (len(earlier) == 37 and n.startswith('INSTALL_TO_data/ui/info/dmg/'))), [])
-        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38):
+        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -3417,6 +3445,20 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               ['ui/info/dmg/dmg.flx', 'ui/info/dmg/img-00135.nut', 'ui/info/dmg/texlist.lst'])
         if GAUGE_SRC and GAUGE_JPG:
             gauge_tests(z)
+    if z1 and len(earlier) == 39:
+        check('freeze fix v1: INSTALL_TO_data: his MSC only (no bitXor); TEST_ONLY_DATA: each of clone fixes v3\'s files as '
+              'clone articles v1 had it',
+              (sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+               sorted(n[len('TEST_ONLY_DATA/'):] for n in names if n.startswith('TEST_ONLY_DATA/') and not n.endswith('/'))),
+              (['fighter/gekkouga/script/msc/gekkouga.mscsb'],
+               ['revert_1_gekkouga_msc/fighter/gekkouga/script/msc/gekkouga.mscsb',
+                'revert_2_clone_effect/fighter/gekkouga/script/animcmd/weapon/clone/effect.bin',
+                'revert_3_clone_msc/fighter/gekkouga/script/msc/clone/clone.mscsb',
+                'revert_4_shuriken_msc/fighter/gekkouga/script/msc/shuriken/shuriken.mscsb']))
+        ca = Installed(earlier[:next(i for i, e in enumerate(earlier) if 'clone_articles' in e) + 1])
+        check('... each revert is clone articles v1\'s file byte for byte',
+              [n for n in names if n.startswith('TEST_ONLY_DATA/') and not n.endswith('/') and
+               z.read(n) != ca.read('INSTALL_TO_data/' + n.split('/', 2)[2])], [])
     if z1 and len(earlier) == 38:
         check('clone fix v3: INSTALL_TO_data: his MSC (the activating press used up, the kick\'s lockout, the removal reasons, '
               'the copies\' reports, the split holds\' charge), his shuriken\'s (the copies held on their clone\'s place), the '
@@ -3694,7 +3736,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 39)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 40)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -3739,6 +3781,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clone_articles_v1', 'round gauge', 'exe_v46z_gkb11', 'activates', '10 frames', 'fresh press', 'held',
          'kick', 'shuriken', 'clone\'s place', 'S4GF', 'gen=', '500', '600', '701', '801', 'charging', 'landing', 'double jump',
          'unconfirmed') if len(earlier) == 38 else \
+        ('greninja_clonefix_v3', 'froze', 'bitXor', '0x19', 'revert_1_gekkouga_msc', 'revert_2_clone_effect',
+         'revert_3_clone_msc', 'revert_4_shuriken_msc', 'exe_v46z_gkb11', 'unconfirmed') if len(earlier) == 39 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -3832,7 +3876,7 @@ def main():
     GAUGE_JPG = next((x[12:] for x in sys.argv[1:] if x.startswith('--gauge-jpg=')), None)
     a = [x for x in sys.argv[1:] if not x.startswith('--v') and not x.startswith('--fx=') and not x.startswith('--gauge-')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -3857,6 +3901,7 @@ def main():
         firetrail_tests(os.path.join(msc, 'firetrail', 'firetrail.mscsb'), GB.TRAIL_MSC)
         trail_data_tests(out)
     script_tests(out, user)
+    msc_ops_tests(out)
     if len(earlier) >= 38:
         clonefix_v3_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     if len(earlier) >= 36:

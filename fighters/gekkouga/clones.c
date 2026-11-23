@@ -225,7 +225,17 @@ void gekkouga_frame()
     flags = flags | gk_ac_diag();         // aerial chain v1 diag (256 up: the exe's S4GF line logs a change)
     flags = flags | gk_tc_diag();         // tilt chain v1 diag (2097152 + the same fields, in a jab / tilt)
     flags = flags | gk_cl_diag();         // clone fixes v2 diag (1048576 toggled: an S4GF line with VAR_23)
-    flags = flags ^ (gk_vi(62) * 1048576); // clone fix v3 diag: ... and flipped at each shuriken copy's report
+    if (gk_vi(62))                        // clone fix v3 diag: ... and flipped at each shuriken copy's report (freeze
+    {                                     // fix v1: no `^`: bitXor (MSC op 0x19) is in no MSC the game ships; v3's
+        if (flags & 1048576)              // flags ^ ... froze the game at his load)
+        {
+            flags = flags - 1048576;
+        }
+        else
+        {
+            flags = flags + 1048576;
+        }
+    }
     if (gk_ability > 0)
     {
         flags = flags | gk_vi(4);         // v4 diag: 64 / 128 a clone about to be made (next frame; gk_gen_req)

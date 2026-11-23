@@ -1619,3 +1619,20 @@ Four user reports.
     402). An off-stage float-back was offered, not done.
 - Tests: `gekkouga_clones_test` (see the report's counts); `clonefix_v3_tests`, `split_tests`, `clone_free_tests`,
   `clone_articles_tests`, `clone_fx_tests`. Not confirmed in game.
+
+## Freeze fix v1 (`greninja_freeze_fix_v1.zip`, over clone fixes v3; data only, exe_v46z_gkb11)
+
+The user: clone fixes v3's files froze the game at Greninja's load (gkb11's A_release had loaded clone articles v1's
+data fine).
+- **Cause:**
+  - Every opcode of v3's three MSCs was compared with the game's own Greninja MSCs (his, shuriken, moon) and clone
+    articles v1's. The only new one is 0x19 (bitXor), once, in his `gekkouga_frame`: v3's diag line
+    `flags = flags ^ (gk_vi(62) * 1048576)`, run every frame from his load.
+  - No shipped MSC uses bitXor. Most likely the game's interpreter doesn't take it; the game's code for it was not
+    read.
+- **Fix:** the flip by `+` / `-` on `flags & 1048576`.
+- **Guard:** `gekkouga_clones_test.msc_ops_tests` checks every built MSC's opcodes against `MSC_GAME_OPS` (the
+  game's own Greninja MSCs and clone articles v1's). docs/native-notes.md.
+- **TEST_ONLY_DATA** `revert_1` - `revert_4`: each of v3's four files as before v3 (his MSC, the clone's effect.bin,
+  the clone's MSC, the shuriken's MSC), to swap one at a time if the freeze stays.
+- Not confirmed in game.

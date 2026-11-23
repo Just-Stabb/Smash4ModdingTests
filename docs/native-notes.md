@@ -4012,6 +4012,11 @@ MSC on a bunshin-based kind, the 4-shape group.
   floats, whole numbers exact under 2^24, 0 until written, cleared at a KO. Greninja's MSC (127 of 128 globals) keeps its
   aligned kick / split clone state there. MSC gotcha met on the way: `(int)(x + 0.5f)` of a float past 2^23 rounds the
   sum to even first (9437289 + 0.5 -> 9437290): read an exact whole number with `(int)x`.
+- **MSC opcodes the game may not run (Greninja freeze fix v1)**: clone fixes v3's gekkouga.mscsb froze the game at his
+  load (the user, gkb11 A_release; the same exe loaded clone articles v1's data). Its one opcode no shipped Greninja
+  MSC (nor clone articles v1's) uses: 0x19 bitXor (msclang's `^`), in his per-frame hook. Not confirmed from the game's
+  code (its interpreter's switch not read), but keep compiled MSCs to the opcodes the game's own use:
+  `gekkouga_clones_test.MSC_GAME_OPS` (0x1A leftShift and the bitAnd 0x16 / bitOr 0x17 are used by the game).
 - **A fighter's down special press outlives its use (Greninja clone fix v3)**: a press his MSC consumes without a status
   (the full gauge's activation) stays in the game's command buffer and reaches the input sites again on the next frames.
   Clear it where it is used: `WorkModule(0, 32.0f, 0x0F0003C9)` (Buffer_Clear, the specials) and the frame's special
