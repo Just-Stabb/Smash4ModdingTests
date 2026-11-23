@@ -27,9 +27,11 @@ CELL = 256
 SHEET = 1024
 TEXTURE_ID = 0x2800FE30                      # unique GIDX (the trait badge has 0x2800FE00)
 GAUGE_PX = 256                               # the gauge's size in the clip (scaled by PLACES)
-# panel sprite -> (x, y, scale) of gkgauge_mc: left of the damage percent, over the portrait's corner (the band
-# Little Mac's KO meter and the trait badge use is right of the CPU level, so the gauge sits left of it)
-PLACES = {1: (-40, -40, 0.18), 2: (-60, -22, 0.14), 3: (-52, -46, 0.24), 4: (-52, -46, 0.24)}
+# panel sprite -> (x, y, scale) of gkgauge_mc. Round gauge v1 (rendered on the user's dmg.flx, tools/flx_render.py): the
+# Clones v7 places (left of the trait badge) sat on the CPU level ("Lv.") and the badge's star; now in Little Mac's KO
+# meter band (the meter is hidden while the gauge shows), right of the trait badge (dmg_trait_badge.PLACES: its right edge
+# + the gauge's radius (its outer ticks: the whole 256 px cell) + 2 - 3)
+PLACES = {1: (72, -52, 0.16), 2: (38, -27, 0.12), 3: (122, -58, 0.24), 4: (122, -58, 0.24)}
 
 
 def cells(art):

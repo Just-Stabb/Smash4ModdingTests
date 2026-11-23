@@ -1537,3 +1537,26 @@ smash charge, and "When using the clone kick, the clones never clear the hitbox 
   0 (`clone_articles_tests`: the skeleton queue (levels, places, one a frame, one clone, dropped), the shot's copies and
   the channel bits, the KO's resets, the seat and the fall, the shurikens' claims and move, his own untouched, the clone's
   clear on each new motion); supamario_ui_cave_test 0; import_call_check 0. Not confirmed in game.
+
+## Round gauge v1 (`greninja_round_gauge_v1.zip`, over clone articles v1; data only, exe_v46z_gkb11)
+
+Clones v7's round gauge, now built: the user sent their `ui/info/dmg` (the base game's, `$S/gk_in/ui_full/x/ui/info/dmg/`,
+and the update's, `$S/gk_in/dmg/x/dmg/`: only 5 / 7 images there; the other ~128 texlist entries are run-time textures).
+Built on the update's (the one the game loads). Its img-00133 / 00134 are not the update's but this workspace's own mods
+(GIDX 0x2800FE00 / 0x2800FE01: the trait badge's and Hero's menu's textures), so the folder already has the trait badge.
+- Art: `tools/gekkouga_gauge_art.py extract $S/gk_in/futui/x/41672.jpg ART` (41672.eps's 5250 x 3500 preview; LAYERS /
+  FILL as in v7). Build: `tools/gekkouga_gauge_flx.py $S/gk_in/dmg/x/dmg ART OUT`: dmg.flx (+ `gkgauge_mc` in panel sprites
+  1 - 4: the four rings, the track, the 11-frame fill), texlist.lst (16 entries on a new slot 135, the 353 existing entries
+  / 135 slots as they were), img-00135.nut (1024 x 1024, GIDX 0x2800FE30). Only those three ship.
+- Places (`PLACES`): rendered on the user's file (`tools/flx_render.py`), v7's places sat on the CPU level ("Lv.") and the
+  trait badge's star; now in Little Mac's KO meter band (hidden while the gauge shows) right of the trait badge (its right
+  edge + the gauge's radius + 2 - 3): panels 3 / 4 (1 - 2 / 3 - 4 players) (122, -58) x 0.24, panel 1 (5 - 8) (72, -52) x 0.16,
+  panel 2 (small) (38, -27) x 0.12.
+- The exe's driver (`gk_panel`, since v7: finds `gkgauge_mc` and its rings / fill by name, hides the KO meter, turns the
+  rings, sets the fill frame, tints cyan / blue / grey by his VAR_19's mode) is unchanged.
+- Previews: `$S/gk_preview/round_gauge.gif`, `round_gauge_sheet.png`, `round_gauge_panels.png` (before / with the gauge /
+  full, per layout; the renderer draws every layer, Hero's menu included).
+- Tests (`gekkouga_clones_test ... --vca --gauge-src= --gauge-jpg=` 427 / 0, `gauge_tests`): the three files rebuilt byte
+  for byte from the user's folder and the art, the new slot 135 and its 16 cells, every existing entry / slot / sprite /
+  image kept, the clip in panels 1 - 4 with the exe's GAUGE_NAMES and 11 fill frames, no overlap with the trait badge.
+  Not confirmed in game.
