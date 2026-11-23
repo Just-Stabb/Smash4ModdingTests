@@ -2858,6 +2858,61 @@ def shalf_checks(e, info):
     check('shalf: the lookup called with the battle object manager and the attacker\'s id', looked[0], (mgr, gk_id))
 
 
+CB_SET, CB_CLEAR, CB_PRIO, CB_PICK, CB_INIT = 0x02C1A12C, 0x02C1A110, 0x02C1A278, 0x02C1A288, 0x02C1A0C4   # the game's
+
+
+def render_checks(e, lab, A, N, fl, put, hit, frame, st, vacc):
+    """ice2: the countdown against the game's own ColorBlendModule code (vt +0x4C set 0x02C1A12C, +0x44 clear, +0x8C
+    priority 0x02C1A278; the slots initialised by 0x02C1A0C4, +0xD9 1 as its init leaves it), with slot 0 held on (a game
+    overlay there, priority 0x32 as the init leaves it): each frame the slot the draw takes (vt +0xAC, 0x02C1A288, run here)
+    and its colour; with burns 0 (cleared by the arming) all along"""
+    mod = e.alloc(0x100, b'\0')
+    vt = e.alloc(0x100, b'\0')
+    e.setw(mod, vt)
+    e.setw(vt + 0x4C, CB_SET)
+    e.setw(vt + C.COLOUR_CLEAR, CB_CLEAR)
+    e.setw(vt + 0x8C, CB_PRIO)
+    e.call(CB_INIT, mod)
+    e.mu.mem_write(mod + 0xD9, b'\x01')
+    pick = lambda: (e.call(CB_PICK, mod) - (mod + 8)) // 0x4C   # noqa: E731
+    col = lambda sl: tuple(round(x, 4) for x in struct.unpack('>4f', bytes(e.mu.mem_read(mod + 0x4C * sl + 0x18, 16))))   # noqa: E731,E501
+    e.call(CB_SET, mod, e.alloc(16, struct.pack('>4f', 1.0, 1.0, 1.0, 0.3)), 0, 0)   # a game overlay in slot 0
+    old = e.w(vacc + C.W_COLOUR)
+    e.setw(vacc + C.W_COLOUR, mod)
+    before = (pick(), e.w(mod + 0x4C), e.w(mod + 0x98))
+    put([(100, 15, 0.25, 2)])
+    hit(4)
+    rows = []
+    for t in range(1, N + 1):
+        frame()
+        rows.append((pick(), col(1), e.mu.mem_read(mod + 0x9C, 1)[0], e.w(mod + 0x98), sum(1 for kk in range(C.BURN_CAP)
+                                                                                   if e.w(A['btab'] + (4 * C.BURN_CAP + kk) * 16))))
+    want = [(1, tuple(round(x, 4) for x in fl[t - 1]), 1, C.ICE_PRIO, 0) for t in range(1, N + 1)]
+    check('ice2 (the user: "the opponent flashing doesn\'t occur"): the game\'s own ColorBlendModule code, slot 0 held on by '
+          'a game overlay: before, the draw takes slot 0 (%s: the priorities equal, 0x32 / 0x32, so ice detonation v1\'s '
+          'slot 1 colour, written every frame, was hidden whenever slot 0 was on); now every countdown frame 1 - %d the '
+          'draw takes slot 1 (priority %d), its colour the flash\'s (yellow / black in turn), with no burns on the victim'
+          % (before, N, C.ICE_PRIO), (before[0], [r for r in rows if r[0] != 1 or r[2] != 1][:3], rows == want,
+                                      ''.join('Y' if r[1][0] > 0.5 else 'K' for r in rows) ==
+                                      ''.join('Y' if c[0] > 0.5 else 'K' for c in fl)),
+          (0, [], True, True))
+    frame()
+    check('ice2: the countdown over: slot 1 off, its priority back to 0x32, the draw back on slot 0 (the game\'s own colour: '
+          'nothing stuck yellow or black)', (e.mu.mem_read(mod + 0x9C, 1)[0], e.w(mod + 0x98), pick()), (0, 0x32, 0))
+    e.mu.mem_write(mod + 0x50, b'\x00')
+    put([(100, 15, 0.25, 2)])
+    hit(4)
+    for _ in range(5):
+        frame()
+    mid = (pick(), col(1)[:3])
+    e.call(lab['gk_clear'], until=C.CLEAR_BACK)
+    frame()
+    check('ice2: slot 0 off: the flash drawn too (frame 5 yellow: %s); a reset mid-countdown: slot 1 off, priority 0x32, '
+          'nothing drawn from either slot' % (mid,), (mid[0], e.mu.mem_read(mod + 0x9C, 1)[0], e.w(mod + 0x98), st()[0]),
+          (1, 0, 0x32, 0))
+    e.setw(vacc + C.W_COLOUR, old)
+
+
 def ice_checks(e, info, diag):
     """ice detonation v1 (feature ice): the victim hit handler's hook (ICE_HOOK -> ice_hit, back at ICE_BACK with the game's
     word done), the trigger (an ice hit on a burning fighter: its burns cleared, recorded, armed; not ice / not burning /
@@ -2869,21 +2924,24 @@ def ice_checks(e, info, diag):
     if 'ice' not in F:
         check('ice off: the victim hit handler\'s word is the game\'s', '%08X' % e.w(C.ICE_HOOK), '%08X' % C.ICE_ORIG)
         return
-    snd = 'icesnd' in F
-    check('icesnd %s: ice_snd %s' % ('on' if snd else 'off', 'in the cave' if snd else 'not built'), 'ice_snd' in lab, snd)
+    snd = 'ice2' in F
+    N = C.ice_frames(F)                                 # ice2: 156 (the user: "please triple the delay"), v1 52
+    P_ = [('prio', C.ICE_PRIO, C.BTINT_SLOT)] if snd else []          # ice2: the slot's priority raised each frame
+    P0 = [('prio', 0x32, C.BTINT_SLOT)] if snd else []               # ... and put back when it ends
+    check('ice2 %s: ice_snd %s' % ('on' if snd else 'off', 'in the cave' if snd else 'not built'), 'ice_snd' in lab, snd)
     SP, SS = C.ICE_SND_VAR, C.ICE_SND_VAR + 1
 
     def sndv():                                         # (play, stop) written, the victim's +0x1C (its sound's Greninja)
         return (e.vars.get(SP), e.vars.get(SS), e.w(A['ice_st'] + C.ICE_ST * 4 + 0x1C))
     check('ice: the victim hit handler (0x%08X, lwz r3, 0x20(r27)) -> b ice_hit' % C.ICE_HOOK,
           K.branch_target(C.ICE_HOOK, e.w(C.ICE_HOOK)), lab['ice_hit'])
-    fl = C.ice_flash()
-    check('ice: the flash table: %d frames, yellow / black in turn, 3 frames each to 30 then 2, fading in over frames 1 - 2'
-          % C.ICE_FRAMES, (len(fl), [round(c[3], 2) for c in fl[:3]],
-                           ''.join('Y' if c[0] > 0.5 else 'K' for c in fl)),
-          (52, [0.35, 0.6, 0.8], 'YYYKKKYYYKKKYYYKKKYYYKKKYYYKKKYYKKYYKKYYKKYYKKYYKKYY'))
+    fl = C.ice_flash(N)
+    check('ice: the flash table: %d frames, yellow / black in turn, 3 frames each to %d then 2, fading in over frames 1 - 2'
+          % (N, 90 if snd else 30), (len(fl), [round(c[3], 2) for c in fl[:3]],
+                                     ''.join('Y' if c[0] > 0.5 else 'K' for c in fl)),
+          (N, [0.35, 0.6, 0.8], 'YYYKKK' * (15 if snd else 5) + 'YYKK' * (16 if snd else 5) + 'YY'))
     rd = lambda a, n: [round(x, 4) for x in struct.unpack('>%df' % n, bytes(e.mu.mem_read(a, 4 * n)))]   # noqa: E731
-    check('ice: the flash table in the cave', [tuple(rd(A['ice_flash'] + 16 * i, 4)) for i in range(C.ICE_FRAMES)],
+    check('ice: the flash table in the cave', [tuple(rd(A['ice_flash'] + 16 * i, 4)) for i in range(N)],
           [tuple(round(x, 4) for x in c) for c in fl])
     for i in range(8):
         e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
@@ -2910,15 +2968,17 @@ def ice_checks(e, info, diag):
     vst = e.alloc(0x60, b'\0')
     e.setw(vacc + C.F_STATUS, vst)
     cvt = e.alloc(0x100, b'\0')
-    cset, cclr = e.alloc(4), e.alloc(4)
+    cset, cclr, cpri = e.alloc(4), e.alloc(4), e.alloc(4)
     e.setw(cvt + 0x4C, cset)
     e.setw(cvt + C.COLOUR_CLEAR, cclr)
+    e.setw(cvt + 0x8C, cpri)
     cbm = e.alloc(0x100, b'\0')
     e.setw(cbm, cvt)
     e.setw(vacc + C.W_COLOUR, cbm)
     calls = []
     e.stub(cset, lambda e_: calls.append(('set', tuple(rd(e_.r(4), 4)), e_.r(5), e_.r(6))))
     e.stub(cclr, lambda e_: calls.append(('clear', e_.r(4))))
+    e.stub(cpri, lambda e_: calls.append(('prio', e_.r(4), e_.r(5))))
     # the attacker objects (the battle object manager's records)
     mgr = e.alloc(0x40, b'\0')
     e.setw(C.SH_MANAGER, mgr)
@@ -3009,18 +3069,18 @@ def ice_checks(e, info, diag):
         check('ice diag: S4IA (victim 4, amount x100, 4 stacks, owner 2, way 1)',
               [x[1:6] for x in e.osr_full if x[0] == A['gk_fia']], [(4, int(ref[3] * 100), 4, 2, 1)])
     if snd:
-        check('icesnd: on the arming hit the detonation\'s sound asked of the owner (Greninja slot 2: his VAR 0x%08X = 1, '
+        check('ice2: on the arming hit the detonation\'s sound asked of the owner (Greninja slot 2: his VAR 0x%08X = 1, '
               'played by his MSC), recorded at the victim\'s +0x1C (slot + 1 = 3); no stop' % SP, arm_snd, (1.0, None, 3))
         if diag:
-            check('icesnd diag: S4ID (victim 4, cmd 1 play, Greninja slot 2)',
+            check('ice2 diag: S4ID (victim 4, cmd 1 play, Greninja slot 2)',
                   [x[1:4] for x in e.osr_full if x[0] == A['gk_fid']], [(4, 1, 2)])
     else:
-        check('icesnd off: the arming hit asks no sound', (arm_snd[0], arm_snd[1]), (None, None))
+        check('ice2 off: the arming hit asks no sound', (arm_snd[0], arm_snd[1]), (None, None))
     put([(60, 6, 0.4, 2)])
     e.vars = {}
     hit(4)
     if snd:
-        check('icesnd: an ice re-hit while armed: no second sound (once an arming)', sndv(), (None, None, 3))
+        check('ice2: an ice re-hit while armed: no second sound (once an arming)', sndv(), (None, None, 3))
     check('ice: an ice re-hit while armed: ignored (the record kept, the new burn not cleared)', (st()[:3], insts()),
           (got[:3], 1))
     put([])
@@ -3033,25 +3093,26 @@ def ice_checks(e, info, diag):
     # the countdown
     e.vars = {}
     seen, asked = [], None
-    for t in range(1, C.ICE_FRAMES + 3):
+    for t in range(1, N + 3):
         got_ = frame()
         seen.append(got_)
         if asked is None and any(k in e.vars for k in range(C.ICE_VAR, C.ICE_VAR + 4)):
             asked = t
     if snd:
-        check('icesnd: the countdown run out (the blast made): its sound neither played again nor stopped (the boom plays '
+        check('ice2: the countdown run out (the blast made): its sound neither played again nor stopped (the boom plays '
               'on), the record kept', sndv(), (None, None, 3))
-    want_set = [[('set', tuple(round(x, 4) for x in fl[t - 1]), C.BTINT_SLOT, 0)] for t in range(1, C.ICE_FRAMES + 1)]
-    check('ice: the countdown: frames 1 - %d the flash colour in the tint\'s slot %d (once a frame; the burn tint\'s reset '
-          'clears it first on frame 1), frame %d the colour off, %d nothing' % (C.ICE_FRAMES, C.BTINT_SLOT, C.ICE_FRAMES + 1,
-                                                                            C.ICE_FRAMES + 2),
-          [seen[0][-1:]] + seen[1:C.ICE_FRAMES] + seen[C.ICE_FRAMES:],
-          want_set + [[('clear', C.BTINT_SLOT)], []])
+    want_set = [P_ + [('set', tuple(round(x, 4) for x in fl[t - 1]), C.BTINT_SLOT, 0)] for t in range(1, N + 1)]
+    check('ice: the countdown: frames 1 - %d the flash colour in the tint\'s slot %d (once a frame%s; the burn tint\'s reset '
+          'clears it first on frame 1), frame %d the colour off%s, %d nothing' % (
+              N, C.BTINT_SLOT, ', its priority raised to %d first' % C.ICE_PRIO if snd else '', N + 1,
+              ' and its priority back to 0x32' if snd else '', N + 2),
+          [seen[0][-1 - len(P_):]] + seen[1:N] + seen[N:],
+          want_set + [[('clear', C.BTINT_SLOT)] + P0, []])
     t_ = 4 + ref[3] / 100.0
     check('ice: the blast asked at frame %d of Greninja slot 2 (the owner): his VAR 0x%08X - +3 = type 4 + b / 100 = %.4f, '
-          'the victim\'s x 30, y 12 + %g, way +1; the state free again' % (C.ICE_FRAMES - C.ICE_LEAD, C.ICE_VAR, t_, C.ICE_Y),
+          'the victim\'s x 30, y 12 + %g, way +1; the state free again' % (N - C.ICE_LEAD, C.ICE_VAR, t_, C.ICE_Y),
           (asked, [round(e.vars.get(C.ICE_VAR + i, -99.0), 3) for i in range(4)], st()[0], st()[6]),
-          (C.ICE_FRAMES - C.ICE_LEAD, [round(t_, 3), 30.0, round(12.0 + C.ICE_Y, 3), 1.0], 0, 2))
+          (N - C.ICE_LEAD, [round(t_, 3), 30.0, round(12.0 + C.ICE_Y, 3), 1.0], 0, 2))
     # the way: an attacker right of it; the owner not there: another Greninja; none
     gk5 = e.fighter(5, x=0.0)
     e.mu.mem_write(gk5['f'] + 0x1E, b'\x04')
@@ -3059,7 +3120,7 @@ def ice_checks(e, info, diag):
     put([(100, 15, 0.25, 6)])                       # owner slot 6: not in the match
     hit(4, att=0x10002000)
     check('ice: an attacker right of the victim (a projectile at x 50): way -1; owner slot 6', (st()[4], st()[3]), (-1.0, 6))
-    for _ in range(C.ICE_FRAMES):
+    for _ in range(N):
         frame()
     check('ice: the owner gone: the first live Greninja (slot 2) asked', (st()[6], round(e.vars.get(C.ICE_VAR + 3, 0), 3)),
           (2, -1.0))
@@ -3069,23 +3130,23 @@ def ice_checks(e, info, diag):
     e.vars = {}
     put([(100, 15, 0.25, 2)])
     hit(4)
-    for _ in range(C.ICE_FRAMES):
+    for _ in range(N):
         frame()
     check('ice: the owner (slot 2) KO\'d (Dead): Greninja slot 5 asked', st()[6], 5)
     if snd:
-        check('icesnd: ... and its sound from him too (the blast\'s choice: +0x1C slot 5 + 1)', sndv(), (1.0, None, 6))
+        check('ice2: ... and its sound from him too (the blast\'s choice: +0x1C slot 5 + 1)', sndv(), (1.0, None, 6))
     for _ in range(3):
         frame()
     e.mu.mem_write(gk5['f'] + 0x1E, b'\x00')
     e.vars = {}
     put([(100, 15, 0.25, 2)])
     hit(4)
-    for _ in range(C.ICE_FRAMES):
+    for _ in range(N):
         frame()
     check('ice: no Greninja who can: no blast asked (none of his VARs written), the Greninja asked -1',
           (sorted(k for k in e.vars if C.ICE_VAR <= k < C.ICE_VAR + 4), st()[6]), ([], -1))
     if snd:
-        check('icesnd: no Greninja who can: no sound played, none to stop (no blast: no boom)', sndv(), (None, None, 0))
+        check('ice2: no Greninja who can: no sound played, none to stop (no blast: no boom)', sndv(), (None, None, 0))
     for _ in range(3):
         frame()
     e.setw(gst + C.ST_KIND, 0)
@@ -3098,22 +3159,22 @@ def ice_checks(e, info, diag):
     e.setw(vst + C.ST_KIND, C.ST_DEAD)
     e.vars = {}
     got = frame()
-    check('ice: the victim KO\'d (Dead) at frame 11: the colour off at once, the countdown over', (got[-1:], st()[0]),
-          ([('clear', C.BTINT_SLOT)], 0))
+    check('ice: the victim KO\'d (Dead) at frame 11: the colour off at once%s, the countdown over' % (
+        ' (its priority back)' if snd else ''), (got[-1 - len(P0):], st()[0]), ([('clear', C.BTINT_SLOT)] + P0, 0))
     if snd:
-        check('icesnd: ... its sound stopped (Greninja slot 2: his VAR 0x%08X = 1, his MSC SoundModule 0x2714), the '
+        check('ice2: ... its sound stopped (Greninja slot 2: his VAR 0x%08X = 1, his MSC SoundModule 0x2714), the '
               'record cleared' % SS, sndv(), (None, 1.0, 0))
         if diag:
-            check('icesnd diag: S4ID (victim 4, cmd 2 stop, Greninja slot 2)',
+            check('ice2 diag: S4ID (victim 4, cmd 2 stop, Greninja slot 2)',
                   [x[1:4] for x in e.osr_full if x[0] == A['gk_fid']], [(4, 2, 2)])
     if diag:
         check('ice diag: S4IC (victim 4, status 0xB1, frame 11)', [x[1:4] for x in e.osr_full if x[0] == A['gk_fic']],
               [(4, C.ST_DEAD, 11)])
-    for _ in range(C.ICE_FRAMES):
+    for _ in range(N):
         frame()
     check('ice: ... and no blast asked afterwards', sorted(k for k in e.vars if C.ICE_VAR <= k < C.ICE_VAR + 4), [])
     if snd:
-        check('icesnd: ... nor any sound again', (e.vars.get(SP), e.vars.get(SS)), (None, 1.0))
+        check('ice2: ... nor any sound again', (e.vars.get(SP), e.vars.get(SS)), (None, 1.0))
     e.setw(vst + C.ST_KIND, 0)
     # a reset cancels it
     put([(100, 15, 0.25, 2)])
@@ -3124,10 +3185,12 @@ def ice_checks(e, info, diag):
     e.vars = {}
     got = frame()
     if snd:
-        check('icesnd: ... the next frame its sound stopped (his MSC\'s own reset stops it too)', sndv(), (None, 1.0, 0))
+        check('ice2: ... the next frame its sound stopped (his MSC\'s own reset stops it too)', sndv(), (None, 1.0, 0))
     check('ice: ... the next frame the colour off, free again (the burn tint\'s own reset clears the slot too: twice)',
-          (got, st()[0]), ([('clear', C.BTINT_SLOT)] * 2, 0))
+          (got, st()[0]), ([('clear', C.BTINT_SLOT)] * 2 + P0, 0))
     check('ice: ... nothing after', frame(), [])
+    if snd:                                             # ice2 (the user: "the opponent flashing doesn't occur")
+        render_checks(e, lab, A, N, fl, put, hit, frame, st, vacc)
     # the claim: the blast's request first, no burn context
     svt = e.alloc(0x100, b'\0')
     g, s_ = e.alloc(4), e.alloc(4)

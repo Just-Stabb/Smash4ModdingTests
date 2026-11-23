@@ -15,10 +15,11 @@ Each clip: leading / trailing silence trimmed (under -45 dBFS), mono 48 kHz, its
 TONE's volume (dB) per SOUNDS. Prints each sound id, label and length (frames at 60 fps).
 
 --ice=CLIP (usmash spike v2 / trail dim v1, README "Ice detonation sound"): the ice detonation's fuse and boom (the user's
-creeper_explosion.mp3) as label 97 (IceBoom, 0x07680061) after the six: cut so its boom's onset (boom_onset: 1 ms windows)
-comes ICE_SND_LEAD frames after its start (the executable asks for it on the ice hit that arms the countdown; the blast
-lands that many frames later), a 5 ms fade in, the hiss to the boom continuous at its own speed and pitch, its trailing
-silence trimmed.
+creeper_explosion.mp3) as label 97 (IceBoom, 0x07680061) after the six, placed so its boom's onset (boom_onset: 1 ms
+windows) comes ICE_SND_LEAD frames after its start (the executable asks for it on the ice hit that arms the countdown; the
+blast lands that many frames later): with the 156-frame countdown the whole clip fits (its clicks and fuse hiss), so it is
+padded with silence in front (ice_cut; a clip with more before its boom would be cut, faded in over 5 ms), at its own
+speed and pitch, its trailing silence trimmed.
 """
 import os
 import struct
@@ -73,18 +74,19 @@ def boom_onset(x, rate):
 
 
 def ice_cut(path, tmp):
-    """the ice clip as a wav: from (its boom's onset - ICE_SND_LEAD frames) on, faded in over ICE_FADE_IN, its trailing
-    silence trimmed; (wav, onset in the source, the cut's start)"""
+    """the ice clip as a wav: its boom's onset ICE_SND_LEAD frames from its start (start = onset - that: < 0 pads that much
+    silence in front, > 0 cuts there and fades in over ICE_FADE_IN), its trailing silence trimmed; (wav, onset in the
+    source, start)"""
     import numpy as np
     import gekkouga_clone_cave as C
     raw = os.path.join(tmp, 'ice.f32')
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', path, '-ac', '1', '-ar', str(FB.RATE), '-f', 'f32le', raw], check=True)
     on = boom_onset(np.fromfile(raw, '<f4'), FB.RATE)
     start = on - C.ICE_SND_LEAD / 60.0
-    assert start > 0, 'the clip is shorter before its boom than the countdown'
     out = os.path.join(tmp, 'ice.wav')
-    f = 'atrim=start=%.6f,asetpts=PTS-STARTPTS,afade=t=in:st=0:d=%g,areverse,silenceremove=start_periods=1:' \
-        'start_threshold=%ddB:detection=peak,areverse' % (start, ICE_FADE_IN, SILENCE_DB)
+    head = ('atrim=start=%.6f,asetpts=PTS-STARTPTS,afade=t=in:st=0:d=%g' % (start, ICE_FADE_IN) if start > 0 else
+            'adelay=delays=%dS:all=1' % int(round(-start * FB.RATE)))
+    f = head + ',areverse,silenceremove=start_periods=1:start_threshold=%ddB:detection=peak,areverse' % SILENCE_DB
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'f32le', '-ar', str(FB.RATE), '-ac', '1', '-i', raw, '-af', f,
                     '-c:a', 'pcm_s16le', out], check=True)
     return out, on, start
