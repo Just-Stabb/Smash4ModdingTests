@@ -1859,3 +1859,101 @@ stronger hit"; "Can you also extend forward air's length to hit Donkey Kong?". `
 - Not confirmed in game: the ring hit right after the burst (Smash 4 gives the victim the newer hit's knockback: the
   ring's may shorten the burst's launch); the boxes / blade where the game draws them (forward air's joint 25 in the
   preview is a stand-in hand).
+
+## Smash tune v1 (`greninja_smash_tune_v1.zip`, over nair / fair v1; exe_v46z_gkb14)
+
+The user: forward smash "gains a fast burst of speed towards the hit opponent and slows down near them so that up smash
+connects easier", "Also make the forward smash pursuit happen if shielded"; "make all of the smash attacks do the same
+damage as if they were uncharged, but keep the burn damage the same"; up smash "a weak spike if they are on the inner hit
+of the part with both swords going downwards", "send at a diagonal angle away from Greninja"; "reduce the shield damage of
+all of the smash attacks by 50%"; "make the clones check if the player has tap jump enabled"; "remove any knockback from
+the fire ring and turn it into a very weak windbox".
+
+**Forward smash pursuit** (`clones.c` `gk_fp_*`, from `gk_chain_try`: status 0x2D's loop):
+- **Trigger:** his forward smash's own hitboxes (IDs 0 - 3, the reach box 3 included) hitting or shielded: AttackModule
+  0x2727 kinds 2 | 4. The fighter: target 12 (this attack's hit record, docs/position-variables.md: `ATKHIT_OFFSET_X / Y`)
+  turned into a place and matched to a player slot (not his own place).
+- **Not triggers:** the fire trails' hitboxes (another object's attack, 0.1 % burn contacts that linger after the swing)
+  and the clones' hits.
+- **Movement** (after his hitlag, each frame; the fighter's live X from its slot): speed = min(**8**, last + **4**, **0.4** x
+  (gap along his facing - **12**)): a burst (4, 8 a frame; his run is 2.08), then 40 % of what is left each frame, so it
+  slows smoothly and stops **12** from the fighter's centre (up smash's first hit, 25 across at Y 27, reaches 16 out at a
+  standing fighter's height). Never past that point, never backwards (a fighter behind him: nothing).
+- **On the stage:** the game's set_pos (position variables), his Y on his floor at the new X (slopes, steps); a ledge (no
+  floor 1 past the new X) or a wall (3 short) stops him at it.
+- **Ends:** after 30 frames; the fighter KO'd; in the air; leaving 0x2D (Wait, a hit...); a smash chain (`gk_chain_try`:
+  the chain works during and after the burst).
+- **Clones:** no pursuit of their own. In formation they stand at his X + their offsets every frame, so they come with
+  him; split clones act on their own inputs and physics.
+- Trace (the MSC in the test interpreter, a fighter launched at 2.5 a frame slowing x0.9):
+  `$S/gk_preview/fsmash_pursuit.png`. His X 0 -> 4, 12, 20, 28, 36, 44, 50.8, 55.4, 58.6 ... 71.7; the fighter 60 -> 84.
+
+**Uncharged damage:**
+- `gk_sm_release` writes the charge ratio (0x1000000) **0** (was 1.0). func_345 (the attack status's init) sets the
+  attack's power 1 + (0x0200003E 1.4 - 1) x ratio = **1.0** at any charge (stored full or a chain's).
+- The clones' smash copies: `CHARGE_DAMAGE` 1.4 -> **1.0** (his scripts' damage as it is).
+- Kept: the 120-frame shared charge, the auto release, the x5 effects / hitbox sizes.
+- **Burn unchanged:** BURN_MOVES is keyed by the attacker's motion kind (burn_scan never reads the hit's damage): 0.4 % /
+  6 f / 240 f = 16 % (shielded 2.8 %) at any charge.
+- **Knockback drops with the damage** (Smash 4's charge acts only through damage): about 20 - 23 % less (weight 100:
+  forward smash 154 -> 121 at 50 %, 231 -> 177 at 100 %; up smash's geyser 237 -> 182 at 100 %). Later KOs.
+
+**Up smash weak spike** (`gekkouga_build.py` `usmash_spike`):
+- The part: frames 18 - 20, both swords sweeping down from overhead to his sides (his motion: the hands' -Y straight up at
+  15, level at 18, below level at 19). Its inner hits: at the hands (bones 0x19 / 0x18, Y 0, size 17.5).
+- **IDs:** inner 3 / 4 -> **1 / 2**, outer 1 / 2 -> 3 / 4 (and their ATK_RESERVEs): the lowest ID wins an overlap, and the
+  outer spheres covered most of the inner ones. At 18 the geyser (ID 0) still wins; the spike is 19 - 20.
+- **Inner:** angle **300** (60 below level), KBG **50**, BKB **25**, 11 % (uncharged). By position (the plain Hitbox's
+  facing restriction is the AttackModule's +0x11A, 0): behind him it goes down and back. KB at weight 100: 39 at 0 %, 84
+  at 100 %, 107 at 150 % (tumble from 80: about 95 %).
+- Outer hits unchanged (44 degrees, KBG 100, BKB 30). The clones' copy the same.
+
+**Shield damage x0.5** (exe feature `shalf`, `SH_HOOK` 0x02E35C48; docs/native-notes.md "Shield damage"):
+- Smash 4: the hit's damage + its ShieldDamage field (unsigned) added to the shield's pending damage, then x 1.19
+  (0x020000CA) + 0. The field can't go below 0, so the halving is in the exe: f8 (damage + field) x 0.5 before the x 1.19.
+- Whose: the attacker's owner (TeamModule) a Greninja and its motion kind 95 / 99 / 101 (his smashes; the clones play
+  his motion kinds), or the hitbox's Type **0x16** (Water: unused in Smash 4), which only the fire trails' hitboxes carry
+  (`TR_HIT`; they draw nothing).
+- Per hitbox, shield HP (of 50): before this package (x1.4 charge) / uncharged / **now**:
+  - forward smash IDs 0 - 3, 14 %: 23.32 / 16.66 / **8.33**;
+  - up smash: first hit 5 %: 8.33 / 5.95 / **2.98**; geyser 14 %: 23.32 / 16.66 / **8.33**; swords 11 %: 18.33 / 13.09 /
+    **6.55**; the late capsule 10 %: 16.66 / 11.90 / **5.95**;
+  - down smash: tips 13 %: 21.66 / 15.47 / **7.74**; inner 11 %: 18.33 / 13.09 / **6.55**;
+  - the trails' contact (0.1 %): 0.119 / 0.119 / **0.06**.
+- Every ShieldDamage field 0 (never negative). The clones' copies the same (their own exe route: a weapon owned by him).
+
+**Clones and Tap Jump** (`clones.c` `gk_jump_cmd`):
+- The game makes the stick-jump command (0x100000) whatever the setting (`0x02E72248` - `0x02E722B4`; native-notes
+  corrected). The setting is the input frame's 0x8000, read by `ControlModule(0x271C)` (op -> 0x02C1D3CC); the game's
+  jump checks test it with the bit (func_43, func_68, func_1245 ...). The split clones didn't.
+- Now: a stick jump (ground squat, double jump) only with `ControlModule(0x271C)`; the jump button (0x200000) always; the
+  full hop by the stick held up only with Tap Jump on (the jump button held either way).
+- Other settings: their smash / tilt / attack inputs come from his command bits, which the game builds after A+B smash and
+  Stick Smash OFF have changed the inputs (docs/controls.md): nothing to fix.
+
+**Neutral air ring: a very weak windbox** (`gekkouga_build.py` `NAIR_RING_*`):
+- Smash 4's windbox, as F.L.U.D.D.'s water (Mario's pumpwater: 0 %, KBG 100, FKB 50 / 58, BKB 0, Flinchless, NoGFX):
+  Extended_Special_Hitbox capsules, **0 %**, angle 361 by position (away from him either side), **FKB 10** (KB 26.4 at
+  weight 100: about 0.8 a frame; F.L.U.D.D.'s 54.4), **Flinchless** (no reaction: no hitstun, tumble or launch),
+  **DisableHitlag**, Hitlag 0, no clank, NoGFX, no sound, shieldable (0 shield damage), fire.
+- **Part 0, with the burst** (was Part 1): one hit record, so a fighter the burst hit is never touched by the ring (its
+  launch kept) and the ring pushes anyone else once. Set at 12 with the strong hit (Part 0's record cleared only then),
+  tucked inside the burst (corners 8, size 2.5: at most 11.4 from its centre < 12; the burst, ID 0, wins a shared frame),
+  then out along the ring from 14 to 24 as before (the same hexagon / band).
+- **Burn:** kept. A ring touch is a record on the move's hit log (if the game logs a windbox touch: unconfirmed), so it gives
+  neutral air's row (3 %) to those only the ring touched; a burst victim gets one burn (v1 gave two).
+- The clones' copies follow.
+
+**Exe:** exe_v46z_gkb14 = RELEASE (tuning v1's gkb13 + `shalf`); gkb13 still rebuilds byte for byte (RELEASE - shalf).
+No new script, slot or ACMD command (Extended_Special_Hitbox is vanilla): ModAnimNames / Sm4shCommand unchanged.
+
+**Tests:**
+- `gekkouga_clones_test ... --vnr=greninja_nair_fair_v1.zip` **515 / 0** (`smash_tune_tests`; nair_fair_tests' ring moved
+  to the windbox): the pursuit (trace, shield, no hit, behind, facing left, ledge, wall, step, KO, air, 30 frames, chain, leaving),
+  the release's ratio and func_345's power at 0 / full, the burn rows, the spike's IDs / values / reserves and the clones'
+  copy, the shield numbers and the trail marker, the clones' jumps with Tap Jump on / off (ground, air, full hop).
+- `gekkouga_clone_cave_test` 282 / 314 (release / A_release), 0 failures (`shalf_checks`: his / a clone's / the trail's /
+  another fighter's / unknown attackers, the registers kept); gkb13 still 275 / 0; import_call_check 0 on both;
+  `supamario_ui_cave_test` 0 failures; msc_stack_check 0 problems, his globals 121 <= 128; the opcode guard OK. Effects
+  unchanged (no gekkouga_fx_test run needed).
+- Not confirmed in game.

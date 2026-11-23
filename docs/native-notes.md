@@ -1034,8 +1034,11 @@ op table `0x02C1C850` for 0-0x1E and `0x02C1C8EC` for 0x2710-0x2727, vtable entr
   Category 0 bits read from the builder: `0x1` attack (any), `0x2` / `0x4` / `0x8` S3 / HI3 / LW3 (tilt by stick),
   `0x10` / `0x20` / `0x40` S4 / HI4 / LW4 (C-stick / A+B smash, or attack with a flick), `0x1000` / `0x2000` /
   `0x4000` / `0x8000` specials N / S / HI / LW, `0x20000`-`0x80000` stick commands (dash / turn: flicks
-  sideways), `0x100000` the stick (tap) jump (flick up within `[+0x80]`, when the tap jump setting is on), `0x200000`
-  the jump button, `0x400000` shield pressed (guard / air dodge), `0x1000000` spot dodge, `0x2000000` /
+  sideways), `0x100000` the stick (tap) jump (flick up: stick Y >= `[+0x7C]` within `[+0x80]` frames; **made whatever
+  the Tap Jump setting**, only not while the held C-stick bit `0x80` is on: `0x02E72248` - `0x02E722B4`; Greninja smash
+  tune v1, corrected: the setting is applied by the jump checks, which test `ControlModule(0x271C)` with this bit:
+  op `0x271C` (`0x02C1D3CC`) = held buttons (`[cm + 0xA0] + 0x3C`, vt `+0x194`) `& 0x8000` (the input frame's Tap Jump
+  bit, below), 0 while `0x80` is held), `0x200000` the jump button, `0x400000` shield pressed (guard / air dodge), `0x1000000` spot dodge, `0x2000000` /
   `0x4000000` rolls (shield held + flick), `0x8000000` / `0x10000000` from `cm vt +0x11C` (+1 / -1), `0x20000000` grab
   (shield held + attack: a Z press sets attack `0x201` in the struct update, `0x02003878`). Category 1: taunts
   (`0x1` side, `0x2` up, `0x4` down: d-pad presses) and, from `0x02E738AC`, more (throw directions and others,
@@ -1060,6 +1063,21 @@ op table `0x02C1C850` for 0-0x1E and `0x02C1C8EC` for 0x2710-0x2727, vtable entr
   value) get that timer. `BUFFER_CLEAR` (`0x0F0003C9`, user_entry -> hv_var's zero -> `buf_var`): MSC's way.
   Tested in unicorn with a stand-in builder (`tools/acmd_ext_test.py` `buf_tests`); the real builder's mapping is
   read from the code, not run. Not tried in game yet.
+
+## Shield damage (Greninja smash tune v1: `gekkouga_clone_cave.py` feature `shalf`)
+
+A hit on a shield (the victim's shield hit handler, `0x02E35A..` - `0x02E35C70`, before the shield event `0x02E35EE4`; r26
+the hitbox's attack data, r30 the event, `[r30 + 0x10]` its collision record: `+0x18` the attacker's object id): the
+attacker is looked up (`0x02BF2108` / `0x02BF205C` on the battle object manager `[0x102F6C30]`; a record: `+0` id, `+0xC`
+its module accessor, `+0x1E` live >= 4), its owner (`0x02BEFB40`: accessor `+0x6C` TeamModule vt `+0x64`, `0x50000000`
+none -> itself) checked for the Smash Tour items' flag (fighter `+0x630` bit 3: f28 / f30 = common `0x0200033F` /
+`0x02000340`, else 1.0), then **`0x02E35C48` `fmadds f8, f29, f28, f13`**: damage x f28 + the hitbox's shield damage
+(`lhz` attack data `+0x58`: unsigned, so a negative field is huge, port_check S9) x f30, added to the victim's pending
+shield damage `+0x7564`. The shield's update (`0x02E36050` - `0x02E3606C`) takes HP - pending x `0x020000CA` (1.19) x the
+equipment's multiplier + `0x020000CB` (0), floored. The plain Hitbox command's facing restriction (attack data `+0x4F`) is
+AttackModule vt `+0x40C` = its `+0x11A` (0 from the constructor `0x02C07968`; vt `+0x404` sets it): by position. Its
+Type (parameter 23) is attack data `+0x55` (the MSC builder's argument 24 too), read by AttackModule `0x02C093A0` (a
+per-Type power: `+0xEC` mask, `+0xE8` multiplier) and fighter code `0x02E489C4` / `0x02E4DCB8`.
 
 ## Buffered aerials out of ground statuses (edge-cancel bug)
 

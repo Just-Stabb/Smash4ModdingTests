@@ -856,8 +856,8 @@ USMASH_SPIKE = dict(Angle=300, KBG=50, FKB=0, BKB=25)
                                   # 300 degrees: down and away at 60 below level, by position (a plain Hitbox's facing
                                   # restriction is the AttackModule's default, +0x11A = 0: Ultimate's LR_CHECK_POS, the
                                   # victim's side of him), so behind him it goes down and back (240 on screen); weak: KBG 50
-                                  # / BKB 25 (11 %, weight 100: KB 39 at 0 %, 80 at 100 %, 107 at 150 %: no tumble under
-                                  # about 100 %; was 44 degrees, KBG 100, BKB 30)
+                                  # / BKB 25 (11 %, weight 100: KB 39 at 0 %, 84 at 100 %, 107 at 150 %: no tumble (80)
+                                  # under about 95 %; was 44 degrees, KBG 100, BKB 30)
 USMASH_SPIKE_FRAME = 18
 
 

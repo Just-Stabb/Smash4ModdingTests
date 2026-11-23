@@ -91,6 +91,7 @@ class Game:
         self.line_tests = 0
         self.air_kind = 0          # aerial chain v1: ControlModule(0x10): the air attack the input asks for (1 n - 5 d)
         self.atk_hit = 0           # AttackModule(0x2727, kinds): what his attack hit since it started (2 hurtbox, 4 shield)
+        self.tap_jump = True       # smash tune v1: ControlModule(0x271C): his Tap Jump setting (the game's default on)
 
     def line_test(self):
         """the Line_Test variables: a vertical segment (X0, Y0) -> (X0, Y1) meets the nearest floor (going down) or
@@ -156,6 +157,8 @@ class Game:
         if sid == 0xE:                                        # ControlModule
             if a[0] == 0x10:
                 return self.air_kind
+            if a[0] == 0x271C:
+                return int(self.tap_jump)
             if a[0] == 0x2710:
                 return int(a[1] in self.press)
             if a[0] == 0x2712:
@@ -226,6 +229,8 @@ class Game:
             if a[0] == 0x2724:
                 self.log.append(('atk_clear',))
                 self.atk_hit = 0
+            if a[0] == 0x2728:
+                self.log.append(('power', fv(a[1])))          # smash tune v1: the attack's power (func_345)
             return 0
         return 0
 
@@ -543,9 +548,10 @@ def msc_tests(mscsb, src):
     check('the next forward smash: automatic (1)', m.g('gk_sm_auto'), 1)
     g.held = set()
     r = m('gk_sm_start_loop', 1)
-    check('at the hold point, not even held: the attack (0x2D, keep), ratio 1.0, charged flag, the store used, chain = forward',
+    check('at the hold point, not even held: the attack (0x2D, keep), charged flag, the store used, chain = forward; '
+          'smash tune v1: ratio 0 (was 1.0: the uncharged damage)',
           (r, g.status_req, g.vars.get(0x1000000), 0x21000002 in g.flags, m.g('gk_smash'), m.g('gk_chain')),
-          (1, [(0x2D, 1)], 1.0, True, 0, 1))
+          (1, [(0x2D, 1)], 0.0, True, 0, 1))
     g.status_req = []
     m.vm.g[4] = 0x2D
     g.frame = 15.0
@@ -1600,7 +1606,7 @@ def tuning_tests(mscsb, src, out, user, tr_mscsb):
           'True block one command shorter, its second hit kept); its hitboxes x1.25 (nair / fair v1: its Part 0 hits '
           'sized to the burst, NAIR_STRONG / NAIR_LATE: nair_fair_tests)',
           (len(sf(ug, 'attackairn', 0x0F0000B2)), len(sf(g, 'attackairn', 0x0F0000B2)), w == int(tr.params[0]) - 2,
-           [v(c, 'Size') for c in gn if c.name in GB.HITBOXES and int(v(c, 'Part')) == 0]),
+           [v(c, 'Size') for c in gn if c.name in GB.HITBOXES and int(v(c, 'ID')) == 0]),
           (1, 0, True, [round(v(c, 'Size') * 1.25, 4) for c in un if c.name in GB.HITBOXES] if not hasattr(GB, 'nair_ring')
            else [GB.NAIR_STRONG, GB.NAIR_LATE, GB.NAIR_STRONG]))
     check('... its water burst (0x330000B) and fire ring (0x330001D / 1E) x1.25 (1.45 -> 1.8125)',
@@ -1678,8 +1684,9 @@ FAIR_DK = 19.9                    # DK's nearest point from his hand in the user
 
 def nair_fair_tests(out, user):
     """nair / fair v1 (README "Neutral air ring v1"): neutral air's strong / late hits sized to the burst, the fire ring's
-    weak capsules (Part 1, IDs 1-6) following FIRE_RING's flames outside them, their own hit record kept from frame 14 to
-    24; forward air 10 longer with a hitbox ID 2 reaching DK; the clones' copies the same"""
+    capsules (IDs 1-6) following FIRE_RING's flames outside them (smash tune v1: a very weak windbox, Part 0 with the burst,
+    set at 12 inside it; nair / fair v1: weak hits, Part 1, their own hit record kept from 14 to 24); forward air 10 longer
+    with a hitbox ID 2 reaching DK; the clones' copies the same"""
     import math
     import acmd
     import gekkouga_fx as FX
@@ -1700,26 +1707,33 @@ def nair_fair_tests(out, user):
             fr += float(c.params[0])
         tl.append((fr, c))
     hb = [(f, c) for f, c in tl if c.name in GB.HITBOXES]
-    p0 = [(f, int(v(c, 'ID')), float(v(c, 'Damage')), round(float(v(c, 'Size')), 3)) for f, c in hb if int(v(c, 'Part')) == 0]
+    p0 = [(f, int(v(c, 'ID')), float(v(c, 'Damage')), round(float(v(c, 'Size')), 3)) for f, c in hb if int(v(c, 'ID')) == 0]
     check('nair ring v1: neutral air\'s Part 0 hits (ID 0): strong 11 %% at 12 (and the connected re-hit at 17) %.1f, late '
           '6 %% at 14 %.1f (tuning v1 %.3f / %.1f): the burst as drawn (its solid disc / its edge)' % (
               GB.NAIR_STRONG, GB.NAIR_LATE, NAIR_TUNING[0], NAIR_TUNING[1]),
           (p0, GB.NAIR_STRONG > NAIR_TUNING[0] * 1.2, GB.NAIR_LATE > NAIR_TUNING[1]),
           ([(12.0, 0, 11.0, GB.NAIR_STRONG), (14.0, 0, 6.0, GB.NAIR_LATE), (17.0, 0, 11.0, GB.NAIR_STRONG)], True, True))
-    ring = [(f, c) for f, c in hb if int(v(c, 'Part')) != 0]
+    ring = [(f, c) for f, c in hb if int(v(c, 'ID')) != 0]
     frames = sorted({f for f, _c in ring})
-    check('nair ring v1: the ring\'s hitboxes: Extended_Hitbox capsules, Part 1, IDs 1-6 on joint 0, set at 14 / 16 / 18 / '
-          '20 / 22 (6 each), all gone at 24 (Remove_All_Hitboxes), the Part 0 hit removed alone at 19 (Remove_Hitbox 0)',
+    check('nair ring v1 / smash tune v1: the ring\'s windboxes: Extended_Special_Hitbox capsules, Part 0 (the burst\'s), IDs '
+          '1-6 on joint 0, set at 12 (with the strong hit) / 14 / 16 / 18 / 20 / 22 (6 each), all gone at 24 '
+          '(Remove_All_Hitboxes), the burst\'s ID 0 removed alone at 19 (Remove_Hitbox 0)',
           ({c.name for _f, c in ring}, {int(v(c, 'Part')) for _f, c in ring}, sorted({int(v(c, 'ID')) for _f, c in ring}),
            {int(v(c, 'Bone')) for _f, c in ring}, frames, [sum(1 for f, _c in ring if f == x) for x in frames],
            [(f, c.name, list(c.params)) for f, c in tl if c.name in ('Remove_Hitbox', 'Remove_All_Hitboxes')]),
-          ({'Extended_Hitbox'}, {1}, [1, 2, 3, 4, 5, 6], {0}, [14.0, 16.0, 18.0, 20.0, 22.0], [6] * 5,
+          ({'Extended_Special_Hitbox'}, {0}, [1, 2, 3, 4, 5, 6], {0}, [12.0, 14.0, 16.0, 18.0, 20.0, 22.0], [6] * 6,
            [(19.0, 'Remove_Hitbox', [0]), (24.0, 'Remove_All_Hitboxes', [])]))
-    vals = {(float(v(c, 'Damage')), int(v(c, 'Angle')), int(v(c, 'KBG')), int(v(c, 'FKB')), int(v(c, 'BKB')), int(v(c, 'Effect')),
-             int(v(c, 'ShieldDamage')), int(v(c, 'SFXType')), float(v(c, 'Hitlag'))) for _f, c in ring}
-    check('nair ring v1: the ring\'s hits weak: 2.5 %, angle 60 (the burst\'s), KBG 25, FKB 0, BKB 25, fire (element 5, '
-          'burn sound 8), no shield damage, half hitlag; no shield break anywhere in neutral air (no LASTHIT_STATUS)',
-          (vals, [c for c in gn if c.name == 'SET_FLOAT']), ({(2.5, 60, 25, 0, 25, 5, 0, 8, 0.5)}, []))
+    names = ('Damage', 'Angle', 'KBG', 'FKB', 'BKB', 'Hitlag', 'SDI', 'Clang', 'Rebound', 'ShieldDamage', 'SFXType',
+             'Shieldable', 'FacingRestrict', 'DisableHitlag', 'NoGFX', 'Flinchless', 'Effect')
+    vals = {tuple(round(float(v(c, n)), 3) for n in names) for _f, c in ring}
+    kb = ((1 + 10 / 2.0) * 200 / 200 * 1.4 + 18) * 100 / 100 + 0
+    check('smash tune v1 (the user: "Please remove any knockback from the fire ring and turn it into a very weak '
+          'windbox"): the ring a windbox as F.L.U.D.D.\'s water (0 %%, KBG 100, set knockback, BKB 0, Flinchless 1: a push, '
+          'no reaction, NoGFX 1): 0 %%, angle 361 by position (FacingRestrict 0), set knockback 10 (KB %.1f at weight 100: '
+          'about %.2f a frame, F.L.U.D.D.\'s 54.4), no hitlag (DisableHitlag 1, Hitlag 0), no clank, no shield damage, no '
+          'sound, shieldable, fire; no shield break anywhere in neutral air (no LASTHIT_STATUS)' % (kb, kb * 0.03),
+          (vals, [c for c in gn if c.name == 'SET_FLOAT']),
+          ({(0.0, 361, 100, 10, 0, 0.0, 0.0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 5)}, []))
     # ---- the ring's geometry against FIRE_RING (its own formula here, not GB.ring_radius)
     fx = next(c for c in e.scripts[acmd.crc('attackairn')] if c.name == 'EFFECT_FOLLOW_FLIP')
     efr = 0.0
@@ -1734,7 +1748,7 @@ def nair_fair_tests(out, user):
     def flames(f):                       # the flames' centres' radius at frame f (t: frames since the call less one)
         t = max(0, f - efr - 1)
         return size * (R['r0'] + R['v'] * (1 - R['air'] ** t) / (1 - R['air']))
-    geo, bad = [], []
+    geo, bad, tuck = [], [], None
     for f in frames:
         cs = sorted((c for ff, c in ring if ff == f), key=lambda c: int(v(c, 'ID')))
         pts = [((float(v(c, 'Z')), float(v(c, 'Y')) - cy), (float(v(c, 'Z2')), float(v(c, 'Y2')) - cy)) for c in cs]
@@ -1744,6 +1758,9 @@ def nair_fair_tests(out, user):
                      for k in range(6))
         ang = sorted(round(math.degrees(math.atan2(p[0][1], p[0][0])) % 360) for p in pts)
         r, s_ = sum(rv) / len(rv), sz.pop() if len(sz) == 1 else None
+        if f == 12.0:
+            tuck = (round(r, 2), s_, closed, ang)
+            continue
         mid = r * math.cos(math.radians(30))
         tips = flames(f + 1) + GB.NAIR_RING_TIP
         inner, outer = ((r - s_) + (mid - s_)) / 2, ((r + s_) + (mid + s_)) / 2
@@ -1753,16 +1770,27 @@ def nair_fair_tests(out, user):
                 abs(outer - max(tips, (GB.NAIR_LATE + tips) / 2 + GB.NAIR_RING_MIN)) < 0.05 and abs(inner - want_in) < 0.05
                 and r - s_ >= GB.NAIR_LATE and flames(f + 1) < outer):
             bad.append((f, round(inner, 2), round(outer, 2), round(tips, 2), closed, ang))
-    check('nair ring v1: each set a closed hexagon of 6 capsules (corners at 0, 60 ... 300 degrees, one radius) round the '
-          'burst / ring\'s centre (joint 0, Y %.1f); its band from the burst boxes\' edge (%.1f, its mean inner edge) to the '
-          'ring\'s flame tips at the next frame (FIRE_RING r0 %.1f + v %.1f (1 - air %.1f^t) / (1 - air), x %.4f, + %.1f: its '
-          'mean outer edge), its corners outside the burst boxes; moving out with the flames (frame, flames, tips, corner '
-          'radius, capsule size): %s' % (cy, GB.NAIR_LATE, R['r0'], R['v'], R['air'], size, GB.NAIR_RING_TIP, geo),
+    check('nair ring v1: from 14 each set a closed hexagon of 6 capsules (corners at 0, 60 ... 300 degrees, one radius) '
+          'round the burst / ring\'s centre (joint 0, Y %.1f); its band from the burst boxes\' edge (%.1f, its mean inner '
+          'edge) to the ring\'s flame tips at the next frame (FIRE_RING r0 %.1f + v %.1f (1 - air %.1f^t) / (1 - air), x '
+          '%.4f, + %.1f: its mean outer edge), its corners outside the burst boxes; moving out with the flames (frame, '
+          'flames, tips, corner radius, capsule size): %s' % (cy, GB.NAIR_LATE, R['r0'], R['v'], R['air'], size,
+                                                              GB.NAIR_RING_TIP, geo),
           (bad, [x[3] for x in geo] == sorted(x[3] for x in geo) and geo[0][3] < geo[-1][3]), ([], True))
+    # the burst's centre at 12 / 13: joint 3 in his motion (the user's AttackAirN: Z 0.89 - 0.90, Y 8.46 - 8.67)
+    far = max(math.hypot(z - 0.9, (y + cy) - yb) for z, y in ((GB.NAIR_RING_TUCK * math.cos(math.radians(a_)),
+                                                                GB.NAIR_RING_TUCK * math.sin(math.radians(a_)))
+                                                               for a_ in range(0, 360, 60)) for yb in (8.46, 8.67))
+    check('smash tune v1: at 12 (with the burst\'s strong hit, so Part 0\'s record is cleared only then) the windboxes are '
+          'tucked inside the burst: a hexagon of corner radius %.0f, size %.1f: at most %.2f from the burst\'s centre '
+          '(joint 3) < its size %.0f, so whatever they touch the burst (ID 0: the lower ID wins a shared frame) touches too'
+          % (GB.NAIR_RING_TUCK, GB.NAIR_RING_MIN, far + GB.NAIR_RING_MIN, GB.NAIR_STRONG),
+          (tuck, far + GB.NAIR_RING_MIN < GB.NAIR_STRONG), ((GB.NAIR_RING_TUCK, GB.NAIR_RING_MIN, True,
+                                                              [0, 60, 120, 180, 240, 300]), True))
     check('nair ring v1: the ring boxes follow the effect\'s timing: the burst / ring called at %d (FIRE_RING life %d: its '
-          'flames gone by %d), the boxes from the strong hit\'s end (14, the late hit) to 24, within the flames\' life' % (
-              efr, R['life'], efr + R['life']),
-          (efr == GB.NAIR_FX_FRAME, frames[0], max(f for f, c in tl if c.name == 'Remove_All_Hitboxes') <= efr + R['life'],
+          'flames gone by %d), out along the ring from the strong hit\'s end (14, the late hit) to 24, within the '
+          'flames\' life' % (efr, R['life'], efr + R['life']),
+          (efr == GB.NAIR_FX_FRAME, frames[1], max(f for f, c in tl if c.name == 'Remove_All_Hitboxes') <= efr + R['life'],
            size == GB.NAIR_FX_SIZE, cy == GB.NAIR_FX_Y), (True, 14.0, True, True, True))
     # ---- the hit records: set_attack (0x02C08848) returns at once (the record kept) when the ID is out on the same Part,
     # and clears the Part's record when an ID not out (or moved from another Part) is set on it
@@ -1771,7 +1799,7 @@ def nair_fair_tests(out, user):
         if c.name in GB.HITBOXES:
             hid, part = int(v(c, 'ID')), int(v(c, 'Part'))
             if live.get(hid) == part:
-                keeps += part == 1
+                keeps += 1
             else:
                 clears.append((f, part, hid))
             live[hid] = part
@@ -1781,17 +1809,19 @@ def nair_fair_tests(out, user):
             live = {}
     for f, c in hb:
         shared.add((int(v(c, 'ID')), int(v(c, 'Part'))))
-    check('nair ring v1: the strong / late hits and the ring don\'t share a hit record: their own Parts (0 / 1) and IDs (0 / '
-          '1-6); Part 1\'s record is cleared only when the ring is first set (frame 14, before it can hit), every later set '
-          'moves IDs still out on Part 1 (24 sets: the record kept: one ring hit an opponent); the clone\'s AttackModule '
-          '(a weapon: IDs 0-6, Parts 0-1) holds them',
-          (sorted({p for _i, p in shared}), sorted({i for i, p in shared if p == 0}), sorted({i for i, p in shared if p == 1}),
-           [x for x in clears if x[1] == 1], keeps, max(i for i, _p in shared) <= 6 and max(p for _i, p in shared) <= 1),
-          ([0, 1], [0], [1, 2, 3, 4, 5, 6], [(14.0, 1, k) for k in range(1, 7)], 24, True))
-    check('nair ring v1: the ring\'s hits burn (neutral air\'s row, motion 104: 0.25 %% / 15 f / 180 f) with no exe change: '
-          'burn_scan takes every Part\'s hit log (entries 0 - %d, AttackModule +0x18 the highest Part in use + 1: 2) and the '
-          'release marks each new record (feature mark), so a Part 1 record after a Part 0 one is new' % (C.BURN_ENTS - 1),
-          ((104, 0.25, 15, 180) in C.BURN_MOVES, C.BURN_ENTS >= 2, 'mark' in C.RELEASE), (True, True, True))
+    check('smash tune v1: the burst and the ring share one hit record (Part 0, IDs 0 / 1-6): Part 0\'s record is cleared only '
+          'at 12, as the strong hit and the tucked ring are set together (before anything is hit); every later set moves '
+          'IDs still out (the late hit, the re-hit, the ring\'s 30 moves: 32 sets, the record kept). So a fighter the burst '
+          'hit is never pushed by the ring (its launch kept: the user\'s worry) and the ring pushes anyone else once; the '
+          'clone\'s AttackModule (a weapon: IDs 0-6, Parts 0-1) holds them',
+          (sorted({p for _i, p in shared}), sorted({i for i, p in shared}), clears, keeps,
+           max(i for i, _p in shared) <= 6),
+          ([0], [0, 1, 2, 3, 4, 5, 6], [(12.0, 0, k) for k in range(7)], 32, True))
+    check('smash tune v1: the ring\'s touch still burns (a fire ring; neutral air\'s row, motion 104: 0.25 %% / 15 f / 180 f, '
+          'once, as its hit record): burn_scan takes every new record of the move\'s hit log (feature mark), a windbox\'s '
+          'too if the game logs it (unconfirmed in game); one record for the burst and the ring: a burst victim gets one '
+          'burn (nair ring v1 gave it two)',
+          ((104, 0.25, 15, 180) in C.BURN_MOVES, 'mark' in C.RELEASE), (True, True))
     # ---- forward air
     gf = g.scripts[acmd.crc('attackairf')]
     hf = {int(v(c, 'ID')): c for c in gf if c.name in GB.HITBOXES}
@@ -1828,10 +1858,287 @@ def nair_fair_tests(out, user):
                 diff.append((nm, int(v(a_, 'ID'))))
     cef = sorted((int(c.params[0]), round(float(v(c, 'Y')), 2)) for c in ce.scripts[acmd.crc('attackairf')]
                  if c.name == 'External_Graphic')
-    check('nair ring v1 / fair reach: the clones\' copies the same (their scripts are his: neutral air\'s 33 hitbox sets, '
+    check('nair ring v1 / fair reach: the clones\' copies the same (their scripts are his: neutral air\'s 39 hitbox sets, '
           'forward air\'s 3 hitboxes, bones as the article\'s; its second sword and flames)',
           (diff, len([c for c in cg.scripts[acmd.crc('attackairn')] if c.name in GB.HITBOXES]), cef),
-          ([], 33, sorted([(GB.SWORD, 0.0), (GB.SWORD, -10.0), (GB.FIRE_BLADE, 0.0), (GB.FIRE_BLADE, -10.0)])))
+          ([], 39, sorted([(GB.SWORD, 0.0), (GB.SWORD, -10.0), (GB.FIRE_BLADE, 0.0), (GB.FIRE_BLADE, -10.0)])))
+
+
+FP_SLOT = 2                       # the fighter hit: player slot 3 (fighter table entry 2)
+
+
+def fp_setup(mscsb, src):
+    """smash tune v1: him in forward smash (0x2D) on the floor (y 10) at x 0 facing right, his own slot (0) at his place"""
+    m = fresh(mscsb, src)
+    g = m.game
+    m.vm.g[4], m.vm.g[18], m.vm.g[24] = 0x2D, 0, 0
+    g.x, g.y, g.lr, g.frame = 0.0, 10.0, 1.0, 14.0
+    return m, g
+
+
+def fp_frame(m, g, tx, hit=2, hitlag=0, ty=10.0, cmd=0):
+    """one frame of his forward smash's loop (gk_chain_try): the fighter in slot FP_SLOT at (tx, ty), target 12 (this attack's
+    hit) its offset from him when `hit` (AttackModule 0x2727 kinds: 2 a hurtbox, 4 a shield), his hitlag"""
+    V = g.vars
+    V[0x0F000020], V[0x0F000021] = g.x, g.y
+    V[0x0F000020 + 4 * FP_SLOT], V[0x0F000021 + 4 * FP_SLOT] = tx, ty
+    V[0x0F0002CD], V[0x0F0002CE] = ((tx - g.x) * g.lr, ty - g.y) if hit else (0.0, 0.0)
+    g.atk_hit = hit
+    g.hitlag = hitlag
+    m.vm.g[24] = cmd
+    return m('gk_chain_try', 1)
+
+
+def fp_trace(m, g, tx0=60.0, v0=2.5, decay=0.9, lag=6, n=40, hit=2):
+    """the hit at frame 13 (his and its hitlag `lag` frames), then the fighter sliding away at v0 slowing x decay a frame:
+    [(frame, his x, its x)]"""
+    tr, tx, v = [], tx0, v0
+    for t in range(n):
+        if t >= lag:
+            tx, v = round(tx + v, 3), v * decay
+        fp_frame(m, g, tx, hit=hit, hitlag=1 if t < lag else 0)
+        tr.append((13 + t, round(g.x, 3), round(tx, 3)))
+    return tr
+
+
+def smash_tune_tests(mscsb, src, out, user):
+    """smash tune v1 (README "Smash tune v1"): forward smash's pursuit (MSC, run here), the smashes' uncharged damage (the
+    charge ratio 0: the attack's power 1.0; the clones' copies x1.0), up smash's inner sword hits a weak diagonal spike,
+    the smashes' shield damage x0.5 (exe feature shalf: its unicorn test in gekkouga_clone_cave_test; here the numbers),
+    the clones' jumps by his Tap Jump setting, the burn rows unchanged"""
+    import gekkouga_clone_cave as C
+    # ---- 1. forward smash pursuit
+    m, g = fp_setup(mscsb, src)
+    tr = fp_trace(m, g)
+    xs = [x for _f, x, _t in tr]
+    steps = [round(b - a, 3) for a, b in zip([0.0] + xs, xs)]
+    gaps = [round(t - x, 2) for _f, x, t in tr]
+    lag = 6
+    moving = [s_ for s_ in steps[lag:] if s_ > 0]
+    check('smash tune v1, pursuit: nothing during his hitlag (frames 13 - 18: the hit found, target 12\'s place matched to '
+          'slot 3); then a burst (4, 8 a frame: gk_fp_acc 4) at its top speed 8 while far, slowing smoothly (each step '
+          'smaller) as he closes in; never past the stop point (the gap >= 12), ending 12 - 13.5 short of the sliding '
+          'fighter; trace (frame, his x, its x): %s' % (tr[::3],),
+          (steps[:lag], steps[lag:lag + 3], all(b <= a + 1e-6 for a, b in zip(moving[2:], moving[3:])),
+           min(gaps) >= 12.0 - 1e-3, 12.0 <= gaps[-1] <= 13.5, R.s32(m.g('gk_fp_slot'))),
+          ([0.0] * lag, [4.0, 8.0, 8.0], True, True, True, -1))
+    PRE = os.environ.get('GK_PURSUIT_TRACE')
+    if PRE:
+        open(PRE, 'w').write('\n'.join('%d %.3f %.3f' % x for x in tr) + '\n')
+    m, g = fp_setup(mscsb, src)
+    for t in range(40):
+        fp_frame(m, g, 50.0, hit=4 if t == 0 else 4, hitlag=1 if t < 4 else 0)
+    check('pursuit on a shield (kind 4): the same run, to 12 short of the shielding fighter (at 50: he ends at 37.8 - 38)',
+          37.8 <= g.x <= 38.0, True)
+    m, g = fp_setup(mscsb, src)
+    for t in range(30):
+        fp_frame(m, g, 50.0, hit=0)
+    check('no hit / shield yet (AttackModule 0x2727 kinds 6 off): he stays', (g.x, m.g('gk_fp_slot')), (0.0, 0))
+    m, g = fp_setup(mscsb, src)
+    for t in range(30):
+        fp_frame(m, g, -40.0, hit=2, hitlag=1 if t < 3 else 0)
+    check('the fighter behind him (x -40, he faces right): he stays (never backwards, never through it)', g.x, 0.0)
+    m, g = fp_setup(mscsb, src)
+    g.lr = -1.0
+    for t in range(40):
+        fp_frame(m, g, -50.0, hit=2, hitlag=1 if t < 3 else 0)
+    check('facing left, the fighter at -50: he runs left to -37.8 - -38', -38.0 <= g.x <= -37.8, True)
+    m, g = fp_setup(mscsb, src)
+    g.floors = [(-100.0, 30.0, 10.0)]                # the stage's edge at 30
+    for t in range(40):
+        fp_frame(m, g, 70.0, hit=2, hitlag=1 if t < 3 else 0)
+    check('a ledge at 30 (the fighter at 70, off the stage): he stops at the ledge (1 short of it: gk_fp_edge, on the floor) '
+          'and the pursuit ends', (28.8 <= g.x <= 29.0, g.y, R.s32(m.g('gk_fp_slot'))), (True, 10.0, -1))
+    m, g = fp_setup(mscsb, src)
+    g.walls = [(25.0, 0.0, 100.0)]
+    for t in range(40):
+        fp_frame(m, g, 60.0, hit=2, hitlag=1 if t < 3 else 0)
+    check('a wall at 25: he stops 3 short of it (22) and the pursuit ends', (round(g.x, 2), R.s32(m.g('gk_fp_slot'))),
+          (22.0, -1))
+    m, g = fp_setup(mscsb, src)
+    g.floors = [(-100.0, 20.0, 10.0), (20.0, 200.0, 14.0)]   # a step up of 4 at 20
+    for t in range(40):
+        fp_frame(m, g, 60.0, hit=2, hitlag=1 if t < 3 else 0)
+    check('a step up of 4 at x 20 on his way: he goes on along the floor (y 14 there) to 47.8 - 48', (47.8 <= g.x <= 48.0, g.y),
+          (True, 14.0))
+    m, g = fp_setup(mscsb, src)
+    for t in range(6):
+        fp_frame(m, g, 60.0, hit=2, hitlag=1 if t < 3 else 0)
+    x6 = g.x
+    g.vars[0x0F0000A2 + 8 * (FP_SLOT + 3)] = 0xB1
+    fp_frame(m, g, 60.0)
+    check('the fighter KO\'d (status 0xB1): over, he stops', (g.x == x6, R.s32(m.g('gk_fp_slot'))), (True, -1))
+    m, g = fp_setup(mscsb, src)
+    for t in range(6):
+        fp_frame(m, g, 60.0, hit=2, hitlag=1 if t < 3 else 0)
+    m.vm.g[18] = 2
+    x6 = g.x
+    fp_frame(m, g, 60.0)
+    check('in the air (situation 2): over, no move', (g.x == x6, R.s32(m.g('gk_fp_slot'))), (True, -1))
+    m, g = fp_setup(mscsb, src)
+    for t in range(60):
+        fp_frame(m, g, 400.0, hit=2, hitlag=1 if t < 3 else 0)
+    check('the longest pursuit: %d frames after his hitlag (the fighter far: %d x 8 - 4 = he moves %d at most)' % (
+        m('gk_fp_frames'), m('gk_fp_frames'), m('gk_fp_frames') * 8 - 4), (round(g.x, 2), R.s32(m.g('gk_fp_slot'))),
+          (m('gk_fp_frames') * 8.0 - 4.0, -1))
+    # the chain: an up smash input during the burst (frame 16+: forward smash's last hitbox's end)
+    m, g = fp_setup(mscsb, src)
+    for t in range(5):
+        fp_frame(m, g, 60.0, hit=2, hitlag=1 if t < 3 else 0)
+    g.frame = 16.0
+    g.status_req = []
+    r = fp_frame(m, g, 60.0, cmd=0x20)
+    check('during the burst an up smash input chains (gk_chain_try: its start 0x31, auto): the pursuit ends (gk_fp_end) '
+          'and the chain works', (r, g.status_req, m.g('gk_fp_slot'), m.g('gk_chain_req')), (1, [(0x31, 1)], 0, 0x2))
+    m, g = fp_setup(mscsb, src)
+    for t in range(6):
+        fp_frame(m, g, 60.0, hit=2, hitlag=1 if t < 3 else 0)
+    frames(m, 1, st=0)
+    check('he leaves forward smash (Wait): gekkouga_frame ends the pursuit', (m.g('gk_fp_slot'), m.g('gk_fp_t')), (0, 0))
+    m, g = fp_setup(mscsb, src)
+    m.vm.g[4] = 0x33
+    for t in range(10):
+        m.vm.g[4] = 0x33
+        g.atk_hit = 2
+        m('gk_chain_try', 2)
+    check('up smash (0x33) / down smash hitting: no pursuit (forward smash only)', (g.x, m.g('gk_fp_slot')), (0.0, 0))
+    # ---- 2. uncharged damage: the release's ratio, func_345's power (1 + (0x0200003E - 1) x ratio)
+    pw = []
+    for store, auto in ((120, 1), (0, 2)):
+        m = fresh(mscsb, src)
+        g = m.game
+        g.vars[0x200003E], g.vars[0x26] = 1.4, 0.0
+        m.setg('gk_smash', store)
+        m.setg('gk_sm_auto', auto)
+        m.vm.g[4] = 0x2B
+        m('gk_sm_release', 1)
+        m.vm.g[4] = 0x2D
+        g.log = []
+        m('func_345')
+        pw.append((g.vars.get(0x1000000), 0x21000002 in g.flags, [x for x in g.log if x[0] == 'power']))
+    g.vars[0x1000000] = 1.0
+    g.log = []
+    m('func_345')
+    old = [x for x in g.log if x[0] == 'power']
+    check('uncharged: a full stored charge (120) and a chain (0) both release with the charge ratio 0, charged flag on: '
+          'the attack\'s power (func_345, AttackModule 0x2728) 1.0, the uncharged damage (ratio 1.0, before: 1.4)',
+          (pw, old), ([(0.0, True, [('power', 1.0)])] * 2, [('power', 1.4)]))
+    rows = {k: (d, i, f) for k, d, i, f in C.BURN_MOVES}
+    src_c = open(os.path.join(HERE, 'gekkouga_clone_cave.py')).read()
+    check('uncharged: the burn is unchanged at every charge: its rows are keyed by the move\'s motion kind (burn_scan reads '
+          'the attacker\'s motion kind, never the hit\'s damage): forward / up / down smash 0.4 %% every 6 f for 240 f '
+          '= %.0f %% (shielded %.1f %%), as before' % (C.burn_total(C.BURN_MOVES[0]), C.burn_total(C.BURN_MOVES[0], True)),
+          ([rows[k] for k in (95, 99, 101)], 'lwz r0, %(mm_kind)d(r12)        # its motion kind' in src_c),
+          ([(0.4, 6, 240)] * 3, True))
+    # ---- 3. up smash's spike, 4. shield damage (the scripts)
+    B = os.path.join(out, 'fighter', 'gekkouga', 'script', 'animcmd')
+    gm = acmd.ACMDFile.load(os.path.join(B, 'body', 'game.bin'))
+    cg = acmd.ACMDFile.load(os.path.join(B, 'weapon', 'clone', 'game.bin'))
+    pv = lambda c, n: c.params[c.info['syntax'].index(n)]
+    tl, fr = [], 0.0
+    for c in gm.scripts[acmd.crc('attackhi4')]:
+        if c.name == 'FRAME':
+            fr = float(c.params[0])
+        tl.append((fr, c))
+    at18 = sorted((int(pv(c, 'ID')), int(pv(c, 'Bone')), float(pv(c, 'Y')), float(pv(c, 'Size')), float(pv(c, 'Damage')),
+                   int(pv(c, 'Angle')), int(pv(c, 'KBG')), int(pv(c, 'BKB')), int(pv(c, 'FKB'))) for f, c in tl
+                  if f == 18.0 and c.name in GB.HITBOXES)
+    res = sorted((int(c.params[0]), int(pv(c, 'Bone')), float(pv(c, 'Y'))) for f, c in tl if c.name == 'ATK_RESERVE' and f == 15.0)
+    later = [(f, c.name, int(c.params[0])) for f, c in tl if f > 18 and c.name in GB.HITBOXES + ('Remove_Hitbox',)]
+    kb = lambda pc, d=11.0, kbg=50, bkb=25: round(((pc / 10.0 + pc * d / 20.0) * 1.0 * 1.4 + 18) * kbg / 100.0 + bkb, 1)
+    check('up smash spike: at 18 the geyser (ID 0) and both swords; the inner hits (at the hands: Y 0, size 17.5, nearer '
+          'his body) now IDs 1 / 2 (the lower IDs: they win where the outer ones overlap them) at %d degrees (down and away, '
+          'by position: behind him down and back), KBG %d / BKB %d (weak: KB %.0f at 0 %%, %.0f at 100 %%, %.0f at 150 %% on '
+          'weight 100; tumble from 80), 11 %% (the uncharged damage); the outer ones IDs 3 / 4 as before (44, KBG 100, BKB '
+          '30); their reserves renumbered; the geyser off at 19; at 21 the body capsule (ID 1) and IDs 2 - 4 removed as '
+          'before' % (
+              GB.USMASH_SPIKE['Angle'], GB.USMASH_SPIKE['KBG'], GB.USMASH_SPIKE['BKB'], kb(11), kb(111), kb(161)),
+          (at18, res, later),
+          ([(0, 0, 27.0, 30.0, 14.0, 90, 104, 30, 0), (1, 0x19, 0.0, 17.5, 11.0, 300, 50, 25, 0),
+            (2, 0x18, 0.0, 17.5, 11.0, 300, 50, 25, 0), (3, 0x19, -20.0, 23.5, 11.0, 44, 100, 30, 0),
+            (4, 0x18, -20.0, 23.5, 11.0, 44, 100, 30, 0)],
+           [(0, 0, 27.0), (1, 0x19, 0.0), (2, 0x18, 0.0), (3, 0x19, -4.0), (4, 0x18, -4.0)],
+           [(19.0, 'Remove_Hitbox', 0), (21.0, 'Extended_Hitbox', 1), (21.0, 'Remove_Hitbox', 2),
+            (21.0, 'Remove_Hitbox', 3), (21.0, 'Remove_Hitbox', 4)]))
+    ch = [c for c in cg.scripts[acmd.crc('attackhi4')] if c.name in GB.HITBOXES]
+    mine = [c for c in gm.scripts[acmd.crc('attackhi4')] if c.name in GB.HITBOXES]
+    check('up smash spike: the clones\' copy the same (IDs, angle 300, KBG 50, BKB 25, 11 %: x1.0), bones the article\'s',
+          [(int(pv(a, 'ID')), int(pv(a, 'Angle')), int(pv(a, 'KBG')), int(pv(a, 'BKB')), float(pv(a, 'Damage'))) for a in ch],
+          [(int(pv(a, 'ID')), int(pv(a, 'Angle')), int(pv(a, 'KBG')), int(pv(a, 'BKB')), float(pv(a, 'Damage'))) for a in mine])
+    table, neg = [], []
+    for nm in ('attacks4', 'attackhi4', 'attacklw4'):
+        for f, c in [(0, c) for c in gm.scripts[acmd.crc(nm)] if c.name in GB.HITBOXES]:
+            d, sd = float(pv(c, 'Damage')), int(pv(c, 'ShieldDamage'))
+            neg += [sd] if sd < 0 else []
+            table.append((nm, int(pv(c, 'ID')), d, round((d * 1.4 + sd) * 1.19, 2), round((d + sd) * 1.19, 2),
+                          round((d + sd) * 1.19 * C.SH_SCALE, 2)))
+    check('shield damage x0.5 (exe feature shalf: the shield hit\'s pending damage halved before the 1.19 multiplier for a '
+          'Greninja\'s attack in motion 95 / 99 / 101 or with the trail\'s Type): per hitbox (move, ID, damage, shield '
+          'damage before this package (x1.4 charge), uncharged, now): %s; every ShieldDamage field 0 (never negative)'
+          % table, (neg, all(abs(t[5] - t[4] / 2) < 0.01 for t in table), 'shalf' in C.RELEASE, C.SH_KINDS,
+                     sorted(k for k, _d, _i, _f in C.BURN_MOVES if k < 0x100 and _d == 0.4), C.SH_SCALE),
+          ([], True, True, (95, 99, 101), [95, 99, 101], 0.5))
+    tg = acmd.ACMDFile.load(os.path.join(B, 'weapon', 'firetrail', 'game.bin'))
+    types = {}
+    for fn, ff in (('body', gm), ('clone', cg), ('firetrail', tg)):
+        for crc, sc in ff.scripts.items():
+            for c in sc:
+                if c.name in GB.HITBOXES and int(pv(c, 'Type')) == C.SH_TYPE:
+                    types[fn] = types.get(fn, 0) + 1
+    sk = os.path.join(B, 'weapon', 'skeleton', 'game.bin')
+    if os.path.exists(sk):
+        for crc, sc in acmd.ACMDFile.load(sk).scripts.items():
+            types['skeleton'] = types.get('skeleton', 0) + sum(1 for c in sc if c.name in GB.HITBOXES and
+                                                                 int(pv(c, 'Type')) == C.SH_TYPE)
+    check('shield damage x0.5: the fire trails\' hitboxes (0.1 %%: their shield damage 0.119 -> 0.06) carry Type 0x%X '
+          '(Water: unused in Smash 4), and only they do (his, the clones\', the skeleton\'s none): the exe\'s marker'
+          % C.SH_TYPE, (types.get('firetrail', 0) > 0, types.get('body', 0), types.get('clone', 0), types.get('skeleton', 0),
+                        GB.TR_HIT['Type']), (True, 0, 0, 0, C.SH_TYPE))
+    # ---- 5. the clones' jumps and his Tap Jump setting
+    got = {}
+    for tap in (False, True):
+        for cmd in (0x100000, 0x200000):
+            m, g, _tr = ak_run(mscsb, src, True, frames_=24)
+            for _ in range(200):
+                ak_frame(m, g, st=0xE)
+                if m('gk_bvi', 1, 0) < 10 and m('gk_bvi', 2, 0) < 10:
+                    break
+            for _ in range(20):
+                ak_frame(m, g, st=0)
+            g.tap_jump = tap
+            ak_frame(m, g, st=0x28 if cmd == 0x100000 else 0xA, cmd=cmd, stick=(0.0, 0.9) if cmd == 0x100000 else (0, 0))
+            got[(tap, cmd)] = (ak_cmd(g, 1)[0], m('gk_bvi', 1, 0))
+    check('clones and Tap Jump (ControlModule 0x271C: his input frame\'s 0x8000, the game\'s own stick-jump check): split '
+          'clones on the ground, his stick flicked up (command 0x100000, an up tilt: the game makes the bit whatever the '
+          'setting): Tap Jump off: no jump (they stay, action 0); on: the squat (0x18, action 1); the jump button '
+          '(0x200000): the squat either way', got,
+          {(False, 0x100000): (0, 0), (False, 0x200000): (0x18, 1), (True, 0x100000): (0x18, 1), (True, 0x200000): (0x18, 1)})
+    vys = {}
+    for tap in (False, True):
+        for held, sy in ((False, 0.9), (True, 0.0), (False, 0.0)):
+            m = fresh(mscsb, src)
+            g = m.game
+            g.tap_jump = tap
+            g.held = {2} if held else set()
+            m('gk_jump', 1, f2i(0.0), f2i(sy))
+            vys[(tap, held, sy)] = m.gf('gk_lvy')
+    check('clones and Tap Jump: the squat\'s end: a full jump (4.07) with the jump button held, or the stick up (0.9) only '
+          'with Tap Jump on; else the short hop (2.82)', vys,
+          {(False, False, 0.9): 2.82, (False, True, 0.0): 4.07, (False, False, 0.0): 2.82,
+           (True, False, 0.9): 4.07, (True, True, 0.0): 4.07, (True, False, 0.0): 2.82})
+    air = {}
+    for tap in (False, True):
+        m, g, _tr = ak_run(mscsb, src, True, frames_=24)
+        g.tap_jump = tap
+        n0 = m('gk_bvi', 1, 9)
+        ak_frame(m, g, st=0xE, cmd=0x100000, stick=(0.0, 0.9))
+        air[tap] = (n0, m('gk_bvi', 1, 9), ak_cmd(g, 1)[0] == 0x1B)
+    check('clones and Tap Jump: in the air (after the kick), his stick flicked up: their double jump (JumpAerialF 0x1B) only '
+          'with Tap Jump on', air, {False: (0, 0, False), True: (0, 1, True)})
+    src_c = open(src).read()
+    check('clones and Tap Jump: the clones\' jumps all go through gk_jump_cmd (no bare command 0x300000 test left); the '
+          'other settings they mirror come with his command bits (A+B smash, Stick Smash off: applied to the inputs before '
+          'the game builds them)', ('cmd & 0x300000' in src_c, src_c.count('gk_jump_cmd(cmd)')), (False, 2))
 
 
 def invuln_tests(mscsb, src, out, vanilla_vl):
@@ -3610,6 +3917,9 @@ def script_tests(out, user):
     smash = {zlib.crc32(n.encode()) for n in GB.SMASH_SCRIPTS}
     hold = {zlib.crc32(n.encode()) for n in GB.HOLD_SCRIPTS}
     bad, n, got = [], 0, {}
+    if hasattr(GB, 'usmash_spike'):               # smash tune v1: up smash's inner hits renumbered / a spike (its own
+        ug = acmd.ACMDFile({k: [acmd.Command(c.ident, list(c.params)) for c in sc] for k, sc in ug.scripts.items()})
+        GB.usmash_spike(ug)                       # checks: smash_tune_tests): his script with it, the rest as before
     for f0, f1, kind in ((ug, pg, 'game'), (ue, pe, 'effect')):
         check('%s.bin: the same scripts' % kind, sorted(f0.scripts), sorted(f1.scripts))
         tuned = {zlib.crc32(x.encode()) for x in ('attacks3', 'attackairn', 'attacks4') + (
@@ -3673,13 +3983,14 @@ def script_tests(out, user):
                 if nm == 'Bone':
                     same &= (c1.params[i] == 0) == (c0.params[i] == 0) and (c1.params[i] == 0 or c1.params[i] >= 0x7D0)
                 elif nm == 'Damage':
-                    same &= abs(float(c1.params[i]) - float(c0.params[i]) * (1.4 if crc in smash else 1.0)) < 1e-3
+                    same &= abs(float(c1.params[i]) - float(c0.params[i]) * (GB.CHARGE_DAMAGE if crc in smash else 1.0)) < 1e-3
                 else:
                     same &= c0.params[i] == c1.params[i]
         bad_cmds = [c.name for c in s if c.name not in GB.CLONE_GAME | GB.FLOW | GB.FLOW_KEEP_SAFE]
         ok.append(same and not bad_cmds)
-    check('the clone\'s game scripts (%d): his hitboxes (bones the article\'s joints, his smashes\' damage x1.4), only '
-          'hitbox / timing commands' % len(cg.scripts), all(ok) and len(cg.scripts) >= 35, True)
+    check('the clone\'s game scripts (%d): his hitboxes (bones the article\'s joints, his smashes\' damage x%.1f: smash '
+          'tune v1 1.0, the uncharged damage, as his; x1.4 before), only hitbox / timing commands' % (
+              len(cg.scripts), GB.CHARGE_DAMAGE), all(ok) and len(cg.scripts) >= 35 and GB.CHARGE_DAMAGE == 1.0, True)
     ce = acmd.ACMDFile.load(os.path.join(O, 'weapon', 'clone', 'effect.bin'))
     sizes = []
     for nm in GB.SMASH_SCRIPTS:
@@ -3833,7 +4144,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (37, 38):   # round gauge v1: the damage panel's files; clone fix v3: his MSC
         want_top = ['INSTALL_TO_data', 'README.txt']
-    if len(earlier) == 42:   # tuning v1: the exes (the gauge's ready state, the skeleton's bottom) and data
+    if len(earlier) in (42, 44):   # tuning v1: the exes (the gauge's ready state, the skeleton's bottom) and data; smash
+        # tune v1: the exes (the half shield damage) and data
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (41, 43):   # clone moves v1, nair / fair v1: data only
         want_top = ['INSTALL_TO_data', 'README.txt']
@@ -3955,6 +4267,15 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               ['ui/info/dmg/dmg.flx', 'ui/info/dmg/img-00135.nut', 'ui/info/dmg/texlist.lst'])
         if GAUGE_SRC and GAUGE_JPG:
             gauge_tests(z)
+    if z1 and len(earlier) == 44:
+        check('smash tune v1: INSTALL_TO_data: his MSC (the pursuit, the uncharged ratio, the clones\' Tap Jump), his and the '
+              'clone\'s game scripts (up smash\'s spike, the windbox ring, the clones\' x1.0), the fire trail\'s hitboxes (the '
+              'shield marker); INSTALL_TO_code exe_v46z_gkb14; TEST_ONLY A_release',
+              (sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+               sorted({n.split('/')[1] for n in names if n.startswith('TEST_ONLY_INSTALL_TO_code/') and n.count('/') > 1})),
+              (sorted('fighter/gekkouga/' + x for x in (
+                  'script/animcmd/body/game.bin', 'script/animcmd/weapon/clone/game.bin',
+                  'script/animcmd/weapon/firetrail/game.bin', 'script/msc/gekkouga.mscsb')), ['A_release']))
     if z1 and len(earlier) == 43:
         check('nair / fair v1: INSTALL_TO_data: his and the clone\'s game / effect scripts (neutral air\'s sizes and ring, '
               'forward air\'s reach), trail lite v1\'s bank (the wider trail flames) and fire trail MSC; no exe (tuning '
@@ -4287,7 +4608,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 44)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 45)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -4343,6 +4664,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_tuning_v1', 'exe_v46z_gkb13', 'neutral air', 'Part 1', 'Part 0', 'hexagon', '2.5 %', 'angle 60', 'burn',
          'forward air', 'Donkey Kong', '22.4', '19.9', 'clones', 'trail', 'nair_ring_hitboxes.png', 'fair_reach_tuning.png',
          'knockback', 'unconfirmed') if len(earlier) == 43 else \
+        ('greninja_nair_fair_v1', 'exe_v46z_gkb14', 'pursuit', 'shield', 'ledge', 'chain', '12', 'uncharged', 'burn',
+         'x1.4', 'knockback', 'spike', 'angle 300', 'inner', 'lower hitbox ID', '1.19', '8.3', 'Tap Jump', 'A+B',
+         'windbox', 'F.L.U.D.D.', 'no hitlag', 'fsmash_pursuit.png', 'unconfirmed') if len(earlier) == 44 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -4445,7 +4769,7 @@ def main():
     GAUGE_VL = next((x[5:] for x in sys.argv[1:] if x.startswith('--vl=')), None)
     a = [x for x in sys.argv[1:] if not x.startswith('--v') and not x.startswith('--fx=') and not x.startswith('--gauge-')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff', 'rg11', 'cm', 'tu') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff', 'rg11', 'cm', 'tu', 'nr') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -4471,6 +4795,9 @@ def main():
         trail_data_tests(out)
     script_tests(out, user)
     msc_ops_tests(out)
+    if len(earlier) >= 44:
+        smash_tune_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'), out,
+                         user)
     if len(earlier) >= 43:
         nair_fair_tests(out, user)
     if len(earlier) >= 42:
