@@ -81,6 +81,12 @@ CAVE = 0x04BEA000
 LIMIT = 0x04BF4000                # v3: 8 KB more (zero in exe_v46z_ui10: past its text); v13: 24 KB (the hit check's
                                   # projectiles / items and the swing bind filled v12's)
 TEXT_REGION = LIMIT - 0x02000000
+LIMIT_CART = 0x04BF8000           # clone articles v1 (feature cart): 16 KB more (zero past the text; the diag build had 1 KB
+                                  # left); exes without cart keep LIMIT (their text region / grow arguments, byte for byte)
+
+
+def limit_of(feats):
+    return LIMIT_CART if 'cart' in feats else LIMIT
 TRAMP = 0x037EE540                # 4 words (zero in exe_v46z_ui10)
 
 GK_KIND = 0x30                    # Greninja (fighter_param_attributes.csv CharID 48; the fighter tables' index)
@@ -98,7 +104,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
-                      'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -203,6 +209,16 @@ def NULL_CTOR_OF(img, f):
 
 
 SK_VAR_SNDN, SK_VAR_SNDID, SK_VAR_SNDR, SK_VAR_SNDLOG = 0x0F00030D, 0x0F00030E, 0x0F00030F, 0x0F000310
+# ---- clone articles v1 (feature cart; the user: "allow clones to spawn duplicate articles, such as the skeletons, water
+# shuriken and hydro pump (clone skeletons should spawn on top of each other, forming a stack of skeletons)"): his article
+# list allows 3 skeletons (his and his two clones') and 9 shurikens (his 3 + his clones'); his MSC asks for the clones'
+# skeletons one a frame after his (his VAR_15 = 1 + the level: 0 his, 1, 2 stacked on it); the claim gives each its level
+# (its VAR_20); each running skeleton writes its place into SK_SEAT[owner][level] (its accessor, a frame counter, x, y)
+# and one with a level reads the one below's into its VAR_17 (1: there and running) / 18 / 19 (its x / y) / 21 (its
+# counter mod 10: its MSC sees it go stale), sitting on it (its MSC); its HP latches a bank per level
+SK_VAR_SEAT, SK_VAR_SEATX, SK_VAR_SEATY, SK_VAR_LEVEL, SK_VAR_SEATN = 0x0F000311, 0x0F000312, 0x0F000313, 0x0F000314, 0x0F000315
+SK_LEVELS = 3
+SH_MAX = 9                        # shurikens (vanilla 3)
 # (skeleton v1.7 diag: its MSC's sound requests: VAR_13 a count, VAR_14 the id, VAR_15 the play's answer; VAR_16 the
 # count logged: S4SN)
 MARK_TRAMP = 0x037EE580           # 3 words (zero in exe_v46z_ui10 / _diag and gkb9: 0x037EE580 - 0x037EE594 free)
@@ -814,7 +830,7 @@ TR_VAR_SLOT, TR_VAR_TYPE, TR_VAR_X, TR_VAR_Y, TR_VAR_DIR, TR_VAR_CTX = (0x0F0003
 assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW, SK_TOUCH_ROW) for sh in (False, True)
            for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
 RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd', 'skbody',
-                     'sktouch', 'skdist', 'btint', 'mark', 'sksnd'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+                     'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
 # + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
@@ -1499,7 +1515,7 @@ tr_dcase:
 """
 
 
-def sk_source(D, old_hit, orig94, gmupd=False, sktouch=False, sksnd=False):
+def sk_source(D, old_hit, orig94, gmupd=False, sktouch=False, sksnd=False, cart=False):
     """skeleton v1: the Running Skeleton's native part (fighters/gekkouga/README.md "Skeleton v1")"""
     zero = '''
         lis r12, %(zero_hi)d
@@ -1530,7 +1546,7 @@ sk_start:
         bl sk_col_free
         lwz r30, %(wwork)d(r31)
         cmpwi r30, 0
-        beq sks_out''' + ''.join(zero + var_set('r30', 0x0F000300 + v) for v in range(13)) + '''
+        beq sks_out''' + ''.join(zero + var_set('r30', 0x0F000300 + v) for v in range(22 if cart else 13)) + '''
 sks_out:
         lwz r30, 0x28(r1)
         lwz r31, 0x2C(r1)
@@ -1586,7 +1602,8 @@ sk_frame:
 skf_owned:
         addi r12, r29, -1
         cmplwi r12, %(slots)d
-        bge skf_out''' + vint('r30', 0x0F000305, 'r28') + vint('r30', 0x0F000306, 'r27') + D('''
+        bge skf_out''' + vint('r30', 0x0F000305, 'r28') + vint('r30', 0x0F000306, 'r27') + ('''
+        bl sk_seat''' if cart else '') + D('''
         bl sk_logphase''' + ('''
         bl sk_logsnd''' if sksnd else '')) + '''
         lwz r3, %(wpost)d(r31)          # its scale: SK_SCALE running (the stand-in body), 1.0 else
@@ -1909,7 +1926,69 @@ skd_out:
         addi r1, r1, 0x50
         blr
 ''') + r'''
-# (r30 its WorkModule) -> r3 its owner's slot (1-8) or 0: the first live Greninja whose VAR_15 (a skeleton asked for)
+''' + (r'''# clone articles v1: (r28 its phase, r29 its owner's slot, r30 its WorkModule, r31 its accessor) the stack: running, its
+# accessor / a counter / its x / y in SK_SEAT[owner][level] (else its entry let go); with a level, the one below's into its
+# VAR_17 (1 there) / 18 / 19 (x / y) / 21 (its counter mod 10)
+sk_seat:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r24, 0x20(r1)''' + vint('r30', SK_VAR_LEVEL, 'r27') + '''
+        cmplwi r27, %(sk_levels1)d
+        bgt sst_out
+        addi r12, r29, -1
+        mulli r12, r12, %(sk_levels)d
+        add r12, r12, r27
+        slwi r12, r12, 4
+        lis r26, %(sk_seat_hi)d
+        addi r26, r26, %(sk_seat_lo)d
+        add r25, r26, r12               # its entry
+        cmpwi r28, 1
+        bne sst_gone
+        stw r31, 0(r25)
+        lwz r0, 4(r25)
+        addi r0, r0, 1
+        stw r0, 4(r25)
+        lwz r12, %(wpost)d(r31)
+        cmpwi r12, 0
+        beq sst_low
+        lfs f0, 0x10(r12)
+        stfs f0, 8(r25)
+        lfs f0, 0x14(r12)
+        stfs f0, 0xC(r25)
+        b sst_low
+sst_gone:
+        lwz r0, 0(r25)
+        cmplw r0, r31
+        bne sst_low
+        li r0, 0
+        stw r0, 0(r25)                  # exploded / smoked: off the stack
+sst_low:
+        cmpwi r27, 0
+        beq sst_out
+        addi r24, r25, -16              # the one below
+        lwz r0, 0(r24)
+        cmpwi r0, 0
+        beq sst_none
+        li r26, 1''' + vnum('r30', SK_VAR_SEAT, 'r26') + '''
+        lfs f1, 8(r24)''' + var_set('r30', SK_VAR_SEATX) + '''
+        lfs f1, 0xC(r24)''' + var_set('r30', SK_VAR_SEATY) + '''
+        lwz r26, 4(r24)
+        li r0, 10
+        divwu r12, r26, r0
+        mulli r12, r12, 10
+        subf r26, r12, r26''' + vnum('r30', SK_VAR_SEATN, 'r26') + '''
+        b sst_out
+sst_none:
+        li r26, 0''' + vnum('r30', SK_VAR_SEAT, 'r26') + '''
+sst_out:
+        lmw r24, 0x20(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
+''' if cart else '') + r'''# (r30 its WorkModule) -> r3 its owner's slot (1-8) or 0: the first live Greninja whose VAR_15 (a skeleton asked for)
 # is on: it is cleared, his VAR_16 / 17 / 18 copied to its VAR_1 / 2 / 3, its VAR_0 = his slot
 sk_claim:
         stwu r1, -0x40(r1)
@@ -1936,9 +2015,17 @@ skc_slot:
         lis r12, %(half_hi)d
         lfs f0, %(half_lo)d(r12)
         fcmpu cr0, f1, f0
-        ble skc_next''' + zero + var_set('r27', GK_VAR_SKREQ) + var_get('r27', GK_VAR_SKX) + var_set('r30', SK_VAR_X) + \
+        ble skc_next''' + ('''
+        fctiwz f2, f1                   # clone articles v1: its level = his VAR_15 - 1 (0 - 2)
+        stfd f2, 0x18(r1)
+        lwz r26, 0x1C(r1)
+        addi r26, r26, -1
+        cmplwi r26, %(sk_levels1)d
+        ble skc_lvl
+        li r26, 0
+skc_lvl:''' if cart else '') + zero + var_set('r27', GK_VAR_SKREQ) + var_get('r27', GK_VAR_SKX) + var_set('r30', SK_VAR_X) + \
         var_get('r27', GK_VAR_SKY) + var_set('r30', SK_VAR_Y) + var_get('r27', GK_VAR_SKDIR) + var_set('r30', SK_VAR_DIR) + \
-        vnum('r30', SK_VAR_SLOT, 'r29') + D(vint('r30', SK_VAR_X, 'r5') + '''
+        vnum('r30', SK_VAR_SLOT, 'r29') + (vnum('r30', SK_VAR_LEVEL, 'r26') if cart else '') + D(vint('r30', SK_VAR_X, 'r5') + '''
         stw r5, 0x10(r1)''' + vint('r30', SK_VAR_Y, 'r6') + '''
         stw r6, 0x14(r1)''' + vint('r30', SK_VAR_DIR, 'r7') + '''
         lwz r5, 0x10(r1)
@@ -2180,11 +2267,18 @@ sk_hits:
         lfs f3, 8(r8)
         fadds f4, f2, f3
         stfs f4, 0x18(r8)               # top
+''' + (vint('r18', SK_VAR_LEVEL, 'r14') + '''
+        cmplwi r14, %(sk_levels1)d
+        ble skh_bank
+        li r14, 0
+skh_bank:
+        mulli r14, r14, %(sk_bank)d     # clone articles v1: a bank of latches per level''' if cart else '') + '''
         addi r12, r19, -1
         mulli r12, r12, %(sk_lat8)d
         lis r16, %(sk_latch_hi)d
         addi r16, r16, %(sk_latch_lo)d
-        add r16, r16, r12               # its latches
+        add r16, r16, r12               # its latches''' + ('''
+        add r16, r16, r14''' if cart else '') + '''
         li r15, 0
 skh_ref:                                # every latched attacker: entries no longer on let go
         slwi r12, r15, 3
@@ -3060,7 +3154,9 @@ def layout(img, feats=None):
     rows += [[CLONE_KIND, 1, 0, 0], [CLONE_KIND, 1, 0, 0]]
     feats = FEATURES if feats is None else feats
     if 'skeleton' in feats:
-        rows += [[SK_KIND, 1, 0, 0]]                    # skeleton v1: article 8, one at a time
+        rows += [[SK_KIND, SK_LEVELS if 'cart' in feats else 1, 0, 0]]   # skeleton v1: article 8, one at a time (clone
+        if 'cart' in feats:                             # articles v1: 3, his and his clones', stacked)
+            rows[0] = [rows[0][0], SH_MAX] + rows[0][2:]
     if 'burn2' in feats:
         assert 'skeleton' in feats, 'burn2 needs skeleton'
         rows += [[TR_KIND, TR_MAX, 0, 0]]               # burn v2: article 9, the fire trails (TR_MAX at once)
@@ -3143,7 +3239,8 @@ def build(rpx, diag=False, feats=None):
     A['sk_box'] = alloc(0x1C, 4) if skel else 0             # (W, 0, H) + this frame's left / right / bottom / top
     A['sk_nums'] = alloc(4 * 10, 4) if skel else 0           # 0.0 - 9.0 (ints as floats)
     A['sk_k'] = alloc(20, 4) if skel else 0                  # SK_HP, 10.0, 8.0 (the hit point's height), 0.5, SK_SCALE
-    A['sk_latch'] = alloc(SLOTS * SK_LATCH * 8, 4) if skel else 0
+    A['sk_latch'] = alloc(SLOTS * SK_LATCH * 8 * (SK_LEVELS if 'cart' in feats else 1), 4) if skel else 0
+    A['sk_seat'] = alloc(SLOTS * SK_LEVELS * 16, 4) if 'cart' in feats else 0   # clone articles v1: the stack
     A['hyd_t'] = alloc(4, 4) if skel and diag else 0          # v1.2 diag: the hydrant's +0x94 calls
     burn2 = 'burn2' in feats
     A['tr_ents'] = alloc(8 * 3) if burn2 else 0               # burn v2: the trail's motion entries (the hydrant's motion)
@@ -3283,7 +3380,9 @@ def build(rpx, diag=False, feats=None):
         out.blob(A['sk_box'], struct.pack('>7f', sk_dims(feats)[0], 0.0, sk_dims(feats)[2], 0, 0, 0, 0), 'skeleton hit box')
         out.blob(A['sk_nums'], struct.pack('>10f', *range(10)), 'skeleton 0-9')
         out.blob(A['sk_k'], struct.pack('>5f', SK_HP, 10.0, 8.0, 0.5, SK_SCALE), 'skeleton constants')
-        out.blob(A['sk_latch'], bytes(SLOTS * SK_LATCH * 8), 'skeleton attackers latched')
+        out.blob(A['sk_latch'], bytes(SLOTS * SK_LATCH * 8 * (SK_LEVELS if 'cart' in feats else 1)), 'skeleton attackers latched')
+        if 'cart' in feats:
+            out.blob(A['sk_seat'], bytes(SLOTS * SK_LEVELS * 16), 'skeleton stack: accessor, counter, x, y per owner / level')
         if diag:
             out.blob(A['hyd_t'], bytes(4), 'hydrant diag counter')
     if burn2:
@@ -3366,14 +3465,14 @@ def build(rpx, diag=False, feats=None):
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
              wstop=W_STOP, wcol=W_COLOUR, wmodel=W_MODEL, wlink=W_LINK, wvis=W_VIS, wpost=W_POSTURE,
              cclear=COLOUR_CLEAR, nmoves=len(burn_moves(feats)), bcap=BURN_CAP, bcap16=BURN_CAP * 16, bents=BURN_ENTS,
-             dm_add=DM_ADD, mark_off=MARK_OFF, mark=MARK, fstatus=F_STATUS, st_kind=ST_KIND, st_dead=ST_DEAD, st_dead_n=ST_DEAD_N, ent_log=ENT_LOG, node_obj=NODE_OBJ, node_type=NODE_TYPE, mm_kind=MM_KIND, am_ents=AM_ENTS, am_count=AM_COUNT, am_max=AM_MAX, ent_size=ENT_SIZE,
+             dm_add=DM_ADD, sk_levels=SK_LEVELS, sk_levels1=SK_LEVELS - 1, mark_off=MARK_OFF, mark=MARK, fstatus=F_STATUS, st_kind=ST_KIND, st_dead=ST_DEAD, st_dead_n=ST_DEAD_N, ent_log=ENT_LOG, node_obj=NODE_OBJ, node_type=NODE_TYPE, mm_kind=MM_KIND, am_ents=AM_ENTS, am_count=AM_COUNT, am_max=AM_MAX, ent_size=ENT_SIZE,
              ent_nodes=ENT_NODES, node_max=NODE_MAX, node_on=NODE_ON, node_min_x=NODE_MIN_X, node_min_y=NODE_MIN_Y,
              node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD,
-             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, pm_scale=PM_SCALE, sk_remake=SK_REMAKE, npose=len(POSE_BONES), pose_min=POSE_MIN, mdl_mtx=MDL_MTX, mm_model=MM_MODEL, log_off=POSE_LOG_BONE * 0x30 + 0xC, nlatch=SLOTS * SK_LATCH * 2, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(SK_VERTS), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(burn_contexts(feats) * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
+             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, pm_scale=PM_SCALE, sk_remake=SK_REMAKE, npose=len(POSE_BONES), pose_min=POSE_MIN, mdl_mtx=MDL_MTX, mm_model=MM_MODEL, log_off=POSE_LOG_BONE * 0x30 + 0xC, nlatch=SLOTS * SK_LATCH * 2 * (SK_LEVELS if 'cart' in feats else 1), sk_bank=SLOTS * SK_LATCH * 8, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(SK_VERTS), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(burn_contexts(feats) * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
              hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'pose_tab', 'pose_last', 'gk_ftp', 'sk_desc', 'gk_fcd', 'gk_fce', 'gk_fcf', 'gk_fcg', 'gk_fch', 'hyd_t', 'gk_fsg', 'gk_fsd', 'gk_fsv', 'gk_fse', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'gk_fsn', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'pose_tab', 'pose_last', 'gk_ftp', 'sk_desc', 'gk_fcd', 'gk_fce', 'gk_fcf', 'gk_fcg', 'gk_fch', 'hyd_t', 'gk_fsg', 'gk_fsd', 'gk_fsv', 'gk_fse', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'gk_fsn', 'sk_seat', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -5692,7 +5791,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''
@@ -5788,7 +5887,7 @@ w_dcase:
     for i, w in enumerate(words):
         out.put(code_at + 4 * i, w, 'code %s' % a.items[i] if hasattr(a, 'items') else 'code')
     end = code_at + 4 * len(words)
-    assert end <= LIMIT, 'cave full: 0x%08X' % end
+    assert end <= limit_of(feats), 'cave full: 0x%08X' % end
     lab = a.labels
     # the singleton's vtable copy with our hit method
     vb = bytearray(img.blob(L['svt'], L['vsize']))
@@ -5862,7 +5961,7 @@ w_dcase:
         for i, w in enumerate(t.words()):
             out.put(HYD_TRAMP + 4 * i, w, 'hydrant diag trampoline', 0)
     ct = OL.clear_tail(img.w)                         # burn v1.2: the clear-all chain's last `b CLEAR_BACK` -> gk_clear
-    assert not CAVE <= ct < LIMIT, 'clear chain already through this cave'
+    assert not CAVE <= ct < limit_of(feats), 'clear chain already through this cave'
     out.put(ct, asm1(ct, 'b 0x%X' % lab['gk_clear']), 'the clear-all chain -> gk_clear (burn v1.2)', img.w(ct))
     assert PANEL_VT not in img.relocs(), 'the panel update word has a relocation'
     out.put(PANEL_VT, lab['gk_panel'], 'the damage panel update: the gauge (then the trait badge / the game)', PANEL_PREV)
@@ -5904,7 +6003,8 @@ w_dcase:
 
 def args(rpx, diag=False, feats=None):
     out, _info = build(rpx, diag, feats)
-    return ['textregion:0x%X' % TEXT_REGION, 'grow:0x%08X' % LIMIT] + \
+    lim = limit_of(_info['feats'])
+    return ['textregion:0x%X' % (lim - 0x02000000), 'grow:0x%08X' % lim] + \
         ['0x%08X=0x%08X' % (a, w) for a, (w, _n) in sorted(out.words.items())]
 
 
@@ -5924,7 +6024,7 @@ def main():
         for nm in ('g1_stub', 'hud', 's13', 's42', 's43', 'gk_entry', 'w_hit', 'w_init', 'w_poll', 'gk_panel', 'gk_dcase',
                    'w_dcase'):
             print('%-10s 0x%08X' % (nm, info['labels'][nm]))
-        print('end        0x%08X (limit 0x%08X), %d words' % (info['end'], LIMIT, len(out.words)))
+        print('end        0x%08X (limit 0x%08X), %d words' % (info['end'], limit_of(feats), len(out.words)))
         return
     print(' '.join(args(o.rpx, o.diag, feats)))
 
