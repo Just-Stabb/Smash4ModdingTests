@@ -406,10 +406,15 @@ def msc_tests(mscsb, src):
     frames(m, 10)
     g.press, g.stick = {1}, (0.0, -1.0)
     x2 = g.x
+    g.vars[0x0F0003C9] = 0
+    m.vm.g[24] = 0x8000
     m('gekkouga_frame')
-    check('plain down special: nothing (no swap, no stance)', (g.x, g.status_req), (x2, []))
+    check('aligned kick v1: plain down special (no left / right): no swap, not cleared (the buffer, the special bits: the '
+          'game\'s input goes on)', (g.x, g.status_req, g.vars.get(0x0F0003C9), m.vm.g[24] & 0xF000), (x2, [], 0, 0x8000))
     r = m('gk_lw_press')
-    check('the input sites during the ability: no stance', (r, g.status_req), (0, []))
+    check('aligned kick v1: the input sites during the ability: the aligned kick (0x161), no stance', (r, g.status_req),
+          (1, [(0x161, 1)]))
+    g.status_req = []
     g.press, g.stick = {1}, (0.0, 1.0)
     m.vm.g[24] = 0x4000
     m('gekkouga_frame')
@@ -1481,7 +1486,11 @@ def clone_fx_tests(mscsb, src, out):
         except (IndexError, AssertionError):
             return False
     bad = []
+    import acmd as _acmd
+    kick = {_acmd.crc(n) for n in GB.KICK_SCRIPTS} if hasattr(GB, 'KICK_SCRIPTS') else set()
     for crc, cmds in ce.scripts.items():
+        if crc in kick:                  # aligned kick v1: the counter kick's False branches (clone_kick; aligned_kick_tests)
+            continue
         if crc not in pe.scripts:
             bad.append((hex(crc), 'not his'))
             continue
