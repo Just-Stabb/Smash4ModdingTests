@@ -1629,11 +1629,11 @@ def tuning_tests(mscsb, src, out, user, tr_mscsb):
         t.setg('tr_type', ty)
         n = t('tr_fx_count')
         fl[ty] = [(round(fv(t('tr_fx_dz', k)), 2), round(fv(t('tr_fx_size', k)), 2)) for k in range(n)]
-    check('tuning: denser trails: forward 12 flames 8 - 85 (7 apart), up 8 (4 - 22 each side, 6 apart), down 16 (6 - 55 '
-          'each side, 7 apart), sizes 0.85 - 1.15',
+    check('trail lite v1: half the flames over the same lengths: forward 6 flames 8 - 85 (15.4 apart), up 4 (4 and 22 '
+          'each side), down 8 (6 - 55 each side, 16.3 apart), sizes 0.85 - 1.15',
           ({k: (len(x), min(z for z, _ in x), max(z for z, _ in x)) for k, x in fl.items()},
            sorted({sz for x in fl.values() for _, sz in x})),
-          ({1: (12, 8.0, 85.0), 2: (8, -22.0, 22.0), 3: (16, -55.0, 55.0)}, [0.85, 0.95, 1.05, 1.15]))
+          ({1: (6, 8.0, 85.0), 2: (4, -22.0, 22.0), 3: (8, -55.0, 55.0)}, [0.85, 0.95, 1.05, 1.15]))
     unc = []
     for ty, nm in ((1, 'FireTrailS4'), (2, 'FireTrailHi4'), (3, 'FireTrailLw4')):
         for z, _sz in fl[ty]:
@@ -3325,13 +3325,15 @@ def firetrail_tests(mscsb, src):
            [('fx', 0x26, 0), ('fx', 0x1C, 1), ('fx', 0x2717, 0x330001C, 0, 0.0, 0.0, 8.0)], []))
     g.log = []
     run(m, 5)
-    check('trail: a flame a frame along its way (local Z 15 ... 43, X / Y 0: on the ground ahead; tuning v1: 7 apart)',
-          [x[4:7] for x in g.log if x[0] == 'fx'], [(0.0, 0.0, 8.0 + 7.0 * k) for k in range(1, 6)])
+    check('trail: a flame a frame along its way (local Z 23.4 ... 85, X / Y 0: on the ground ahead; trail lite v1: 15.4 '
+          'apart, 6 in all)',
+          [tuple(round(v, 2) for v in x[4:7]) for x in g.log if x[0] == 'fx'],
+          [(0.0, 0.0, round(8.0 + 15.4 * k, 2)) for k in range(1, 6)])
     g.log = []
     run(m, 158)
-    check('trail: frames 7 - 164: its last 6 flames (50 ... 85: tuning v1, 12 in all), then nothing; it stays put',
+    check('trail: frames 7 - 164: no more flames (trail lite v1: all 6 made by frame 6), then nothing; it stays put',
           ([x[6] for x in g.log if x[0] == 'fx'], [x for x in g.log if x[0] == 'remove'], g.posture_sets[-1]),
-          ([8.0 + 7.0 * k for k in range(6, 12)], [], (40.0, 10.0)))
+          ([], [], (40.0, 10.0)))
     g.log = []
     run(m, 1)
     check('trail: frame 165: its fire fades (0x2723 (id, 0, 0): its set\'s 15-frame fade)', [x for x in g.log if x[0] == 'fx'],
@@ -3343,9 +3345,9 @@ def firetrail_tests(mscsb, src):
     check('trail: frame 180 (3 s): its fire ended, removed', [x for x in g.log if x[0] in ('fx', 'remove')],
           [('fx', 0x2723, 0x330001C, 1, 1), ('remove',)])
     for typ, way, want in [(t, w, ws) for t, ws in (
-            (1, [8.0 + 7.0 * k for k in range(12)]),                 # (tuning v1: denser)
-            (2, [(4.0 + 6.0 * (k // 2)) * (1 - 2 * (k % 2)) for k in range(8)]),
-            (3, [(6.0 + 7.0 * (k // 2)) * (1 - 2 * (k % 2)) for k in range(16)])) for w in (1.0, -1.0)]:
+            (1, [round(8.0 + 15.4 * k, 2) for k in range(6)]),       # (trail lite v1: half of tuning v1's, same lengths)
+            (2, [(4.0 + 18.0 * (k // 2)) * (1 - 2 * (k % 2)) for k in range(4)]),
+            (3, [round((6.0 + 49.0 / 3.0 * (k // 2)) * (1 - 2 * (k % 2)), 2) for k in range(8)])) for w in (1.0, -1.0)]:
         m, g = make()
         g.vars.update({0x0F000300: 3.0, 0x0F000301: float(typ), 0x0F000302: 0.0, 0x0F000303: 0.0, 0x0F000304: way})
         run(m, 20)
@@ -3354,7 +3356,7 @@ def firetrail_tests(mscsb, src):
                   ('forward', 'up', 'down')[typ - 1], 'right' if way > 0 else 'left', typ - 1,
                   'ahead' if typ == 1 else 'each side alternately (up smash: under its geyser, 6 / 14: an interpretation)'),
               ([x[1] for x in g.log if x[0] == 'motion'], [x for x in g.log if x[0] == 'lr'][:1],
-               [x[4:7] for x in g.log if x[0] == 'fx' and x[1] == 0x2717]),
+               [tuple(round(v, 2) for v in x[4:7]) for x in g.log if x[0] == 'fx' and x[1] == 0x2717]),
               ([typ - 1], [('lr', way)], [(0.0, 0.0, z) for z in want]))
 
 

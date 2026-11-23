@@ -631,7 +631,9 @@ int tr_wait_max() { return 30; }          // never claimed: removed
 int tr_fx() { return 0x330001c; }         // his bank's PtcGekkougaFireTrail (fire_ground_10: its base on the point)
 // tuning v1 (the user: "please make the trail fire more full, for each smash attack and match them better"): denser,
 // overlapping flames (7 apart or less: the flame ~14 wide), their sizes varied 0.85 - 1.15 (k x 3 mod 4), their flipbooks
-// out of step (one made a frame)
+// out of step (one made a frame); trail lite v1 (the user: "make the smash attacks spawn less fire but cover the same
+// area"): half as many flames over the same lengths, about 15 - 18 apart (each flame's quad ~21 wide at size 1, its
+// second layer ~29: the band stays unbroken)
 float tr_fx_size(int k) { return 0.85f + 0.1f * (float)((k * 3) % 4); }
 
 float tr_var(int n)
@@ -649,13 +651,13 @@ int tr_fx_count()
 {
     if (tr_type == 0x1)
     {
-        return 12;                        // forward smash: 8 - 85 ahead (its blade 85 long: tuning v1)
+        return 6;                         // forward smash: 8 - 85 ahead (its blade 85 long: tuning v1; 12 -> 6 trail lite v1)
     }
     if (tr_type == 0x2)
     {
-        return 8;                         // up smash: 4 - 22 each side under its geyser
+        return 4;                         // up smash: 4 and 22 each side under its geyser (8 -> 4 trail lite v1)
     }
-    return 16;                            // down smash: 6 - 55 each side along its sweep
+    return 8;                             // down smash: 6 - 55 each side along its sweep (16 -> 8 trail lite v1)
 }
 
 // fire trail fix v1: forward along its way (joint 0's local Z)
@@ -665,9 +667,9 @@ float tr_fx_dz(int k)
     {
         if (k % 2 == 0)
         {
-            return 4.0f + 6.0f * (float)(k / 2);
+            return 4.0f + 18.0f * (float)(k / 2);
         }
-        return -4.0f - 6.0f * (float)(k / 2);
+        return -4.0f - 18.0f * (float)(k / 2);
     }
     return tr_fx_dx(k);
 }
@@ -676,7 +678,7 @@ float tr_fx_dx(int k)
 {
     if (tr_type == 0x1)
     {
-        return 8.0f + 7.0f * (float)k;
+        return 8.0f + 15.4f * (float)k;
     }
     if (tr_type == 0x2)
     {
@@ -684,9 +686,9 @@ float tr_fx_dx(int k)
     }
     if (k % 2 == 0)
     {
-        return 6.0f + 7.0f * (float)(k / 2);
+        return 6.0f + 16.333334f * (float)(k / 2);
     }
-    return -6.0f - 7.0f * (float)(k / 2);
+    return -6.0f - 16.333334f * (float)(k / 2);
 }
 
 float tr_fx_dy(int k)

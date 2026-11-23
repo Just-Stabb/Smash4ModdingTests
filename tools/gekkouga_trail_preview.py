@@ -29,12 +29,12 @@ def offsets():
     """(smash, [local Z]) from fighters/gekkouga/weapons/firetrail.c (tr_fx_count / tr_fx_dz / tr_fx_dx)"""
     out = []
     for t, name in ((1, 'forward'), (2, 'up'), (3, 'down')):
-        if t == 1:                       # tuning v1's denser trails
-            zs = [8.0 + 7.0 * k for k in range(12)]
+        if t == 1:                       # trail lite v1: half of tuning v1's flames over the same lengths
+            zs = [8.0 + 15.4 * k for k in range(6)]
         elif t == 2:
-            zs = [(4.0 + 6.0 * (k // 2)) * (1 if k % 2 == 0 else -1) for k in range(8)]
+            zs = [(4.0 + 18.0 * (k // 2)) * (1 if k % 2 == 0 else -1) for k in range(4)]
         else:
-            zs = [(6.0 + 7.0 * (k // 2)) * (1 if k % 2 == 0 else -1) for k in range(16)]
+            zs = [(6.0 + 16.333334 * (k // 2)) * (1 if k % 2 == 0 else -1) for k in range(8)]
         out.append((name, zs))
     return out
 
@@ -48,8 +48,8 @@ def main():
     a = ap.parse_args()
     from PIL import Image, ImageDraw
     src = open(os.path.join(ROOT, 'fighters', 'gekkouga', 'weapons', 'firetrail.c')).read()
-    assert 'return 4.0f + 6.0f * (float)(k / 2);' in src and 'return 8.0f + 7.0f * (float)k;' in src and \
-        'return 6.0f + 7.0f * (float)(k / 2);' in src and 'return 0.85f + 0.1f * (float)((k * 3) % 4);' in src
+    assert 'return 4.0f + 18.0f * (float)(k / 2);' in src and 'return 8.0f + 15.4f * (float)k;' in src and \
+        'return 6.0f + 16.333334f * (float)(k / 2);' in src and 'return 0.85f + 0.1f * (float)((k * 3) % 4);' in src
     gid = int(re.search(r'int tr_fx\(\) \{ return (0x[0-9a-f]+); \}', src).group(1), 16)
     items, bones, bind = NP.model_items(a.vanilla)
     o = omo.Omo(dict(omo.pac_read(os.path.join(a.vanilla, 'motion', 'body', 'main.pac')))['FitGekkougaBodyMainA00Wait1.omo'])

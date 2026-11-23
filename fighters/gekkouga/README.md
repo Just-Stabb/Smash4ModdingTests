@@ -1786,3 +1786,22 @@ solid collision from the bottom", "the smash attack charging star effect normal 
   - `gekkouga_fx_test` (the trail's layers);
   - the earlier checks moved to the new values.
 - Not confirmed in game.
+
+## Trail lite v1 (in the next package, with the neutral air changes)
+
+The user: "make the smash attacks spawn less fire but cover the same area".
+
+- `weapons/firetrail.c`: half of tuning v1's flames over the same lengths:
+  - forward 6 (8 - 85, 15.4 apart);
+  - up 4 (4 and 22 each side);
+  - down 8 (6 - 55 each side, 16.3 apart);
+  - sizes 0.85 - 1.15 as before.
+- `gekkouga_fx.py` `TRAIL_WIDE` 1.9 -> 3.0: each flame (both layers) wider, so the band stays unbroken at its base.
+- The trails' hitboxes (`TR_BOXES`) are unchanged: the same area.
+- Preview `$S/gk_preview/trail_lite.png`.
+- Tests:
+  - `firetrail_tests` and the tuning trail check moved to the new positions;
+  - `gekkouga_fx_test` 51 / 0;
+  - `msc_stack_check` firetrail 0 problems, globals 30;
+  - the opcode guard OK.
+- Not confirmed in game.
