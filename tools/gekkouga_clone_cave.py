@@ -105,7 +105,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
                       'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2',
-                      'gready', 'skbot', 'shalf'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'gready', 'skbot', 'shalf', 'ice'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -134,6 +134,9 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', '
 #   shalf   smash tune v1: his smash attacks' shield damage x 0.5 (SH_HOOK: a Greninja's attack in a smash motion, his or a
 #           clone's, or the fire trail's (its hitboxes' Type SH_TYPE): this hit's shield damage halved before the game's
 #           multiplier)
+#   ice     ice detonation v1 (needs btint): an ice (Effect 4) hit on a burning fighter clears its burns and arms a blast
+#           52 frames later (ICE_HOOK in the victim hit handler, ice_arm / ice_vic / ice_req; the flashing in the burn tint's
+#           slot; the blast is a fire trail article in its blast mode, asked of a Greninja through ICE_VAR)
 #   bstart  v8: the clone's start (specializer +0x34) runs bunshin's own (0x02AF6738: black overlay, LinkModule link 3
 #           attributes 0 / 0xD, EffectModule +0xB4 / +0xA4), then clears the black (ColorBlendModule vt +0x44(0), as
 #           Terminate_Overlays' handler 0x02BE37B8 does); without it the start does nothing (v7)
@@ -905,6 +908,443 @@ btu_out:
 '''
 
 
+def ice_src(D, btint=True):
+    """ice detonation v1 (feature ice): ice_hit (ICE_HOOK's branch), ice_arm, ice_vic (the countdown, from burn_tick),
+    ice_req (the blast's request), ice_gk_ok"""
+    chk = lambda reg, bad: '''
+        lis r0, 0x1000
+        cmplw %s, r0
+        blt %s
+        lis r0, 0x8000
+        cmplw %s, r0
+        bge %s''' % (reg, bad, reg, bad)
+    tint_off = '''
+        lis r12, %(bti_st_hi)d
+        addi r12, r12, %(bti_st_lo)d
+        slwi r0, r31, 4
+        add r12, r12, r0
+        li r0, 0
+        stw r0, 0(r12)                  # its burn tint off the next frame (tier 0, fade -1: bti_vic's reset path)
+        li r0, -1
+        stw r0, 4(r12)''' if btint else ''
+    return r'''
+# ==== ice detonation v1: ICE_HOOK (the victim hit handler, r27 the victim's accessor, r28 the hit info; every volatile
+# register free) -> here: an ice (Effect 4) hit on a fighter arms it (ice_arm); then the game's word, back
+ice_hit:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stw r31, 0x2C(r1)
+        lbz r0, %(hit_elem)d(r28)       # the hitbox's Effect (its data's copy +0x43)
+        cmpwi r0, %(ice_elem)d
+        bne ih_out
+        li r31, 1
+ih_find:
+        cmpwi r31, %(slots)d
+        bgt ih_out
+        mr r3, r31
+        bl gk_entry
+        cmpwi r3, 0
+        beq ih_next
+        lwz r0, %(bacc)d(r3)
+        cmplw r0, r27
+        beq ih_vic
+ih_next:
+        addi r31, r31, 1
+        b ih_find
+ih_vic: addi r3, r31, -1                # the victim's slot 0-7
+        mr r4, r28
+        mr r5, r27
+        bl ice_arm
+ih_out: lwz r31, 0x2C(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        lwz r3, 0x20(r27)               # the game's word
+        b 0x%(ice_back)08X
+
+# (r3 the victim 0-7, r4 the hit info, r5 its accessor): not armed and burning -> its burns cleared and recorded, armed
+ice_arm:
+        stwu r1, -0x80(r1)
+        mflr r0
+        stw r0, 0x84(r1)
+        stmw r24, 0x60(r1)
+        mr r31, r3
+        mr r30, r4
+        mr r29, r5
+        lis r28, %(ice_st_hi)d
+        addi r28, r28, %(ice_st_lo)d
+        slwi r0, r31, 5
+        add r28, r28, r0                # its state
+        lwz r0, 0(r28)
+        cmpwi r0, 0
+        bgt ia_out                      # armed already: an ice re-hit is ignored
+        lis r25, %(ice_k_hi)d
+        addi r25, r25, %(ice_k_lo)d
+        lfs f2, 8(r25)                  # the remaining damage: 0
+        li r9, 0
+ia_z:   slwi r10, r9, 2
+        addi r10, r10, 0x20
+        stfsx f2, r1, r10               # per owner (0x20 + 4 x slot)
+        addi r9, r9, 1
+        cmpwi r9, %(slots)d
+        blt ia_z
+        lfd f8, 0(r25)
+        lis r9, 0x4330
+        stw r9, 0x10(r1)
+        lis r12, %(btab_hi)d
+        addi r12, r12, %(btab_lo)d
+        mulli r0, r31, %(bcap16)d
+        add r12, r12, r0
+        mr r24, r12                     # its instances
+        li r11, %(bcap)d
+        li r27, 0                       # the stacks
+        li r26, 0                       # the owner (the first instance's, then the one with the most)
+ia_cnt: lwz r0, 0(r12)
+        cmpwi r0, 0
+        beq ia_cn
+        cmpwi r27, 0
+        bne ia_c2
+        lwz r26, 8(r12)
+ia_c2:  addi r27, r27, 1
+        lhz r9, 6(r12)                  # its interval
+        cmpwi r9, 0
+        beq ia_cn
+        xoris r0, r0, 0x8000
+        stw r0, 0x14(r1)
+        lfd f5, 0x10(r1)
+        fsub f5, f5, f8
+        frsp f5, f5                     # frames left
+        xoris r9, r9, 0x8000
+        stw r9, 0x14(r1)
+        lfd f6, 0x10(r1)
+        fsub f6, f6, f8
+        frsp f6, f6
+        lfs f4, 12(r12)
+        fdivs f7, f4, f6
+        fmuls f7, f7, f5                # its remaining damage
+        fadds f2, f2, f7
+        lwz r9, 8(r12)
+        cmplwi r9, %(slots)d
+        bge ia_cn
+        slwi r9, r9, 2
+        addi r9, r9, 0x20
+        lfsx f0, r1, r9
+        fadds f0, f0, f7
+        stfsx f0, r1, r9
+ia_cn:  addi r12, r12, 16
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne ia_cnt
+        cmpwi r27, 0
+        beq ia_out                      # not burning: nothing
+        cmplwi r26, %(slots)d
+        blt ia_ow
+        li r26, 0
+ia_ow:  li r9, 0
+ia_best:
+        slwi r10, r9, 2
+        addi r10, r10, 0x20
+        lfsx f0, r1, r10
+        slwi r10, r26, 2
+        addi r10, r10, 0x20
+        lfsx f1, r1, r10
+        fcmpu cr0, f0, f1
+        ble ia_bn
+        mr r26, r9
+ia_bn:  addi r9, r9, 1
+        cmpwi r9, %(slots)d
+        blt ia_best
+        li r0, 0                        # every burn on it cleared (anyone's)
+        li r11, %(bcap)d
+        mr r12, r24
+ia_clr: stw r0, 0(r12)
+        addi r12, r12, 16
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne ia_clr
+        li r0, 1
+        stw r0, 0(r28)                  # armed: frame 1 next
+        stfs f2, 4(r28)
+        stw r27, 8(r28)
+        stw r26, 0xC(r28)
+        xoris r0, r27, 0x8000
+        stw r0, 0x14(r1)
+        lfd f5, 0x10(r1)
+        fsub f5, f5, f8
+        frsp f5, f5
+        lfs f0, 12(r25)
+        fmadds f3, f5, f0, f2           # b = remaining + ICE_STACK x stacks ...
+        lfs f0, 16(r25)
+        fcmpu cr0, f3, f0
+        ble ia_b
+        fmr f3, f0                      # ... at most ICE_AMOUNT_MAX
+ia_b:   stfs f3, 0x14(r28)
+        li r0, -1
+        stw r0, 0x18(r28)
+        lfs f1, 20(r25)
+        stfs f1, 0x10(r28)              # the way: +1 unless the attacker stands right of it
+        lis r3, %(mgr_hi)d
+        lwz r3, %(mgr_lo)d(r3)          # the battle object manager
+        cmpwi r3, 0
+        beq ia_tint
+        lwz r4, %(hit_att)d(r30)        # the attacker's object id
+        lis r12, 0x%(look_hi)04X
+        ori r12, r12, 0x%(look_lo)04X
+        mtctr r12
+        bctrl                           # its record
+        cmpwi r3, 0
+        beq ia_tint
+        lbz r0, 0x1E(r3)
+        cmplwi r0, 4
+        blt ia_tint
+        lwz r12, 0xC(r3)''' + chk('r12', 'ia_tint') + '''
+        lwz r12, %(wpost)d(r12)''' + chk('r12', 'ia_tint') + '''
+        lwz r11, %(wpost)d(r29)''' + chk('r11', 'ia_tint') + '''
+        lfs f1, 0x10(r12)               # the attacker's x
+        lfs f2, 0x10(r11)               # the victim's
+        fcmpu cr0, f2, f1
+        bge ia_tint
+        lfs f0, 24(r25)
+        stfs f0, 0x10(r28)              # left of it: -1
+ia_tint:''' + tint_off + D('''
+        lfs f1, 0x14(r28)
+        lis r12, %(hundred_hi)d
+        lfs f0, %(hundred_lo)d(r12)
+        fmuls f1, f1, f0
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lfs f1, 0x10(r28)
+        fctiwz f1, f1
+        stfd f1, 0x48(r1)
+        lis r3, %(gk_fia_hi)d
+        addi r3, r3, %(gk_fia_lo)d
+        mr r4, r31
+        lwz r5, 0x1C(r1)
+        lwz r6, 8(r28)
+        lwz r7, 0xC(r28)
+        lwz r8, 0x4C(r1)''' + osr()) + '''
+ia_out: lmw r24, 0x60(r1)
+        lwz r0, 0x84(r1)
+        mtlr r0
+        addi r1, r1, 0x80
+        blr
+
+# (r3 a victim 0-7, r4 his slot 0-7): its countdown, one step a frame (the first live Greninja's burn_tick only)
+ice_vic:
+        stwu r1, -0x50(r1)
+        mflr r0
+        stw r0, 0x54(r1)
+        stmw r25, 0x30(r1)
+        mr r31, r3
+        mr r30, r4
+        li r29, 0
+iv_g:   cmpw r29, r30
+        bge iv_me
+        addi r3, r29, 1
+        bl gk_entry
+        cmpwi r3, 0
+        beq iv_gn
+        lwz r0, 4(r3)
+        cmpwi r0, %(gkind)d
+        beq iv_out                      # an earlier Greninja's burn_tick does it
+iv_gn:  addi r29, r29, 1
+        b iv_g
+iv_me:  lis r28, %(ice_st_hi)d
+        addi r28, r28, %(ice_st_lo)d
+        slwi r0, r31, 5
+        add r28, r28, r0
+        lwz r27, 0(r28)
+        cmpwi r27, 0
+        beq iv_out
+        addi r3, r31, 1
+        bl gk_entry
+        cmpwi r3, 0
+        beq iv_gone
+        lwz r26, %(bacc)d(r3)''' + chk('r26', 'iv_gone') + '''
+        cmpwi r27, -1
+        beq iv_off                      # a reset: off
+        lwz r11, %(fstatus)d(r26)''' + chk('r11', 'iv_live') + '''
+        lwz r25, %(st_kind)d(r11)
+        addi r10, r25, -%(st_dead)d
+        cmplwi r10, %(st_dead_n)d
+        blt iv_ko                       # KO'd: cancelled
+iv_live:
+        cmpwi r27, %(ice_frames)d
+        bgt iv_off                      # done (the blast is out): the colour off, free again
+        lis r4, %(ice_flash_hi)d
+        addi r4, r4, %(ice_flash_lo)d
+        addi r0, r27, -1
+        slwi r0, r0, 4
+        add r4, r4, r0                  # this frame's colour
+        lwz r3, %(wcol)d(r26)''' + chk('r3', 'iv_req') + '''
+        li r5, %(ice_slot)d
+        li r6, 0
+        lwz r12, 0(r3)
+        lwz r12, 0x4C(r12)
+        mtctr r12
+        bctrl
+iv_req: cmpwi r27, %(ice_ask)d
+        bne iv_step
+        mr r3, r31
+        bl ice_req
+iv_step:
+        addi r27, r27, 1
+        stw r27, 0(r28)
+        b iv_out
+iv_ko:''' + D('''
+        lis r3, %(gk_fic_hi)d
+        addi r3, r3, %(gk_fic_lo)d
+        mr r4, r31
+        mr r5, r25
+        mr r6, r27''' + osr()) + '''
+iv_off: li r0, 0
+        stw r0, 0(r28)
+        lwz r3, %(wcol)d(r26)''' + chk('r3', 'iv_out') + '''
+        li r4, %(ice_slot)d
+        lwz r12, 0(r3)
+        lwz r12, %(cclear)d(r12)
+        mtctr r12
+        bctrl
+        b iv_out
+iv_gone:
+        li r0, 0                        # no such fighter: nothing to clear
+        stw r0, 0(r28)
+iv_out: lmw r25, 0x30(r1)
+        lwz r0, 0x54(r1)
+        mtlr r0
+        addi r1, r1, 0x50
+        blr
+
+# (r3 a victim 0-7): the blast asked of a Greninja (the owner, else the first that can): his VAR ICE_VAR + 0 - 3 = type
+# 4 + b / 100, the victim's x, its y + ICE_Y, the way
+ice_req:
+        stwu r1, -0x50(r1)
+        mflr r0
+        stw r0, 0x54(r1)
+        stmw r26, 0x30(r1)
+        mr r31, r3
+        lis r30, %(ice_st_hi)d
+        addi r30, r30, %(ice_st_lo)d
+        slwi r0, r31, 5
+        add r30, r30, r0
+        lwz r28, 0xC(r30)
+        addi r28, r28, 1                # the owner's slot 1-8
+        mr r3, r28
+        addi r4, r31, 1
+        bl ice_gk_ok
+        mr. r29, r3
+        bne ir_have
+        li r28, 1
+ir_any: cmpwi r28, %(slots)d
+        bgt ir_none
+        mr r3, r28
+        addi r4, r31, 1
+        bl ice_gk_ok
+        mr. r29, r3
+        bne ir_have
+        addi r28, r28, 1
+        b ir_any
+ir_none:
+        li r28, 0                       # none: no blast
+        b ir_log
+ir_have:
+        addi r3, r31, 1
+        bl gk_entry
+        cmpwi r3, 0
+        beq ir_out
+        lwz r12, %(bacc)d(r3)''' + chk('r12', 'ir_out') + '''
+        lwz r12, %(wpost)d(r12)''' + chk('r12', 'ir_out') + '''
+        lis r11, %(ice_k_hi)d
+        addi r11, r11, %(ice_k_lo)d
+        lfs f1, 0x10(r12)
+        stfs f1, 0x14(r1)               # x
+        lfs f1, 0x14(r12)
+        lfs f0, 36(r11)
+        fadds f1, f1, f0
+        stfs f1, 0x18(r1)               # y + ICE_Y
+        lfs f1, 0x10(r30)
+        stfs f1, 0x1C(r1)               # the way
+        lfs f1, 0x14(r30)
+        lfs f0, 32(r11)
+        lfs f2, 28(r11)
+        fmadds f1, f1, f0, f2
+        stfs f1, 0x10(r1)               # type 4 + b / 100
+        lwz r12, %(acc)d(r29)
+        cmpwi r12, 0
+        beq ir_out
+        lwz r27, %(work)d(r12)          # his WorkModule
+        cmpwi r27, 0
+        beq ir_out
+        li r26, 1
+ir_set: andi. r26, r26, 3               # x, y, way, then the type
+        mr r3, r27
+        lis r4, 0x%(ice_var_hi)04X
+        ori r4, r4, 0x%(ice_var_lo)04X
+        add r4, r4, r26
+        slwi r9, r26, 2
+        addi r9, r9, 0x10
+        lfsx f1, r1, r9
+        lwz r12, 0(r3)
+        lwz r12, 0x4C(r12)
+        mtctr r12
+        bctrl
+        cmpwi r26, 0
+        beq ir_log
+        addi r26, r26, 1
+        b ir_set
+ir_log: addi r0, r28, -1
+        stw r0, 0x18(r30)               # the Greninja asked (-1 none)''' + D('''
+        lfs f1, 0x14(r30)
+        lis r12, %(hundred_hi)d
+        lfs f0, %(hundred_lo)d(r12)
+        fmuls f1, f1, f0
+        fctiwz f1, f1
+        stfd f1, 0x20(r1)
+        lis r3, %(gk_fib_hi)d
+        addi r3, r3, %(gk_fib_lo)d
+        mr r4, r31
+        addi r5, r28, -1
+        lwz r6, 0x24(r1)''' + osr()) + '''
+ir_out: lmw r26, 0x30(r1)
+        lwz r0, 0x54(r1)
+        mtlr r0
+        addi r1, r1, 0x50
+        blr
+
+# (r3 a slot 1-8, r4 the victim's 1-8) -> r3 his entry when a live Greninja, not the victim, not KO'd; else 0
+ice_gk_ok:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        cmpw r3, r4
+        beq igo_no
+        bl gk_entry
+        mr. r31, r3
+        beq igo_no
+        lwz r0, 4(r31)
+        cmpwi r0, %(gkind)d
+        bne igo_no
+        lwz r12, %(bacc)d(r31)''' + chk('r12', 'igo_no') + '''
+        lwz r11, %(fstatus)d(r12)''' + chk('r11', 'igo_yes') + '''
+        lwz r10, %(st_kind)d(r11)
+        addi r10, r10, -%(st_dead)d
+        cmplwi r10, %(st_dead_n)d
+        blt igo_no
+igo_yes:
+        mr r3, r31
+        b igo_out
+igo_no: li r3, 0
+igo_out:
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+'''
+
+
 def bfx_tier(instances):
     """the tier of a victim's burns: instances [(frames left, interval, damage a tick)] (the exe's bfx_vic)"""
     live = [(f, iv, d) for f, iv, d in instances if f]
@@ -957,10 +1397,93 @@ SH_MANAGER = 0x102F6C30           # [it]: the battle object manager (the ACMD Hi
 SH_KINDS = (95, 99, 101)          # his motion.mtable: attacks4, attackhi4, attacklw4 (BURN_MOVES' smash rows)
 SH_TYPE = 0x16                    # the trail's hitboxes' Type (Water: no Smash 4 hitbox uses it)
 SH_SCALE = 0.5
+
+# ---- ice detonation v1 (feature ice; the user: "make it so a burning character can be cleared of all burns with an ice
+# element hitbox ... this explosion to attach to the affected opponent on a delay where they quickly shift to a flashing
+# yellow and black for 52 frames until they explode ... scale the size and damage of the explosion with how burned the
+# opponent is"). (1) The trigger: every hit on a hurtbox goes through the victim hit handler 0x02C25318 (any battle
+# object's vt +0xD4; a shield hit goes to the shield's own handler 0x02E35794 instead, so a shielded ice hit never gets
+# here); at ICE_HOOK (after its r26 - r30 are set: r27 the victim's accessor, r28 the hit info, whose +0x44 is the hitbox
+# data's 0x68-byte copy: +0x87 its Effect / element, +0x2C the attacker's object id) ice_hit takes an Effect ICE_ELEMENT
+# (Freezing: reference/spreadsheets Element tab) hit on a fighter (its slot: the entry whose accessor it is) to ice_arm:
+# a victim not armed (ice_st +0 <= 0) with at least one burn instance (anyone's) has them all cleared (its fire fades,
+# bfx_vic; its tint / outline off, bti_st fade -1) and records the remaining damage (each instance's damage a tick x frames
+# left / interval, summed), the stack count, the owner with the most of it, and the way to send it (+1 when the victim
+# stands right of (or on) the attacker object, else -1: away from whoever landed the ice hit); armed (ice_st +0 = 1).
+# Re-hit with ice while armed: ignored. Burns while armed: none taken (burn_add skips an armed victim).
+# (2) The countdown (ice_vic, from burn_tick per victim, the first live Greninja's only: one step a frame, as bti_vic):
+# frame t = 1 ... ICE_FRAMES its ColorBlendModule slot BTINT_SLOT (the burn tint's) = ICE_FLASH[t - 1] (yellow / black,
+# 3 frames each to frame 30, then 2: faster toward the blast; the first two frames fading in); at t = ICE_FRAMES - ICE_LEAD
+# the blast is asked for (ice_req: the owner if a live Greninja (not Dead / Rebirth, not the victim), else the first such:
+# his VAR ICE_VAR + 0..3 = type 4 + b / 100, the victim's x, its y + ICE_Y, the way; b = the burn amount: remaining +
+# ICE_STACK x stacks, at most ICE_AMOUNT_MAX); his MSC makes article 9 (clones.c gk_ib_tick) and tr_claim gives it that
+# request first (no burn context); weapons/firetrail.c's blast mode makes the explosion (hitbox + effect) from it. At t =
+# ICE_FRAMES + 1 the slot is cleared and the victim free again. A KO (Dead / Rebirth) cancels it (slot cleared, nothing
+# asked); a match / training reset (gk_clear) too (ice_st +0 -1: the slot cleared the next frame)
+ICE_HOOK = 0x02C253B4             # the victim hit handler's `lwz r3, 0x20(r27)` (its StatusModule, after r26 - r30 are set)
+ICE_ORIG = 0x807B0020
+ICE_BACK = ICE_HOOK + 4
+ICE_ELEMENT = 4                   # Freezing ("Puts opponents to freezing state when deals more than 52.5 KB")
+HIT_ELEMENT = 0x87                # hit info +0x44 (the hitbox data) + 0x43 (its Effect)
+HIT_ATTACKER = 0x2C               # hit info: the attacker's object id
+ICE_FRAMES = 52
+ICE_LEAD = 1                      # the blast asked for one frame early (made, claimed and set within the next 1 - 2)
+ICE_STACK = 0.5                   # each stack adds this much to the burn amount (many weak stacks count)
+ICE_AMOUNT_MAX = 99.9             # (type 4 + b / 100 stays under 5)
+ICE_Y = 9.0                       # the blast's centre above the victim's feet
+ICE_VAR = 0x0F0003B0              # his gk_vi(48) - (51): the blast request (type, x, y, way)
+ICE_SLOTS_EXTRA = 2               # article 9's list: TR_MAX + this (room for blasts while 6 trails burn)
+
+
+def tr_motions(feats):
+    """the fire trail article's motion kinds: forward / up / down (+ the ice blast, FireTrailIceBoom)"""
+    return 4 if 'ice' in feats else 3
+ICE_ST = 32                       # bytes a victim: +0 t (0 off, -1 off asked, 1.. armed frame), +4 remaining damage, +8
+                                  # stacks, +0xC owner slot, +0x10 way, +0x14 b, +0x18 the Greninja asked (slot 0-7, -1)
+ICE_YELLOW = (1.0, 0.85, 0.05)
+ICE_BLACK = (0.02, 0.02, 0.02)
+ICE_ALPHA = 0.8
+
+
+def ice_flash():
+    """[(r, g, b, a)] for frames 1 ... ICE_FRAMES: yellow / black in turn, 3 frames each to frame 30, then 2 each (a
+    quickening flash); frames 1 / 2 at alpha 0.35 / 0.6 (it shifts in quickly)"""
+    out, f, c = [], 1, 0
+    while f <= ICE_FRAMES:
+        n = 3 if f <= 30 else 2
+        for _ in range(n):
+            if f > ICE_FRAMES:
+                break
+            a = 0.35 if f == 1 else 0.6 if f == 2 else ICE_ALPHA
+            out.append((ICE_YELLOW if c == 0 else ICE_BLACK) + (a,))
+            f += 1
+        c ^= 1
+    return out
+
+
+def ice_k():
+    """ice_k's bytes: +0 the int -> float magic, +8 0.0, +12 ICE_STACK, +16 ICE_AMOUNT_MAX, +20 1.0, +24 -1.0, +28 4.0,
+    +32 0.01, +36 ICE_Y"""
+    return struct.pack('>II8f', 0x43300000, 0x80000000, 0.0, ICE_STACK, ICE_AMOUNT_MAX, 1.0, -1.0, 4.0, 0.01, ICE_Y)
+
+
+def ice_amount(instances):
+    """(Python reference) a victim's burns [(frames left, interval, damage a tick, owner)] -> (remaining damage, stacks,
+    owner, b): ice_arm's record"""
+    live = [x for x in instances if x[0]]
+    rem = sum(d * f / iv for f, iv, d, _o in live if iv)
+    per = {}
+    for f, iv, d, o in live:
+        per[o] = per.get(o, 0.0) + (d * f / iv if iv else 0.0)
+    owner = live[0][3] if live else -1
+    for o in range(SLOTS):
+        if per.get(o, 0.0) > per.get(owner, 0.0) + 1e-9:
+            owner = o
+    return rem, len(live), owner, min(rem + ICE_STACK * len(live), ICE_AMOUNT_MAX)
 assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW, SK_TOUCH_ROW) for sh in (False, True)
            for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
 RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd', 'skbody',
-                     'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2', 'gready', 'skbot', 'shalf'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+                     'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2', 'gready', 'skbot', 'shalf', 'ice'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
 # + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
@@ -968,7 +1491,8 @@ RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 
 # gmupd (exe_v46z_gkb6; burn v2.1 - aerial chain v1's exe_v46z_gkb5 is RELEASE - tiers - gmupd - skbody); skeleton v1.5:
 # + skbody, sktouch (exe_v46z_gkb7; v1.3 / v1.4's gkb6 is RELEASE - skbody - sktouch); skeleton v1.6: + skdist
 # (exe_v46z_gkb8; gkb7 is RELEASE - skdist); burn tint v1: + btint (exe_v46z_gkb9; gkb8 is RELEASE - btint); smash tune v1:
-# + shalf (exe_v46z_gkb14; tuning v1's gkb13 is RELEASE - shalf)
+# + shalf (exe_v46z_gkb14; tuning v1's gkb13 is RELEASE - shalf); ice detonation v1: + ice (exe_v46z_gkb15; gkb14 is
+# RELEASE - ice)
 VARIANTS = (('A_release', RELEASE),)
 # skeleton v1.6 (the user: "Please stop packaging G_pose. It has no use anymore."): A_release only. The pose feature
 # stays (the exes shipped with it up to v1.5 still rebuild from this script); v1.5 and before: + ('G_pose', (RELEASE -
@@ -1247,7 +1771,7 @@ def vnum(wm, vid, reg):
         lfsx f1, r12, r0''' % reg + var_set(wm, vid)
 
 
-def burn2_src(D, orig94, tiers=False):
+def burn2_src(D, orig94, tiers=False, ice=False):
     """burn v2: the burning fighters' fire (bfx_vic) and the fire trail article's native part (tr_94 / tr_frame /
     tr_claim / tr_dcase); skeleton v1.3 (tiers): the fire by tier (BFX_TIERS / BFX_TIER_IDS)"""
     count = """
@@ -1529,10 +2053,16 @@ trc_slot:
         cmpwi r27, 0
         beq trc_next
         li r26, 0                       # request k
-trc_req:
+trc_req:""" + ("""
+        cmpwi r26, 4
+        bge trc_next
+        lis r12, %(ice_reqofs_hi)d
+        addi r12, r12, %(ice_reqofs_lo)d
+        slwi r0, r26, 2
+        lwzx r25, r12, r0               # ice detonation v1: request 0 the blast's (ICE_VAR), 1 - 3 the trails'""" if ice else """
         cmpwi r26, %(tr_reqs)d
         bge trc_next
-        slwi r25, r26, 2
+        slwi r25, r26, 2""") + r"""
         mr r3, r27
         lis r4, %(gk_var_tr_hi)d
         ori r4, r4, %(gk_var_tr_lo)d
@@ -1578,7 +2108,9 @@ trc_copy:
         lwz r12, 0x4C(r12)
         mtctr r12
         bctrl                           # his request taken""" + vnum('r30', TR_VAR_SLOT, 'r29') + """
-        addi r28, r29, -1
+        addi r28, r29, -1""" + ("""
+        cmpwi r26, 0
+        beq trc_noctx                   # ice detonation v1: a blast burns nothing: no context""" if ice else '') + """
         lis r26, %(tr_ttl_hi)d
         addi r26, r26, %(tr_ttl_lo)d
         mulli r0, r28, %(tr_ctx4)d
@@ -3315,7 +3847,9 @@ def layout(img, feats=None):
             rows[0] = [rows[0][0], SH_MAX] + rows[0][2:]
     if 'burn2' in feats:
         assert 'skeleton' in feats, 'burn2 needs skeleton'
-        rows += [[TR_KIND, TR_MAX, 0, 0]]               # burn v2: article 9, the fire trails (TR_MAX at once)
+        rows += [[TR_KIND, TR_MAX + (ICE_SLOTS_EXTRA if 'ice' in feats else 0), 0, 0]]   # burn v2: article 9, the
+        # fire trails (TR_MAX at once); ice detonation v1: + ICE_SLOTS_EXTRA for blasts (a trail with no burn context goes
+        # at once: weapons/firetrail.c, so still TR_MAX burning trails)
     mrow = row_of(img, feats)
     assert img.w(img.w(svt + 0x1C)) == 0x4E800020, "the specializer's +0x1C: a blr"
     for j in (2, 6, 7, 20, 26):
@@ -3399,7 +3933,8 @@ def build(rpx, diag=False, feats=None):
     A['sk_seat'] = alloc(SLOTS * SK_LEVELS * 16, 4) if 'cart' in feats else 0   # clone articles v1: the stack
     A['hyd_t'] = alloc(4, 4) if skel and diag else 0          # v1.2 diag: the hydrant's +0x94 calls
     burn2 = 'burn2' in feats
-    A['tr_ents'] = alloc(8 * 3) if burn2 else 0               # burn v2: the trail's motion entries (the hydrant's motion)
+    A['tr_ents'] = alloc(8 * tr_motions(feats)) if burn2 else 0   # burn v2: the trail's motion entries (the hydrant's
+                                                          # motion; ice detonation v1: a 4th, the blast's)
     A['tr_minfo'] = alloc(W.MINFO_SIZE) if burn2 else 0
     A['tr_desc'] = alloc(L['dsize']) if burn2 else 0
     A['tr_vt'] = alloc(L['vsize']) if burn2 else 0
@@ -3506,6 +4041,18 @@ def build(rpx, diag=False, feats=None):
     assert not btint or 'tiers' in feats, 'btint needs tiers'
     A['bti_k'] = alloc(len(btint_k()), 8) if btint else 0      # burn tint v1: its constants, the tiers' rows
     A['bti_st'] = alloc(16 * SLOTS, 4) if btint else 0         # ... per victim: tier, fade, outline entry, its width
+    ice = 'ice' in feats
+    assert not ice or btint, 'ice needs btint'
+    A['ice_k'] = alloc(len(ice_k()), 8) if ice else 0          # ice detonation v1: its constants
+    A['ice_flash'] = alloc(16 * ICE_FRAMES, 4) if ice else 0   # ... the flash's colour per frame
+    A['ice_st'] = alloc(ICE_ST * SLOTS, 4) if ice else 0       # ... per victim
+    A['ice_reqofs'] = alloc(16, 4) if ice else 0               # ... tr_claim's request offsets (the blast's first)
+    for nm, fs_ in (('gk_fia', 'S4IA ice armed: victim slot=%d burn amount x100=%d stacks=%d owner slot=%d way=%d\n'),
+                    ('gk_fib', 'S4IB ice blast asked: victim slot=%d of Greninja slot=%d (-1 none) amount x100=%d\n'),
+                    ('gk_fic', 'S4IC ice countdown cancelled (KO): victim slot=%d status=%X at frame %d\n')):
+        A[nm] = alloc((len(fs_) + 4) & ~3, 4) if ice and diag else 0
+        if ice and diag:
+            fmts.append((nm, fs_))
     code_at = alloc(0, 4)
 
     # weapon motion entries / info / descriptor / vtable / singleton / row
@@ -3548,10 +4095,10 @@ def build(rpx, diag=False, feats=None):
         if diag:
             out.blob(A['hyd_t'], bytes(4), 'hydrant diag counter')
     if burn2:
-        out.blob(A['tr_ents'], struct.pack('>6I', SK_MOTION, 0, SK_MOTION, 0, SK_MOTION, 0),
-                 'fire trail motions (forward / up / down: the hydrant\'s animation)')
+        out.blob(A['tr_ents'], struct.pack('>%dI' % (2 * tr_motions(feats)), *((SK_MOTION, 0) * tr_motions(feats))),
+                 'fire trail motions (forward / up / down (/ the ice blast): the hydrant\'s animation)')
         mi3 = bytearray(img.blob(L['bminfo'], W.MINFO_SIZE))
-        struct.pack_into('>II', mi3, 0, A['tr_ents'], 3)
+        struct.pack_into('>II', mi3, 0, A['tr_ents'], tr_motions(feats))
         out.blob(A['tr_minfo'], bytes(mi3), 'fire trail motion info')
         d3 = bytearray(img.blob(L['bdesc'], L['dsize']))
         struct.pack_into('>I', d3, 8, A['tr_minfo'])
@@ -3678,6 +4225,12 @@ def build(rpx, diag=False, feats=None):
             p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
         p.update(bti_fade=BTINT_FADE, bti_row=BTINT_ROW, bti_slot=BTINT_SLOT, os_tab_hi=ha(OS_TAB), os_tab_lo=K.slo(OS_TAB),
                  os_n=OS_N, os_ent=OS_ENT, os_count=OS_COUNT)
+    if 'ice' in feats:
+        for nm in ('ice_k', 'ice_flash', 'ice_st', 'ice_reqofs', 'gk_fia', 'gk_fib', 'gk_fic'):
+            p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
+        p.update(hit_elem=HIT_ELEMENT, ice_elem=ICE_ELEMENT, ice_back=ICE_BACK, hit_att=HIT_ATTACKER, look_hi=SH_LOOKUP >> 16,
+                 look_lo=SH_LOOKUP & 0xFFFF, ice_frames=ICE_FRAMES, ice_ask=ICE_FRAMES - ICE_LEAD, ice_slot=BTINT_SLOT,
+                 ice_var_hi=ICE_VAR >> 16, ice_var_lo=ICE_VAR & 0xFFFF, ice_stz=ICE_ST)
     p['bshield_hi'], p['bshield_lo'] = ha(A['bconst']), K.slo(A['bconst'])
     p['thousand_hi'], p['thousand_lo'] = ha(A['bconst'] + 4), K.slo(A['bconst'] + 4)
     p['fm_hi'], p['fm_lo'] = ha(FIGHTER_MANAGER), K.slo(FIGHTER_MANAGER)
@@ -5093,7 +5646,13 @@ ba_kind:
         bnelr                           # not a fighter
         rlwinm r12, r12, 16, 20, 31     # its index
         cmplwi r12, %(slots)d
-        bgelr
+        bgelr''' + ('''
+        lis r10, %(ice_st_hi)d
+        addi r10, r10, %(ice_st_lo)d
+        slwi r0, r12, 5
+        lwzx r0, r10, r0
+        cmpwi r0, 0
+        bgtlr                           # ice detonation v1: an armed victim takes no burn''' if 'ice' in feats else '') + '''
         lis r10, %(btab_hi)d
         addi r10, r10, %(btab_lo)d
         mulli r0, r12, %(bcap16)d
@@ -5252,7 +5811,10 @@ bt_next:''' + ('''
         bl bfx_vic                      # burn v2: its fire as its burns''' if 'burn2' in feats else '') + ('''
         mr r3, r30
         mr r4, r31
-        bl bti_vic                      # burn tint v1: its tint / outline''' if 'btint' in feats else '') + '''
+        bl bti_vic                      # burn tint v1: its tint / outline''' if 'btint' in feats else '') + ('''
+        mr r3, r30
+        mr r4, r31
+        bl ice_vic                      # ice detonation v1: its countdown''' if 'ice' in feats else '') + '''
         addi r30, r30, 1
         b bt_vic
 bt_done:''' + D('''
@@ -5993,7 +6555,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats, 'skbot' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats, 'skbot' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats, 'ice' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (ice_src(D) if 'ice' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''
@@ -6040,7 +6602,19 @@ gc_bti: stw r0, 0(r12)                  # burn tint v1: each victim's tint / out
         addi r12, r12, 16
         addi r11, r11, -1
         cmpwi r11, 0
-        bne gc_bti''') if 'btint' in feats else '') + '''
+        bne gc_bti''') if 'btint' in feats else '') + (('''
+        lis r12, %(ice_st_hi)d
+        addi r12, r12, %(ice_st_lo)d
+        li r11, %(slots)d
+        li r9, -1
+gc_ice: lwz r8, 0(r12)                  # ice detonation v1: a countdown off (its colour cleared the next frame)
+        cmpwi r8, 0
+        beq gc_in
+        stw r9, 0(r12)
+gc_in:  addi r12, r12, %(ice_stz)d
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne gc_ice''') if 'ice' in feats else '') + '''
         lis r12, %(gk_hide_hi)d
         addi r12, r12, %(gk_hide_lo)d
         li r11, 16
@@ -6123,6 +6697,14 @@ w_dcase:
         for i, w in enumerate(OS_COUNT_WORDS):
             assert img.w(OS_COUNT + 4 * i) == w, 'os_count at 0x%08X' % OS_COUNT
         assert all(img.w(OS_TAB + 4 * i) == 0 for i in range(OS_N * OS_ENT // 4)), 'os_tab'
+    if ice:
+        out.blob(A['ice_k'], ice_k(), 'ice detonation constants')
+        out.blob(A['ice_flash'], b''.join(struct.pack('>4f', *c) for c in ice_flash()), 'ice detonation flash colours')
+        out.blob(A['ice_st'], bytes(ICE_ST * SLOTS), 'ice detonation per victim')
+        out.blob(A['ice_reqofs'], struct.pack('>4I', ICE_VAR - GK_VAR_TR, 0, 4, 8), 'fire trail request offsets (the blast first)')
+        assert img.w(ICE_HOOK) == ICE_ORIG and ICE_HOOK not in img.relocs(), 'the victim hit handler at 0x%08X' % ICE_HOOK
+        out.put(ICE_HOOK, asm1(ICE_HOOK, 'b 0x%X' % lab['ice_hit']), 'the victim hit handler -> ice_hit (ice detonation v1)',
+                ICE_ORIG)
     if 'skdist' in feats:
         out.blob(A['sk_dist'], struct.pack('>f', SK_DIST), 'his side special shadow\'s cap (SK_DIST)')
         for at, orig, text, note in SK_DIST_PATCH:

@@ -3,11 +3,13 @@
 the user's processed video effects (tools/fx_video_to_flipbook.py atlases + sidecars) appended to his
 gekkouga.010d0000.ptcl / .efc (data/fighter/gekkouga/effect/gekkouga/).
 
-  python3 -I tools/gekkouga_fx.py IN_EFFECT_DIR KIRBY_PTCL FX_PKG OUT_EFFECT_DIR
+  python3 -I tools/gekkouga_fx.py IN_EFFECT_DIR KIRBY_PTCL FX_PKG OUT_EFFECT_DIR --common=COMMON_PTCL
       IN_EFFECT_DIR   his vanilla effect folder (gekkouga.010d0000.ptcl / .efc)
       KIRBY_PTCL      vanilla kirby.010d0000.ptcl (the template emitter: PtcKirbyStoneEnd / stone)
       FX_PKG          the flipbooks: FX_PKG/<name>/<name>_atlas.png + <name>.json (the user's greninja_fire_effects_v1)
       OUT_EFFECT_DIR  gets the new .ptcl / .efc (nothing else of the folder changes)
+      COMMON_PTCL     vanilla effect/common/common.010d0000.ptcl (ice detonation v1: the shuriken's sparkles are its
+                      PtcCommonIce / kirakira1 emitter, copied)
 
 Every new emitter is a copy of one vanilla template, Kirby's PtcKirbyStoneEnd/stone (cross-checked with
 tools/eft_vertex.features over the 7128 emitters of the vanilla banks): a CPU particle (eft moves it: follow type 0
@@ -170,7 +172,27 @@ def layer_emitters(p, tmpl, name, spec):
     return out
 
 
+def import_emitters(p, tmpl, name, spec):
+    """ice detonation v1: a vanilla emitter of another bank (the common bank's frozen-fighter sparkles) copied into his
+    bank (its shader and texture with it: Ptcl.import_emitter), sized for the shuriken (its emission volume and particle
+    size x spec's), its own name"""
+    if COMMON is None:
+        raise SystemExit('%s needs the common bank (common.010d0000.ptcl): --common=PATH' % name)
+    si = COMMON.find_set(spec['set'])
+    ks = [k for k, x in enumerate(COMMON.sets[si]['emitters'])
+          if x['data'] is not None and COMMON.emitter_name(x['data']) == spec['emitter']]
+    assert len(ks) == 1, (spec['set'], spec['emitter'])
+    em = p.import_emitter(COMMON, si, ks[0])
+    struct.pack_into('>I', em, 0x38, p.add_name(name))
+    f = p.set_field
+    f(em, 'volume_radius', [spec['radius']] * 3)
+    f(em, 'scale', [x * spec['scale'] for x in p.field(em, 'scale')])
+    return [em]
+
+
 def set_emitters(p, tmpl, name, spec):
+    if 'import' in spec:
+        return import_emitters(p, tmpl, name, spec['import'])
     if 'left' in spec:
         return ring_emitters(p, tmpl, name, spec)
     if 'layers' in spec:
@@ -180,9 +202,38 @@ def set_emitters(p, tmpl, name, spec):
     return flip_emitters(p, tmpl, name, spec)
 
 
-def all_sets(burn2=True, tiers=True):
-    """every set in entry order: skeleton v1.2's, then burn v2's, then skeleton v1.3's"""
-    return _sk_sets() + (_fire_sets() if burn2 else []) + (_tier_sets() if burn2 and tiers else [])
+def all_sets(burn2=True, tiers=True, ice=True):
+    """every set in entry order: skeleton v1.2's, then burn v2's, then skeleton v1.3's, then ice detonation v1's"""
+    return _sk_sets() + (_fire_sets() if burn2 else []) + (_tier_sets() if burn2 and tiers else []) + \
+        (_ice_sets() if burn2 and tiers and ice else [])
+
+
+# ---- ice detonation v1 (the user: an ice hit on a burning fighter clears its burns and arms an explosion that goes off on
+# it 52 frames later, "speed up the attached effect", "the smoke of the explosion goes by much faster"; ice sparkles round
+# the uncharged Water Shuriken). The explosion: FootageCrate Simple_Explosion_15 (green screen, 30 fps, 111 frames) made
+# into ice_boom_15 by tools/fx_video_to_flipbook.py --matte chroma --oneshot --retime 0:2,42:4,54:8 --fpc 2 --fade-out 4
+# --cells 16:31: 30 cells of 2 frames (1.0 s; the clip 3.7 s): the fireball (source 1 - 43) at 2x, its last embers (43 -
+# 55) at 4x, the smoke (55 - 99) at 8x with its last 4 cells faded out. One emitter (30 cells). Placed with the fireball's
+# middle (the cells' alpha centroid while it burns, ICE_BOOM_CENTRE of the cell) on the call's point and its fire
+# ICE_BOOM_FIRE_U of the cell wide = 2 x ICE_BOOM_REF at size 1: fighters/gekkouga/weapons/firetrail.c calls it at the
+# blast's hitbox centre with size = the hitbox's radius / ICE_BOOM_REF (the effect grows with the blast)
+ICE_BOOM_REF = 10.0                # the hitbox radius the effect fits at call size 1
+ICE_BOOM_FIRE_U = 0.64             # the fire's width (alpha > 0.3, cells 2 - 20: u 0.06 - 0.70) in a cell
+ICE_BOOM_CENTRE = (0.38, 0.72)     # (u, v) in the cell: the fireball's middle (its alpha centroid, cells 2 - 10)
+# the sparkles: the common bank's PtcCommonIce (0x100003D, the frozen fighter's ice block) emitter kirakira1 (cyan-to-white
+# twinkles, additive, a sphere volume, emitting every 3 frames for ever, each 25 frames) copied into his bank on its own (the
+# set's ice block meshes left out), its volume the shuriken's size (its hitbox 5) and its twinkles x ICE_SPARKLE_SCALE
+ICE_SPARKLE = dict(set='PtcCommonIce', emitter='kirakira1', radius=5.0, scale=0.6)
+COMMON = None                      # the common bank (ptcl.Ptcl), for the sparkles
+
+
+def _ice_sets():
+    d = sidecar('ice_boom_15')
+    w = 2 * ICE_BOOM_REF / ICE_BOOM_FIRE_U
+    h = w * d['cell_size'][1] / d['cell_size'][0]
+    boom = dict(atlas='ice_boom_15', blend=0, size=(w, h),
+                offset=((0.5 - ICE_BOOM_CENTRE[0]) * w, (ICE_BOOM_CENTRE[1] - 0.5) * h))
+    return [('PtcGekkougaIceBoom', boom), ('PtcGekkougaIceSparkle', {'import': ICE_SPARKLE})]
 
 
 def _sk_sets():
@@ -499,10 +550,13 @@ def flip_emitters(p, tmpl, name, spec):
     return out
 
 
-def build(in_dir, kirby_path, fx_pkg, out_dir, sets=None, burn2=True):
-    """the new .ptcl / .efc in out_dir: {set name: effect id}"""
-    global FX_PKG
+def build(in_dir, kirby_path, fx_pkg, out_dir, sets=None, burn2=True, common=None):
+    """the new .ptcl / .efc in out_dir: {set name: effect id}. common: the common bank's .ptcl (ice detonation v1's
+    sparkles are its emitter)"""
+    global FX_PKG, COMMON
     FX_PKG = fx_pkg
+    if common:
+        COMMON = P.Ptcl(open(common, 'rb').read())
     p = P.Ptcl(open(os.path.join(in_dir, 'gekkouga.010d0000.ptcl'), 'rb').read())
     e = EFC.Efc(open(os.path.join(in_dir, 'gekkouga.010d0000.efc'), 'rb').read())
     assert len(e.entries) == VANILLA_ENTRIES and len(p.sets) == 20, 'his vanilla bank'
@@ -526,8 +580,9 @@ def ids_of(sets):
 
 
 if __name__ == '__main__':
-    a = sys.argv[1:]
+    a = [x for x in sys.argv[1:] if not x.startswith('--common=')]
+    cm = next((x[9:] for x in sys.argv[1:] if x.startswith('--common=')), None)
     if len(a) != 4:
         sys.exit(__doc__)
-    for k, v in build(*a).items():
+    for k, v in build(*a, common=cm).items():
         print('0x%08X %s' % (v, k))

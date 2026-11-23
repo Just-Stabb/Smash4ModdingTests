@@ -53,6 +53,10 @@ run it with `python3 -I` on downloaded footage. Needs ffmpeg (libvpx-vp9, libweb
    The sidecar's anchor gives the body's centroid and lowest row in the frame (0..1) either way.
    --fade-out N (one-shots): the last N cells fade out linearly, for footage that ends still dense (smoke
    that never clears).
+   --retime A:S[,B:S2 ...] (one-shots): from source frame A on, the footage plays S times faster (piecewise, at
+   K frames a cell: each cell steps fps x K / 60 x S source frames, nearest frame). An explosion's smoke tail can
+   go by far faster than its fireball (Greninja's ice detonation: 0:2,45:7). The sidecar lists each cell's source
+   frame (retime.cell_source_frames).
 5. Cells and timing: the game runs at 60; eft plays a cell every K frames (0x504 frames a cell, integer).
    K defaults to the slowest that does not drop below the source's rate (30 fps -> 2: 30 fps; 24 -> 3: 20 fps);
    --fpc K forces it. A loop of L source frames becomes N = round(L x 60 / (fps x K)) cells (sampled by
@@ -387,7 +391,30 @@ def run_job(opt):
     D = dist_matrix(feat)
     step_d = float(np.median(np.diag(D, 1)[first:last])) if last > first else 1.0
     loop = None
-    if opt.oneshot:
+    if opt.oneshot and opt.retime:
+        # --retime: the one-shot played faster from some source frames on (piecewise: from frame A, S x the source's
+        # speed), sampled at K frames a cell (--fpc, else the source rate's). The cells walk the source at
+        # fps x K / 60 x S source frames each, nearest frame; n = the cells it takes to pass the kept range's end
+        lo, hi = (opt.range if opt.range else (first, last))
+        kept = hi - lo + 1
+        segs = sorted(opt.retime)
+        base = float(fps) * K / 60
+
+        def speed_at(pos):
+            s = 1.0
+            for a, sp in segs:
+                if pos >= a - 1e-9:
+                    s = sp
+            return s
+        src_idx, pos = [], float(lo)
+        while pos <= hi + 1e-6:
+            src_idx.append(min(hi, int(round(pos))))
+            pos += base * speed_at(pos)
+        n = len(src_idx)
+        if n > cmax:
+            raise SystemExit(f'{opt.name}: the retimed {kept} frames take {n} cells, over {cmax}')
+        seq_src = list(range(lo, hi + 1))
+    elif opt.oneshot:
         lo, hi = (opt.range if opt.range else (first, last))
         kept = hi - lo + 1
         cands = []
@@ -609,6 +636,8 @@ def run_job(opt):
                       'screen_rgb': [round(float(v), 3) for v in matte.screen_rgb]} if opt.matte == 'chroma' else {})},
         'edges_faded': [k for k, v in cut.items() if v and opt.edge_feather > 0],
         'faded_out_last_cells': opt.fade_out if (opt.fade_out and not loop) else 0,
+        'retime': ({'segments': [{'from_source_frame': a, 'speed': sp} for a, sp in sorted(opt.retime)],
+                    'cell_source_frames': [int(i) for i in src_idx]} if (opt.retime and not loop) else None),
         'subject_drift': drift, 'tracked': opt.track or None, 'centred_on_subject': opt.center_subject or None,
         'anchor': anchor,
         'vram_bytes': {'rgba8': W * H * 4, 'bc3': W * H},
@@ -758,6 +787,9 @@ def parser():
     ap.add_argument('--black', type=float, default=0.02)
     ap.add_argument('--gain', default='auto', help="luma: colour / alpha scale; 'auto': the brightest flame -> 1")
     ap.add_argument('--fade-out', type=int, default=0, help='one-shot: fade the last N cells out (linear)')
+    ap.add_argument('--retime', type=lambda s: [tuple(float(v) for v in seg.split(':')) for seg in s.split(',')],
+                    help='one-shot: A:S[,B:S2...] from source frame A on play S x faster (e.g. 0:2,45:7: the fireball '
+                         'at 2x, the smoke from frame 45 at 7x)')
     ap.add_argument('--despill', type=float, default=1.0, help='chroma: 0 = G <= max(R, B) only; 1 = toward '
                     'mean(R, B) as the screen shows through')
     ap.add_argument('--straight', dest='premultiplied', action='store_false')

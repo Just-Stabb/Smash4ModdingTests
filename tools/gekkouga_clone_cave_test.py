@@ -595,15 +595,18 @@ def fighter_desc_checks(e, img, info):
     van = img.w(C.GK_DESC + 8)
     vrows = [[img.w(img.w(van) + 16 * i + 4 * j) for j in range(4)] for i in range(6)]
     cart = 'cart' in info['feats']
+    ice = 'ice' in info['feats']
+    trn = C.TR_MAX + (C.ICE_SLOTS_EXTRA if ice else 0)
     if cart:
         vrows[0] = [vrows[0][0], C.SH_MAX] + vrows[0][2:]
     check('his articles 0-5 as before%s, 6 / 7 the clones (0x1A1, max 1, no spawner)%s%s' % (
           ' (clone articles v1: 9 shurikens, his and his clones\')' if cart else '',
           ', 8 the skeleton' if 'skeleton' in info['feats'] else '',
-          ', 9 the fire trails (burn v2: 0x1A3, %d at once)' % C.TR_MAX if 'burn2' in info['feats'] else ''), rows,
+          ', 9 the fire trails (burn v2: 0x1A3, %d at once%s)' % (trn, ' (ice detonation v1: + 2 for blasts)' if ice else '')
+          if 'burn2' in info['feats'] else ''), rows,
           vrows + [[C.CLONE_KIND, 1, 0, 0], [C.CLONE_KIND, 1, 0, 0]] +
           ([[C.SK_KIND, C.SK_LEVELS if cart else 1, 0, 0]] if 'skeleton' in info['feats'] else []) +
-          ([[C.TR_KIND, C.TR_MAX, 0, 0]] if 'burn2' in info['feats'] else []))
+          ([[C.TR_KIND, trn, 0, 0]] if 'burn2' in info['feats'] else []))
     check('the article instances in all (the ArticleModule holder\'s 64: docs/native-notes.md "Article instance cap")',
           sum(r[1] for r in rows) <= 64, True)
     others = []
@@ -2568,15 +2571,18 @@ def burn2_trail_checks(e, info, diag, gk):
     e.call(e.w(T['dt'] + 4 * k))
     d = e.r(3)
     mi = e.w(d + 8)
-    check('trail descriptor: a bunshin copy, 3 motions (the hydrant\'s hash: forward / up / down)',
-          (d, e.w(mi + 4), [e.w(e.w(mi) + 8 * i) for i in range(3)]), (A['tr_desc'], 3, [C.SK_MOTION] * 3))
+    nm_ = C.tr_motions(F)
+    check('trail descriptor: a bunshin copy, %d motions (the hydrant\'s hash: forward / up / down%s)' % (
+          nm_, ' / ice detonation v1\'s blast' if nm_ == 4 else ''),
+          (d, e.w(mi + 4), [e.w(e.w(mi) + 8 * i) for i in range(nm_)]), (A['tr_desc'], nm_, [C.SK_MOTION] * nm_))
     vt = A['tr_vt']
     check('trail singleton: +0x34 the skeleton\'s start (its VARs 0), +0x94 tr_94, +0xAC the skeleton\'s hit method (not '
           'removed by its hits)', (e.w(A['tr_single']), e.w(vt + 0x34), e.w(vt + 0x94), e.w(vt + W.HIT_METHOD)),
           (vt, lab['sk_start'], lab['tr_94'], lab['sk_hit']))
     lst = e.w(A['gk_desc'] + 8)
-    check('his article list: article 9 the fire trails (0x1A3, %d at once)' % C.TR_MAX,
-          [e.w(e.w(lst) + 16 * 9 + 4 * j) for j in range(4)], [C.TR_KIND, C.TR_MAX, 0, 0])
+    trn = C.TR_MAX + (C.ICE_SLOTS_EXTRA if 'ice' in F else 0)
+    check('his article list: article 9 the fire trails (0x1A3, %d at once%s)' % (trn, ': ice detonation v1, + 2 for '
+          'blasts' if 'ice' in F else ''), [e.w(e.w(lst) + 16 * 9 + 4 * j) for j in range(4)], [C.TR_KIND, trn, 0, 0])
     # ---- its claim, contexts and burns
     sv = {}
     svt = e.alloc(0x100, b'\0')
@@ -2852,6 +2858,264 @@ def shalf_checks(e, info):
     check('shalf: the lookup called with the battle object manager and the attacker\'s id', looked[0], (mgr, gk_id))
 
 
+def ice_checks(e, info, diag):
+    """ice detonation v1 (feature ice): the victim hit handler's hook (ICE_HOOK -> ice_hit, back at ICE_BACK with the game's
+    word done), the trigger (an ice hit on a burning fighter: its burns cleared, recorded, armed; not ice / not burning /
+    armed: nothing), burns refused while armed, the countdown (the flash in the tint's slot every frame, the blast asked
+    of a Greninja at frame 51 with the request's values, the colour off at 53), the owner / fallback / none, a KO and a
+    reset cancelling it, tr_claim taking the blast's request first with no burn context"""
+    from unicorn.ppc_const import UC_PPC_REG_FPR1 as F1
+    lab, A, F = info['labels'], info['A'], info['feats']
+    if 'ice' not in F:
+        check('ice off: the victim hit handler\'s word is the game\'s', '%08X' % e.w(C.ICE_HOOK), '%08X' % C.ICE_ORIG)
+        return
+    check('ice: the victim hit handler (0x%08X, lwz r3, 0x20(r27)) -> b ice_hit' % C.ICE_HOOK,
+          K.branch_target(C.ICE_HOOK, e.w(C.ICE_HOOK)), lab['ice_hit'])
+    fl = C.ice_flash()
+    check('ice: the flash table: %d frames, yellow / black in turn, 3 frames each to 30 then 2, fading in over frames 1 - 2'
+          % C.ICE_FRAMES, (len(fl), [round(c[3], 2) for c in fl[:3]],
+                           ''.join('Y' if c[0] > 0.5 else 'K' for c in fl)),
+          (52, [0.35, 0.6, 0.8], 'YYYKKKYYYKKKYYYKKKYYYKKKYYYKKKYYKKYYKKYYKKYYKKYYKKYY'))
+    rd = lambda a, n: [round(x, 4) for x in struct.unpack('>%df' % n, bytes(e.mu.mem_read(a, 4 * n)))]   # noqa: E731
+    check('ice: the flash table in the cave', [tuple(rd(A['ice_flash'] + 16 * i, 4)) for i in range(C.ICE_FRAMES)],
+          [tuple(round(x, 4) for x in c) for c in fl])
+    for i in range(8):
+        e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
+    for kk in range(C.SLOTS * C.BURN_CAP):
+        e.setw(A['btab'] + 16 * kk, 0)
+    for i in range(C.SLOTS * C.ICE_ST // 4):
+        e.setw(A['ice_st'] + 4 * i, 0)
+    for i in range(C.SLOTS * 4):
+        e.setw(A['bti_st'] + 4 * i, 0)
+    for i in range(C.SLOTS):
+        e.setw(A['bfx_lvl'] + 4 * i, 0)
+    gk = e.fighter(2, x=-20.0)
+    e.mu.mem_write(gk['f'] + 0x1E, b'\x04')
+    gacc = e.w(gk['f'] + C.BASE_ACC)
+    gst = e.alloc(0x60, b'\0')
+    e.setw(gacc + C.F_STATUS, gst)
+    vic = e.fighter(4)
+    e.mu.mem_write(vic['f'] + 0x1E, b'\x04')
+    e.setw(vic['f'] + 4, 0x3)                           # Mario
+    vacc = e.w(vic['f'] + C.BASE_ACC)
+    vpost = e.alloc(0x40, b'\0')
+    e.mu.mem_write(vpost + 0x10, struct.pack('>2f', 30.0, 12.0))
+    e.setw(vacc + C.W_POSTURE, vpost)
+    vst = e.alloc(0x60, b'\0')
+    e.setw(vacc + C.F_STATUS, vst)
+    cvt = e.alloc(0x100, b'\0')
+    cset, cclr = e.alloc(4), e.alloc(4)
+    e.setw(cvt + 0x4C, cset)
+    e.setw(cvt + C.COLOUR_CLEAR, cclr)
+    cbm = e.alloc(0x100, b'\0')
+    e.setw(cbm, cvt)
+    e.setw(vacc + C.W_COLOUR, cbm)
+    calls = []
+    e.stub(cset, lambda e_: calls.append(('set', tuple(rd(e_.r(4), 4)), e_.r(5), e_.r(6))))
+    e.stub(cclr, lambda e_: calls.append(('clear', e_.r(4))))
+    # the attacker objects (the battle object manager's records)
+    mgr = e.alloc(0x40, b'\0')
+    e.setw(C.SH_MANAGER, mgr)
+    recs = {}
+    e.stub(C.SH_LOOKUP, lambda e_: recs.get(e_.r(4), 0))
+
+    def attacker(oid, x):
+        acc = e.alloc(0x100, b'\0')
+        post = e.alloc(0x40, b'\0')
+        e.mu.mem_write(post + 0x10, struct.pack('>f', x))
+        e.setw(acc + C.W_POSTURE, post)
+        rec = e.alloc(0x40, b'\0')
+        e.setw(rec + 0xC, acc)
+        e.mu.mem_write(rec + 0x1E, b'\x04')
+        recs[oid] = rec
+    attacker(0x00010000, 10.0)                          # left of the victim (x 30)
+    attacker(0x10002000, 50.0)                          # right of it (a projectile)
+    info_ = e.alloc(0xE4, b'\0')
+
+    def hit(element, att=0x00010000, acc=None):
+        e.mu.mem_write(info_ + C.HIT_ELEMENT, bytes([element]))
+        e.setw(info_ + C.HIT_ATTACKER, att)
+        for i in range(14, 32):
+            e.mu.reg_write(REGS[i], 0x5A5A0000 + i)
+        e.mu.reg_write(REGS[27], acc or vacc)
+        e.mu.reg_write(REGS[28], info_)
+        e.mu.reg_write(UC_PPC_REG_MSR, e.mu.reg_read(UC_PPC_REG_MSR) | 0x2000)
+        e.osr_full = []
+        e.call(C.ICE_HOOK, until=C.ICE_BACK)
+        return (e.r(3) == e.w((acc or vacc) + 0x20) and e.r(27) == (acc or vacc) and e.r(28) == info_ and
+                all(e.r(i) == 0x5A5A0000 + i for i in range(14, 27) if i not in (27, 28)) and
+                e.mu.reg_read(UC_PPC_REG_1) == 0x70000000 + 0xF0000)
+
+    def put(ins, v=4):
+        for kk in range(C.BURN_CAP):
+            a = A['btab'] + (v * C.BURN_CAP + kk) * 16
+            if kk < len(ins):
+                f_, iv, dmg, ow = ins[kk]
+                e.setw(a, f_)
+                e.setw(a + 4, (iv << 16) | iv)
+                e.setw(a + 8, ow)
+                e.mu.mem_write(a + 12, struct.pack('>f', dmg))
+            else:
+                e.setw(a, 0)
+
+    def insts(v=4):
+        return sum(1 for kk in range(C.BURN_CAP) if e.w(A['btab'] + (v * C.BURN_CAP + kk) * 16))
+
+    def st(v=4):
+        a = A['ice_st'] + C.ICE_ST * v
+        sw = lambda o: struct.unpack('>i', struct.pack('>I', e.w(a + o)))[0]   # noqa: E731
+        return (sw(0), rd(a + 4, 1)[0], sw(8), sw(0xC), rd(a + 0x10, 1)[0], rd(a + 0x14, 1)[0], sw(0x18))
+
+    def frame():
+        del calls[:]
+        e.osr_full = []
+        e.call(lab['burn_him'], gk['f'], 2)
+        return list(calls)
+    rows = {m[0]: m for m in C.BURN_MOVES}
+    sm, nair = rows[95], rows[104]
+    burns = [(160, sm[2], sm[1], 2), (100, nair[2], nair[1], 2), (200, sm[2], sm[1], 5), (30, 6, 0.6, 2)]
+    ref = C.ice_amount(burns)
+    # not ice / not burning
+    put(burns)
+    kept = hit(2)
+    check('ice: a slash (Effect 2) hit on a burning fighter: nothing (its 4 burns kept, not armed); back at 0x%08X with the '
+          'game\'s word (r3 its StatusModule) and the caller\'s registers' % C.ICE_BACK, (kept, insts(), st()[0]), (True, 4, 0))
+    put([])
+    check('ice: an ice (Effect 4) hit on a fighter not burning: nothing armed', (hit(4), st()[0]), (True, 0))
+    check('ice: an ice hit on an object that is no fighter (an accessor not in the table): nothing',
+          hit(4, acc=e.alloc(0x100, b'\0')) or True, True)
+    # the trigger
+    put(burns)
+    e.setw(A['bti_st'] + 16 * 4, 2)
+    e.setw(A['bti_st'] + 16 * 4 + 4, C.BTINT_FADE)
+    hit(4)
+    got = st()
+    check('ice: an ice hit on a burning fighter (Mario, slot 4: two smash burns of his, a neutral air, a skeleton row of '
+          'another Greninja (slot 5)): every burn cleared, armed (t 1); remaining %.3f %%, 4 stacks, owner slot 2 (the most), '
+          'way +1 (the attacker left of it), b = %.3f (+ 0.5 a stack)' % (ref[0], ref[3]),
+          (insts(), got[0], round(got[1], 2), got[2], got[3], got[4], round(got[5], 2), got[6]),
+          (0, 1, round(ref[0], 2), 4, ref[2], 1.0, round(ref[3], 2), -1))
+    check('ice: ... its burn tint off the next frame (bti_st tier 0, fade -1)',
+          (e.w(A['bti_st'] + 16 * 4), struct.unpack('>i', struct.pack('>I', e.w(A['bti_st'] + 16 * 4 + 4)))[0]), (0, -1))
+    if diag:
+        check('ice diag: S4IA (victim 4, amount x100, 4 stacks, owner 2, way 1)',
+              [x[1:6] for x in e.osr_full if x[0] == A['gk_fia']], [(4, int(ref[3] * 100), 4, 2, 1)])
+    put([(60, 6, 0.4, 2)])
+    hit(4)
+    check('ice: an ice re-hit while armed: ignored (the record kept, the new burn not cleared)', (st()[:3], insts()),
+          (got[:3], 1))
+    put([])
+    # burns refused while armed
+    node = e.alloc(0x30, b'\0')
+    e.setw(node + C.NODE_OBJ, (4 << 16) | 0x11)
+    e.mu.mem_write(node + C.NODE_TYPE, b'\x01')
+    e.call(lab['burn_add'], node, A['bmoves'], 2)
+    check('ice: a burn landing on an armed victim (burn_add): not taken', insts(), 0)
+    # the countdown
+    e.vars = {}
+    seen, asked = [], None
+    for t in range(1, C.ICE_FRAMES + 3):
+        got_ = frame()
+        seen.append(got_)
+        if asked is None and any(k in e.vars for k in range(C.ICE_VAR, C.ICE_VAR + 4)):
+            asked = t
+    want_set = [[('set', tuple(round(x, 4) for x in fl[t - 1]), C.BTINT_SLOT, 0)] for t in range(1, C.ICE_FRAMES + 1)]
+    check('ice: the countdown: frames 1 - %d the flash colour in the tint\'s slot %d (once a frame; the burn tint\'s reset '
+          'clears it first on frame 1), frame %d the colour off, %d nothing' % (C.ICE_FRAMES, C.BTINT_SLOT, C.ICE_FRAMES + 1,
+                                                                            C.ICE_FRAMES + 2),
+          [seen[0][-1:]] + seen[1:C.ICE_FRAMES] + seen[C.ICE_FRAMES:],
+          want_set + [[('clear', C.BTINT_SLOT)], []])
+    t_ = 4 + ref[3] / 100.0
+    check('ice: the blast asked at frame %d of Greninja slot 2 (the owner): his VAR 0x%08X - +3 = type 4 + b / 100 = %.4f, '
+          'the victim\'s x 30, y 12 + %g, way +1; the state free again' % (C.ICE_FRAMES - C.ICE_LEAD, C.ICE_VAR, t_, C.ICE_Y),
+          (asked, [round(e.vars.get(C.ICE_VAR + i, -99.0), 3) for i in range(4)], st()[0], st()[6]),
+          (C.ICE_FRAMES - C.ICE_LEAD, [round(t_, 3), 30.0, round(12.0 + C.ICE_Y, 3), 1.0], 0, 2))
+    # the way: an attacker right of it; the owner not there: another Greninja; none
+    gk5 = e.fighter(5, x=0.0)
+    e.mu.mem_write(gk5['f'] + 0x1E, b'\x04')
+    e.vars = {}
+    put([(100, 15, 0.25, 6)])                       # owner slot 6: not in the match
+    hit(4, att=0x10002000)
+    check('ice: an attacker right of the victim (a projectile at x 50): way -1; owner slot 6', (st()[4], st()[3]), (-1.0, 6))
+    for _ in range(C.ICE_FRAMES):
+        frame()
+    check('ice: the owner gone: the first live Greninja (slot 2) asked', (st()[6], round(e.vars.get(C.ICE_VAR + 3, 0), 3)),
+          (2, -1.0))
+    for _ in range(3):
+        frame()
+    e.setw(gst + C.ST_KIND, C.ST_DEAD)
+    e.vars = {}
+    put([(100, 15, 0.25, 2)])
+    hit(4)
+    for _ in range(C.ICE_FRAMES):
+        frame()
+    check('ice: the owner (slot 2) KO\'d (Dead): Greninja slot 5 asked', st()[6], 5)
+    for _ in range(3):
+        frame()
+    e.mu.mem_write(gk5['f'] + 0x1E, b'\x00')
+    e.vars = {}
+    put([(100, 15, 0.25, 2)])
+    hit(4)
+    for _ in range(C.ICE_FRAMES):
+        frame()
+    check('ice: no Greninja who can: no blast asked (none of his VARs written), the Greninja asked -1',
+          (sorted(k for k in e.vars if C.ICE_VAR <= k < C.ICE_VAR + 4), st()[6]), ([], -1))
+    for _ in range(3):
+        frame()
+    e.setw(gst + C.ST_KIND, 0)
+    # a KO cancels it
+    e.vars = {}
+    put([(100, 15, 0.25, 2)])
+    hit(4)
+    for _ in range(10):
+        frame()
+    e.setw(vst + C.ST_KIND, C.ST_DEAD)
+    got = frame()
+    check('ice: the victim KO\'d (Dead) at frame 11: the colour off at once, the countdown over', (got[-1:], st()[0]),
+          ([('clear', C.BTINT_SLOT)], 0))
+    if diag:
+        check('ice diag: S4IC (victim 4, status 0xB1, frame 11)', [x[1:4] for x in e.osr_full if x[0] == A['gk_fic']],
+              [(4, C.ST_DEAD, 11)])
+    for _ in range(C.ICE_FRAMES):
+        frame()
+    check('ice: ... and no blast asked afterwards', sorted(k for k in e.vars if C.ICE_VAR <= k < C.ICE_VAR + 4), [])
+    e.setw(vst + C.ST_KIND, 0)
+    # a reset cancels it
+    put([(100, 15, 0.25, 2)])
+    hit(4)
+    frame()
+    e.call(lab['gk_clear'], until=C.CLEAR_BACK)
+    check('ice: a match / training reset (gk_clear): the countdown -1 (off asked)', st()[0], -1)
+    got = frame()
+    check('ice: ... the next frame the colour off, free again (the burn tint\'s own reset clears the slot too: twice)',
+          (got, st()[0]), ([('clear', C.BTINT_SLOT)] * 2, 0))
+    check('ice: ... nothing after', frame(), [])
+    # the claim: the blast's request first, no burn context
+    svt = e.alloc(0x100, b'\0')
+    g, s_ = e.alloc(4), e.alloc(4)
+    e.setw(svt + 0x44, g)
+    e.setw(svt + 0x4C, s_)
+    sv = {}
+    e.stub(g, lambda e_: e_.mu.reg_write(F1, f2d(sv.get(e_.r(4), 0.0))))
+    e.stub(s_, lambda e_: sv.__setitem__(e_.r(4), round(d2f(e_.mu.reg_read(F1)), 3)))
+    w = e.alloc(0x40, b'\0')
+    acc = e.alloc(0x100, b'\0')
+    wm = e.alloc(0x10, b'\0')
+    e.setw(wm, svt)
+    e.setw(acc + C.W_WORK, wm)
+    e.setw(w + C.W_ACC, acc)
+    V = C.GK_VAR_TR
+    e.vars = {V: 1.0, V + 1: 5.0, V + 2: 0.0, V + 3: 1.0, C.ICE_VAR: 4.25, C.ICE_VAR + 1: 30.0, C.ICE_VAR + 2: 21.0,
+              C.ICE_VAR + 3: -1.0}
+    e.call(lab['tr_frame'], w)
+    check('ice: tr_claim: a blast request and a trail request: the blast\'s first (type 4.25, x 30, y 21, way -1), no burn '
+          'context (VAR_5 0), his blast request cleared, the trail\'s kept',
+          ([sv.get(0x0F000300 + i, 0.0) for i in range(6)], e.vars.get(C.ICE_VAR), e.vars.get(V)),
+          ([3.0, 4.25, 30.0, 21.0, -1.0, 0.0], 0.0, 1.0))
+    e.vars = {}
+    put([])
+
+
 def col_on_checks(patched):
     """skeleton v1.2: the game's own GC_ON / GC_ENABLE (0x02AC2EF0 / 0x02AC2E54) and the ground's enable 0x02D5D6E0 run
     unstubbed on a fake GroundModule / handle / ground: the words they leave are the hydrant's in the user's log
@@ -2935,6 +3199,7 @@ def main():
     pose_checks(e, info, diag)
     skdist_checks(e, info)
     shalf_checks(e, info)
+    ice_checks(e, info, diag)
     fighter_desc_checks(e, img, info)
     g1_checks(e, info)
     s13_checks(e, info)

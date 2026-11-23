@@ -12,6 +12,8 @@
   python3 tools/gekkouga_build.py effects VANILLA_EFFECT_DIR KIRBY_PTCL FX_PKG OUT_FIGHTER   skeleton v1.2 on: his
                                                                 effect bank + the flipbooks (tools/gekkouga_fx.py) ->
                                                                 OUT_FIGHTER/effect/gekkouga/gekkouga.010d0000.ptcl / .efc
+                                                                [--common=COMMON_PTCL: ice detonation v1's sparkles,
+                                                                the common bank's emitter; FX_PKG with ice_boom_15]
 
 VANILLA.c: the decompiled vanilla MSC with its labels (git show 0932c7b:fighters/gekkouga/gekkouga.c); the result is
 fighters/gekkouga/gekkouga.c. The MSC step runs tools/universal_mechanics.py on it (roll-off 2.2 / 1.0, Hero's
@@ -1510,10 +1512,12 @@ if __name__ == '__main__':
         print(cmd_data(a[1], a[2]))
     elif len(a) == 4 and a[0] == 'all':
         print(cmd_all(a[1], a[2], a[3]))
-    elif len(a) in (5, 6) and a[0] == 'effects':
-        import gekkouga_fx                   # (a 6th argument --skeleton-only: skeleton v1.2's bank, without burn v2's)
+    elif len([x for x in a if not x.startswith('--common=')]) in (5, 6) and a[0] == 'effects':
+        import gekkouga_fx                   # (a 6th argument --skeleton-only: skeleton v1.2's bank, without burn v2's;
+        cm = next((x[9:] for x in a if x.startswith('--common=')), None)   # ice detonation v1: --common=common.010d0000.ptcl
+        a = [x for x in a if not x.startswith('--common=')]
         for k, v in gekkouga_fx.build(a[1], a[2], a[3], os.path.join(a[4], 'effect', 'gekkouga'),
-                                      burn2=a[5:] != ['--skeleton-only']).items():
+                                      burn2=a[5:] != ['--skeleton-only'], common=cm).items():
             print('0x%08X %s' % (v, k))
     elif len(a) == 3 and a[0] == 'trail':
         print(cmd_trail(a[1], a[2]))
