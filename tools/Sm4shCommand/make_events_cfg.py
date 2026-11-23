@@ -20,6 +20,7 @@ LABELS = os.path.join(HERE, "param_labels.json")   # the parameter research (app
 EXAMPLES = os.path.join(HERE, "vanilla_examples.json")   # a real use of each vanilla command (make_examples.py)
 sys.path.insert(0, os.path.join(HERE, ".."))
 from acmd_ext_help import GROUP_HELP, NEW_GROUP  # noqa: E402  (the new commands' group texts)
+from acmd_ext_help import VANILLA_EXAMPLES, VANILLA_HELP  # noqa: E402  (new values in vanilla commands)
 
 
 def one_line(t):
@@ -151,8 +152,11 @@ def main():
             d = one_line(entry["_desc_extra"]) if d == "NONE" else "%s %s" % (d, one_line(entry["_desc_extra"]))
         out += ["", "%08X" % crc, name, f, s, d, "Category: " + category(name, entry)]
         out += param_lines(entry, [] if s == "NONE" else s.split(","))
-        out += ["Example: " + line for line in entry.get("_example") or vanilla.get(crc, [])]
-        out += [("Help: " + line).rstrip() for line in entry.get("_help", [])]
+        example = entry.get("_example") or vanilla.get(crc, [])
+        if name in VANILLA_EXAMPLES:              # a vanilla command's new value: the game's example, then ours
+            example = example + ([""] if example else []) + VANILLA_EXAMPLES[name]
+        out += ["Example: " + line for line in example]
+        out += [("Help: " + line).rstrip() for line in entry.get("_help", []) or VANILLA_HELP.get(name, [])]
     for group, lines in GROUP_HELP.items():
         out += ["", "Group: " + group] + [("Help: " + line).rstrip() for line in lines]
     open(DST, "w", newline="\r\n").write("\n".join(out) + "\n")

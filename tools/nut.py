@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Smash 4 Wii U textures (.nut, NTWU): read a texture to RGBA and write one back in the same format.
 
-  python3 tools/nut.py info FILE.nut
-  python3 tools/nut.py png FILE.nut OUT.png            first texture's first mip, as a PNG
+  python3 tools/nut.py info FILE.nut                   (NTWU or NTP3)
+  python3 tools/nut.py png FILE.nut OUT.png            first texture's first mip, as a PNG (NTWU or NTP3)
   python3 tools/nut.py replace FILE.nut IMAGE OUT.nut  IMAGE (any size; resized) into the texture,
                                                        same format / size / ID, mips rebuilt
   python3 tools/nut.py ntp3 OUT.nut ID:FORMAT:IMAGE...  new NTP3 .nut (FORMAT dxt1, dxt5 or rgba)
@@ -351,6 +351,51 @@ def mip_chain(img, smallest=4):
     return out
 
 
+def read_ntp3(d):
+    """an NTP3 .nut's bytes -> [(tex_id, fmt 0 / 2 / 14, RGBA [h, w, 4] of the first mip)] (the layout write_ntp3
+    writes and the game's own trail textures use: header 0x10, then each texture's header (+0x10 data size, +0x12
+    header size, +0x15 mip count, +0x17 format, +0x18 / +0x1A width / height, +0x20 data offset from that texture's
+    header... as Smash Forge's NUT.cs), then the data; DXT blocks in DDS (little-endian) order, untiled)"""
+    if d[:2] == b'\x78\x9c':
+        d = zlib.decompress(d)
+    assert d[:4] == b'NTP3', d[:4]
+    count = be16(d, 6)
+    hp, out, data = 0x10, [], 0x10
+    heads = []
+    for _ in range(count):
+        hs = be16(d, hp + 0xC)
+        heads.append(hp)
+        data += hs
+        hp += hs
+    for hp in heads:
+        size, hs = be32(d, hp + 8), be16(d, hp + 0xC)
+        fmt, w, h = d[hp + 0x13], be16(d, hp + 0x14), be16(d, hp + 0x16)
+        g = d.find(b'GIDX', hp, hp + hs)
+        tex_id = be32(d, g + 8) if g >= 0 else None
+        mip0 = d[data:data + size]
+        data += size
+        if fmt == 14:
+            img = np.frombuffer(mip0[:w * h * 4], np.uint8).reshape(h, w, 4)[..., [1, 2, 3, 0]].copy()
+        elif fmt in (0, 1, 2):
+            ew, eh = (w + 3) // 4, (h + 3) // 4
+            eb = 8 if fmt == 0 else 16
+            lin = np.frombuffer(mip0[:ew * eh * eb], np.uint8).reshape(ew * eh, eb)
+            if fmt == 0:
+                px = _bc1_colors(lin, True)
+            elif fmt == 1:
+                px = _bc1_colors(lin[:, 8:], False)
+                px[:, :, 3] = np.stack([(lin[:, j // 2] >> (4 * (j & 1))) & 15 for j in range(16)], 1) * 17
+            else:
+                px = _bc1_colors(lin[:, 8:], False)
+                px[:, :, 3] = _bc4_values(lin[:, :8])
+            img = px.reshape(eh, ew, 4, 4, 4).transpose(0, 2, 1, 3, 4).reshape(eh * 4, ew * 4, 4)[:h, :w]
+            img = img.astype(np.uint8)
+        else:
+            raise NotImplementedError('NTP3 format %d' % fmt)
+        out.append((tex_id, fmt, img))
+    return out
+
+
 def write_ntp3(textures):
     """textures: [(tex_id, fmt, [mip RGBA arrays])] -> .nut bytes"""
     heads, datas = [], []
@@ -492,9 +537,23 @@ def append_ntwu(data, textures):
     return zlib.compress(bytes(out)) if packed else bytes(out)
 
 
+def _is_ntp3(path):
+    d = open(path, 'rb').read(0x10000)
+    return d[:4] == b'NTP3' or d[:2] == b'\x78\x9c' and zlib.decompressobj().decompress(d)[:4] == b'NTP3'
+
+
 def main():
     cmd = sys.argv[1]
-    if cmd == 'info':
+    if cmd in ('info', 'png') and _is_ntp3(sys.argv[2]):
+        texs = read_ntp3(open(sys.argv[2], 'rb').read())
+        if cmd == 'info':
+            for tex_id, fmt, img in texs:
+                print('NTP3 id 0x%08X %dx%d format %d (%s)' % (tex_id or 0, img.shape[1], img.shape[0], fmt,
+                                                             {0: 'DXT1', 1: 'DXT3', 2: 'DXT5', 14: 'RGBA8'}[fmt]))
+        else:
+            from PIL import Image
+            Image.fromarray(texs[0][2], 'RGBA').save(sys.argv[3])
+    elif cmd == 'info':
         d, texs = load(sys.argv[2])
         for t in texs:
             print('id 0x%08X %dx%d fmt 0x%X tile %d swizzle 0x%X pitch %d levels %d image 0x%X mips 0x%X' %

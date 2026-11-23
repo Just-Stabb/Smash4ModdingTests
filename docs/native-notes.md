@@ -2021,7 +2021,11 @@ tests `tools/hitbox_var_test.py` (unicorn: `--synthetic` the cave with stubs; `P
   (vt `+0x4C`): the textures are the fighters' `effect/<name>/trail/*.nut` (vanilla: NTP3, one mip,
   128 x 128, DXT5 / DXT1 for the "Add" ones, id 0).
 - The words after the table are other variables (referenced by code), so new names need a copy of
-  the table: `tools/trail_table_cave.py`.
+  the table: `tools/trail_table_cave.py` (ids 260 - 271), `tools/kamui_trail_cave.py` (Corrin's, 272 / 273).
+- The set-up (`0x032F5394`-`0x032F53D4`): `lhz r0, 0xC(r27)` (the id, u16), `slwi r6, r0, 2`, `lwzx r5, r6, r25`,
+  then `0x04ADA3F4(buf, "%s.nut", name)` and `0x032F99C4(buf)`. `kamui_trail_cave_test.py` runs those
+  instructions (unicorn) over the patched table. Adding trail textures: docs/acmd-params/effects.md
+  "Trail textures: where they come from, and adding one".
 
 ### The trail shaders (`shader/effect_trail.nsh`)
 

@@ -3,7 +3,8 @@ namespace Sm4shCommand.Viewer
     /// <summary>
     /// Sword trail texture names by id (v1.6.0): Sword_Glow / AFTER_IMAGE* texture id N (1-based) is Names[N - 1], loaded
     /// as "&lt;name&gt;.nut" from the fighters' effect/&lt;bank&gt;/trail folders. Ids 1-259: the game's own table (cross_f.rpx
-    /// 0x10423E60, docs/native-notes.md "Sword trails"); 260 on: tools/trail_table_cave.py's NEW_TRAILS (exe B).
+    /// 0x10423E60, docs/native-notes.md "Sword trails"); 260 - 271: tools/trail_table_cave.py's NEW_TRAILS (exe B; 270 /
+    /// 271 Byleth's, v1.7.31); 272 on: tools/kamui_trail_cave.py's KAMUI_TRAILS (Corrin's cyan trail, v1.7.31).
     /// </summary>
     public static class TrailNames
     {
@@ -88,7 +89,10 @@ namespace Sm4shCommand.Viewer
             "TexKamuiSpearTrace03", "TexKamuiSpearTrace04", "TexKamuiSpearTrace05", "TexKamuiSpearTrace06",
             "TexKamuiSpearTrace07", "TexEdgeSwordTrace", "TexEdgeSwordTraceAdd", "TexEdgeSwordTrace2",
             "TexEdgeSwordTrace2Add", "TexBraveSwordTrace", "TexBraveSwordTraceAdd", "TexBraveFireSwordTrace",
-            "TexBraveLightningSwordTrace", "TexBraveFinalSwordTrace", "TexBraveSwordTrace3"
+            "TexBraveLightningSwordTrace", "TexBraveFinalSwordTrace", "TexBraveSwordTrace3", "TexMasterSwordTrace",
+            "TexMasterSwordTraceAdd",
+            // v1.7.31: Corrin's cyan trail (tools/kamui_trail_cave.py KAMUI_TRAILS): 272 / 273
+            "TexKamuiSwordTraceCyan", "TexKamuiSwordTraceCyanAdd"
         };
 
         /// <summary>The name of trail texture id (1-based), or null.</summary>

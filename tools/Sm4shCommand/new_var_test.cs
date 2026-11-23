@@ -88,7 +88,7 @@ class NvTest
         Check("commands", ACMD_INFO.CMD_NAMES.Count, 635);   // v1.7.14: + Outline_Shell; v1.7.13: + Outline_Set, Mesh_Visibility; v1.7.12: + Screen_Invert; v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
         Check("New_Var known: size 11, group", ACMD_INFO.CMD_SIZES[FighterVariable.NewVarIdent] + " " +
               ACMD_INFO.GetCategory(FighterVariable.NewVarIdent), "11 New Commands / Variables");
-        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 51);       // v1.7.14: + Outline_Shell; v1.7.13: + Outline_Set, Mesh_Visibility; v1.7.12: + Screen_Invert; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
+        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 53);       // v1.7.31: + Sword_Glow, Sword_Glow2 (their new trail texture ids); v1.7.14: + Outline_Shell; v1.7.13: + Outline_Set, Mesh_Visibility; v1.7.12: + Screen_Invert; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
         Check("group help blocks", ACMD_INFO.GROUP_HELP.Count, 11);      // v1.7.0: + New Commands / Time & stage; v1.7.6: + New Commands / Effects
         LoadAliases(args[1]);
         Check("aliases loaded", FighterVariable.AliasCount > 500, true);

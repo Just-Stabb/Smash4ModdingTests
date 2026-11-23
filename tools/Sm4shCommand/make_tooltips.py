@@ -8,6 +8,9 @@ sheets in reference/:
   gfx.txt                MSC Note Sheet: Global GFX IDs (Graphic=0x10000XX)
   angles.txt             special knockback angles
   articles.txt           reference/FighterArticles.xml, per fighter (Article=N)
+  trails.txt             sword trail texture ids (Sword_Glow / Sword_Glow2 / Sword_Trace / AFTER_IMAGE2_ON...):
+                         the names of SM4SHCommand/Classes/Viewer/TrailNames.cs (the game's table, then
+                         tools/trail_table_cave.py's and tools/kamui_trail_cave.py's), and per fighter its own ones
   fighters/NAME.txt      fighter_param_vl sheet (reference/fighter_param_vl/): each fighter's special
                          move params 0x05-0x09xxxxxx, with the defaults
 
@@ -458,6 +461,54 @@ def articles():
     return write("articles.txt", ["Article IDs per fighter (reference/FighterArticles.xml)."], sections)
 
 
+TRAIL_NAMES = os.path.join(HERE, "SM4SHCommand", "Classes", "Viewer", "TrailNames.cs")
+# the commands whose first (and, for the two-texture forms, second) parameter is a trail texture id
+TRAIL_COMMANDS_1 = ["Sword_Glow", "Sword_Glow2", "Sword_Trace", "AFTER_IMAGE2_ON", "AFTER_IMAGE_27_arg_sword_trail_form"]
+TRAIL_COMMANDS_2 = ["Sword_Glow", "Sword_Glow2", "AFTER_IMAGE_27_arg_sword_trail_form"]
+GAME_TRAILS = 259
+# the fighter whose own trail textures they are (fighter/NAME/effect/NAME/trail/): (folder, first id, last id, note)
+FIGHTER_TRAILS = [
+    ("kamui", 240, 241, "Corrin's own sword trail (vanilla: her Sword_Glow uses 240 / 241)"),
+    ("kamui", 252, 259, "Corrin's own spear trails (vanilla)"),
+    ("edge", 260, 263, "Sephiroth's port (tools/trail_table_cave.py)"),
+    ("brave", 264, 269, "Hero's port (tools/trail_table_cave.py)"),
+    ("master", 270, 271, "Byleth's port (tools/trail_table_cave.py)"),
+    ("kamui", 272, 273, "NEW (v1.7.31): Corrin's cyan / light-blue sword trail (tools/kamui_trail_cave.py). Use "
+     "Texture1=272 (the trail), Texture2=273 (its glow), Shader=1, BlendMode=0xB. Needs the executable with "
+     "kamui_trail_cave.py's table (else the game can crash) and fighter/kamui/effect/kamui/trail/"
+     "TexKamuiSwordTraceCyan.nut / TexKamuiSwordTraceCyanAdd.nut"),
+]
+
+
+def trail_names():
+    """the trail texture names by id (1-based), from the Hitbox Viewer's table"""
+    text = open(TRAIL_NAMES, encoding="utf-8-sig").read()
+    body = text[text.index("Names = {"):text.index("};", text.index("Names = {"))]
+    return re.findall(r'"([^"]+)"', body)
+
+
+def trails():
+    names = trail_names()
+    def desc(i):
+        n = names[i - 1]
+        where = ("the game's own table" if i <= GAME_TRAILS else
+                 "added by the patched executable (tools/trail_table_cave.py / kamui_trail_cave.py): ids past the "
+                 "installed executable's table can crash the game")
+        return "Trail texture %d (0x%X): %s.nut in a fighter's effect/<fighter>/trail/ folder; %s" % (i, i, n, where)
+    every = [(i, names[i - 1], desc(i)) for i in range(1, len(names) + 1)]
+    sections = [(["[command %s]" % ", ".join(TRAIL_COMMANDS_1), "[index 1]"], every),
+                (["[command %s]" % ", ".join(TRAIL_COMMANDS_2), "[index 2]"], every)]
+    for fighter in sorted(set(f for f, _a, _b, _n in FIGHTER_TRAILS)):
+        own = [(i, names[i - 1], "%s\\n%s" % (note, desc(i))) for f, a, b, note in FIGHTER_TRAILS if f == fighter
+               for i in range(a, b + 1)]
+        who = "[fighter %s]" % ", ".join([fighter] + ALIASES.get(fighter, []))
+        sections.append(([who, "[command %s]" % ", ".join(TRAIL_COMMANDS_1), "[index 1]"], own))
+        sections.append(([who, "[command %s]" % ", ".join(TRAIL_COMMANDS_2), "[index 2]"], own))
+    return write("trails.txt", ["Sword trail texture ids (1-based) in the trail commands' texture parameters: id N is",
+                                "\"<name N>.nut\" (docs/acmd-params/effects.md \"Trails\", docs/native-notes.md "
+                                "\"Sword trails\")."], sections)
+
+
 def fighters():
     total = 0
     folder = os.path.join(REF, "fighter_param_vl")
@@ -506,6 +557,7 @@ def main():
     counts["gfx"] = gfx()
     counts["angles"] = angles()
     counts["articles"] = articles()
+    counts["trails"] = trails()
     counts["fighters/*"] = fighters()
     for k, v in counts.items():
         print("%-20s %d" % (k, v))

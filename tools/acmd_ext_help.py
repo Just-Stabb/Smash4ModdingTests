@@ -3548,3 +3548,91 @@ EXAMPLES['Outline_Shell'] = [
     'FRAME(Frames=100)',
     'Outline_Shell(Target=0, Red=150, Green=140, Blue=255, Alpha=200, Width=3, Frames=0, FadeIn=10, FadeOut=10, Flash=90, Blend=1)',
 ]
+
+# --- new values for vanilla commands (v1.7.31): trail textures ----------------------------------------------------
+# A vanilla command that takes a new value (a new id, flag or variable) keeps its own group; its Help says what is new
+# and its examples gain one showing it (make_events_cfg.py: VANILLA_HELP after the parameters, VANILLA_EXAMPLES after
+# the game's own example), and "New Commands"' group text lists it.
+_ov = GROUP_HELP[NEW_GROUP]
+_ov[_ov.index('## More'):_ov.index('## More')] = [
+    '## New values in vanilla commands',
+    '- Trail textures (Sm4shCommand v1.7.31, tools/kamui_trail_cave.py): Sword_Glow / Sword_Glow2 texture ids 272 '
+    '(TexKamuiSwordTraceCyan) and 273 (TexKamuiSwordTraceCyanAdd), Corrin\'s cyan sword trail, after the game\'s 259 '
+    'and the ports\' 260 - 271 (Sephiroth, Hero, Byleth). See Sword_Glow (group "Trails & sword glow"); hover a '
+    'texture id in a script for its name.',
+    '',
+]
+_TRAIL_IDS = [
+    '## Texture ids (changed in v1.7.31: 272 / 273 are new)',
+    'Texture1 / Texture2 are trail texture ids: id N is entry N of the trail-name table, and the trail\'s texture is '
+    '"<that name>.nut" among the textures of the fighters in the match (every .nut in a fighter\'s '
+    'effect/<fighter>/trail/ folder). Texture1 is the trail itself (its alpha is the trail\'s shape), Texture2 is '
+    'light added on top ("...Add" textures); 0 = none. Hover an id in a script for its name.',
+    '- 1 - 259: the game\'s own table (e.g. Corrin\'s 240 / 241 TexKamuiSwordTrace / Add, Ike\'s 4 / 143, Marth\'s '
+    '9 / 144).',
+    '- 260 - 271: the ports\' (tools/trail_table_cave.py): Sephiroth 260 - 263, Hero 264 - 269, Byleth 270 / 271.',
+    '- New: 272 TexKamuiSwordTraceCyan and 273 TexKamuiSwordTraceCyanAdd, a cyan / light-blue sword trail and its '
+    'glow, for Corrin (tools/kamui_trail_cave.py; the textures in fighter/kamui/effect/kamui/trail/). Use them as a '
+    'pair, Texture1=272, Texture2=273, with Shader=1 and BlendMode=0xB as her own trail. Sm4shCommand shows them as '
+    '0x110 / 0x111 once the script is decompiled.',
+    'They need the patched cross_f.rpx with the longer table (tools/kamui_trail_cave.py, which adds them after '
+    'trail_table_cave.py\'s 271). On an executable without it, ids past its table read garbage as a name pointer: '
+    'the game can crash. Like any trail texture they only draw when the fighter\'s trail folder has the .nut (a '
+    'texture of another fighter in the match is found too, by name).',
+    '',
+    '## Adding your own trail texture',
+    'A 128 x 128 picture laid out as the game\'s: along the trail left to right (the blade on the right, the tail end '
+    'on the left), across the blade top to bottom. tools/kamui_trail_build.py makes the pair (NTP3, one mip: DXT5 and '
+    'a DXT1 Add); add its names to tools/kamui_trail_cave.py\'s KAMUI_TRAILS (or trail_table_cave.py\'s NEW_TRAILS '
+    'for another fighter), rebuild the executable, and add the names to Sm4shCommand\'s TrailNames.cs and '
+    'make_tooltips.py (docs/acmd-params/effects.md "Trails").',
+    '',
+    'Ultimate\'s AFTER_IMAGE4_ON is Smash 4\'s Sword_Glow (tools/ultimate_acmd.py converts it): the same two '
+    'textures, blur length and blade points.',
+]
+VANILLA_HELP = {
+    'Sword_Glow': _TRAIL_IDS,
+    'Sword_Glow2': [
+        '## Texture ids (changed in v1.7.31: 272 / 273 are new)',
+        'Color / Unknown1 are Sword_Glow\'s Texture1 / Texture2 (trail texture ids; Unknown24 its BlendMode, '
+        'Unknown25 its Shader): 272 / 273 are Corrin\'s new cyan trail pair, as in Sword_Glow (see its help for every '
+        'id, and the executable they need).',
+    ],
+}
+VANILLA_EXAMPLES = {
+    'Sword_Glow': [
+        '// Corrin\'s forward tilt (AttackS3, effect script) with the new cyan trail: her own Sword_Glow (sword joint',
+        '// 0x19, the blade from Y 0.1 to 14, her blade flare 0x3390001) with Texture1=272, Texture2=273 instead of',
+        '// her orange 240 / 241. Needs the executable with tools/kamui_trail_cave.py\'s table and',
+        '// fighter/kamui/effect/kamui/trail/TexKamuiSwordTraceCyan.nut / TexKamuiSwordTraceCyanAdd.nut',
+        'FRAME(Frames=7)',
+        'Sword_Glow(Texture1=272, Texture2=273, BlurLength=8, Bone1=0x19, X1=0, Y1=0.1, Z1=0, Bone2=0x19, X2=0, Y2=14, '
+        'Z2=0, Terminate=1, Graphic=0x3390001, Bone3=0x19, X=0, Y=0, Z=0, RotX=0, RotY=0, RotZ=0, Size=1, TrailMode=0, '
+        'Axis=0, Unused=0, BlendMode=0xB, Shader=1)',
+        'FRAME(Frames=8)',
+        'Graphic_Effect(Graphic=0x1000019, Bone=0, X=0, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=1.2, RandomX=0, '
+        'RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=0)',
+        'FRAME(Frames=12)',
+        'Terminate_Sword_Glow(FadeTime=5)',
+        '',
+        '// Corrin\'s up air (AttackAirHi): a short cyan trail (BlurLength 4) from frame 6, faded out over 3 frames',
+        '// from frame 12, as her own',
+        'FRAME(Frames=6)',
+        'Sword_Glow(Texture1=272, Texture2=273, BlurLength=4, Bone1=0x19, X1=0, Y1=0.1, Z1=0, Bone2=0x19, X2=0, Y2=14, '
+        'Z2=0, Terminate=1, Graphic=0x3390001, Bone3=0x19, X=0, Y=0, Z=0, RotX=0, RotY=0, RotZ=0, Size=1, TrailMode=0, '
+        'Axis=0, Unused=0, BlendMode=0xB, Shader=1)',
+        'FRAME(Frames=12)',
+        'Terminate_Sword_Glow(FadeTime=3)',
+    ],
+    'Sword_Glow2': [
+        '// Corrin\'s neutral air: her second trail (Sword_Glow2 on joint 0x10, her spear textures) in the new cyan pair',
+        '// 272 / 273 instead of her own 253 / 252 (TexKamuiSpearTrace01 / TexKamuiSpearTrace), with the sword\'s',
+        'FRAME(Frames=5)',
+        'Sword_Glow(Texture1=272, Texture2=273, BlurLength=4, Bone1=0x19, X1=0, Y1=0.1, Z1=0, Bone2=0x19, X2=0, Y2=14, '
+        'Z2=0, Terminate=1, Graphic=0x3390001, Bone3=0x19, X=0, Y=0, Z=0, RotX=0, RotY=0, RotZ=0, Size=1, TrailMode=0, '
+        'Axis=0, Unused=0, BlendMode=0xB, Shader=1)',
+        'Sword_Glow2(Color=272, Unknown1=273, BlurLength=4, Bone1=0x10, X=1, Y=0, Z=0, Bone2=0x10, X2=16, Y2=0, Z2=0, '
+        'Anchored=1, Graphic=0, Bone3=0x10, X3=6, Y3=0, Z3=0, RotX=0, RotY=90, RotZ=0, Size=1, Unknown21=0, '
+        'Unknown22=0, Unknown23=0, Unknown24=0xB, Unknown25=1, Unknown26=0)',
+    ],
+}

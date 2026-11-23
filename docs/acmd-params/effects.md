@@ -44,6 +44,43 @@ but the meaning inferred (or inferred from values + an Ultimate equivalent), **L
   byte 'Axis' 0/1/2 = X/Y/Z; BlendMode < 14 (|0x900); Shader -> `"0x4F%06x"` (>=1000 adds a
   second pass). Sword_Glow p0 is texture 1 (acmd_info says "Color"). The f2 float in the
   AFTER_IMAGE2 / Sword_Glow forms is passed but never read.
+
+### Trail textures: where they come from, and adding one
+
+- **The id**: the request's texture id is a u16 (`lhz r0, 0xC(r27)` at `0x032F5394`); the trail set-up
+  (`0x032F515C`, reached from the trail creator `0x032F9128` / `0x032F5158`) reads
+  `table[id - 1]` (`slwi r6, r0, 2` / `lwzx r5, r6, r25` with r25 = the table - 4, built by `lis` / `addi`
+  at `0x032F53A4` / `0x032F53B0`, the table's only reference), no bound check, and formats `"%s.nut"`
+  (`0x10192344`) from it. 0 = no texture.
+- **The table**: the game's has 259 names at `0x10423E60` (`TexLinkSwordTrace` ... `TexKamuiSpearTrace07`),
+  followed by other variables, so it can't grow in place. `tools/trail_table_cave.py` copies it into the
+  grown code space (`0x04B9B000`, the pointers then the strings, below `0x04B9C000`) and repoints the two
+  instructions: ids 260 - 271 are the ports' (Sephiroth, Hero, Byleth). `tools/kamui_trail_cave.py` adds
+  Corrin's after them: **272 `TexKamuiSwordTraceCyan`, 273 `TexKamuiSwordTraceCyanAdd`**. The copy uses 1,400
+  of its 4,096 bytes: room for about 90 more names of this length before `0x04B9C000` (weapon_expand_append.py's
+  space from there).
+- **The file**: the name is looked up among the loaded trail textures, which are every `.nut` in a loaded
+  fighter's `effect/<fighter>/trail/` folder (`data/fighter/<fighter>/effect/<fighter>/trail/`; the common
+  bank's `effect/common/trail/` too). The lookup is by name across the fighters in the match, so names must be
+  unique (vanilla prefixes them `Tex<Fighter>...`); a folder can carry names no script uses. Adding a file is
+  data only; **a new id needs the table entry (the executable)**. An id past the installed executable's
+  table reads whatever follows as a name pointer: don't use 272 / 273 without `kamui_trail_cave.py`.
+- **The format** (Corrin's vanilla `TexKamuiSwordTrace` / `Add`, and the ports'): NTP3, one texture, texture
+  id 0, 128 x 128, one mip; the trail DXT5, its `...Add` DXT1. U (left to right) runs along the trail, the
+  blade on the right and the tail end on the left; V across the blade (vanilla fades it to transparent at
+  both edges). Shader 1: rgb = (t0.rgb t0.a + t1.rgb t1.a) x the vertex alpha, a = t0.a x it
+  (docs/native-notes.md "The trail shaders"): Texture1's alpha is the trail's shape, Texture2 (the Add, alpha 1)
+  light added on top.
+- **Adding one** (Corrin's cyan v1 as the worked example, fighters/kamui/README.md):
+  1. a picture laid out as above, any size (scaled to 128 x 128): `python3 -I tools/kamui_trail_build.py
+     IMAGE OUT_DIR --name TexKamuiSwordTraceXxx [--add-gain 0.3]` writes `<name>.nut` and `<name>Add.nut`;
+  2. the names into `tools/kamui_trail_cave.py` KAMUI_TRAILS (another fighter's: trail_table_cave.py
+     NEW_TRAILS, or a module like it), rebuild the executable, `tools/kamui_trail_cave_test.py`;
+  3. Sm4shCommand: the names into `Classes/Viewer/TrailNames.cs` (the Hitbox Viewer draws the trail with them)
+     and, for a fighter's own, `make_tooltips.py` FIGHTER_TRAILS (`Tooltips/trails.txt`: every id is named in
+     the texture parameters); the command help in `tools/acmd_ext_help.py` VANILLA_HELP; rebuild;
+  4. ship the `.nut` files in `fighter/<fighter>/effect/<fighter>/trail/` with the executable;
+  5. compare with a vanilla pair first: `python3 -I tools/trail_preview.py OUT.png LABEL=T1.nut,T2.nut ...`.
 - **Lights** (EFFECT_LIGHT, EFFECT_FOLLOW_LIGHT): RGB /255, intensity, offset xyz (x mirrored);
   EFFECT_LIGHT_END fades lights matching an attribute mask over N frames.
 - **Wind** (AreaModule +0x60): Aesthetic_Wind_Effect = AREA_WIND_2ND (op 0x2715, rect area,
