@@ -881,7 +881,15 @@ SK_BOOM = dict(Damage=15.0, Angle=50, KBG=50, FKB=0, BKB=40, Size=27.0, Y=14.0, 
                                   # of shield damage"): size 22 -> 27 (x 1.23, its effect 44 -> 54 wide: tools/gekkouga_fx.py
                                   # SK_BOOM_DIAMETER); shield damage +40 on its 15 %: 55 against a fresh shield's 50 HP
                                   # (Smash 4: the hitbox's damage + its shield damage): a full shield breaks
-SK_BOOM_FRAMES = 4
+SK_BOOM_FRAMES = 101               # skeleton v1.7 (the user: "make the explosion hitbox ... more active (until right before
+                                   # all of the orange is gone in the explosion"); v1 - v1.6: 4): explosion_simple_24's orange
+                                   # (tools/gekkouga_fx_test.py boom_orange: pixels R > 0.45, saturation > 0.35, R > B + 0.25,
+                                   # alpha > 0.3, per cell; 4 game frames a cell) peaks in cells 14 - 16 (~4560 px), is 5 % of
+                                   # that in cell 24, 2 % in 25 (frames 100 - 103), 1 % in 26, gone from 28 (frame 112): the
+                                   # hitbox from its script's frame 0 (the effect's 1) to 101 (the effect's 102, inside cell
+                                   # 25). One Extra_Special_Hitbox, never set again: its hit records hold, one hit an opponent
+                                   # (Rehit 0) for the whole window. Its size stays 27 (the fireball's widest; a smaller one as
+                                   # it fades would need Change_Hitbox_Size, whose effect on the records isn't known here)
 SK_BOOM_HITSTUN = 1.6             # skeleton v1.5 (the user: "make the explosion have 1.6x hitstun"): Extra_Special_Hitbox's
                                   # HitstunMul (the ACMD extension's extras, tools/acmd_ext_cave.py: works in articles' scripts)
 # skeleton v1.5's contact burn (the user: "about 4% overall but rehits quickly ... about 70% overall if it was for 1
@@ -891,7 +899,12 @@ SK_BOOM_HITSTUN = 1.6             # skeleton v1.5 (the user: "make the explosion
 # the exe's contact row (SK_TOUCH_ROW: 3.5 %), 20 a second = 70 % (+ 2 % of the hits)
 SK_TOUCH = dict(Damage=0.1, Angle=361, KBG=0, FKB=0, BKB=0, Size=3.5, Y=3.5, Y2=20.5, Effect=5, Hitlag=0.0, SDI=0.0,
                 Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=0, SFXType=0, DisableHitlag=1, NoGFX=1, Flinchless=1)
-SK_TOUCH_ON, SK_TOUCH_PERIOD = 2, 3
+SK_TOUCH_ON, SK_TOUCH_PERIOD = 2, 3     # (v1.5 / v1.6: on 2 frames, off 1; skeleton v1.7: TEST_ONLY_DATA skeleton_toggle)
+SK_TOUCH_REHIT = 3                # skeleton v1.7 (the user: its multi-hit "seems inconsistent"): one hitbox for the whole
+                                  # run with the game's rehit rate 3 (Hitbox.csv field 31: "how many frames need to play
+                                  # before the hitbox can hit again"), set once a loop of its motion (48 frames, 16 periods);
+                                  # the burns from every new hit record (the exe's feature mark: v1.5 / v1.6 counted records,
+                                  # and a re-set's hit in the same frame as its clear went uncounted)
 
 
 def sk_boom_hitbox():
@@ -926,11 +939,16 @@ def sk_touch_hitbox():
     return acmd.Command(ident, [d[n] for n in syn])
 
 
-def sk_run_script(frames=None):
-    """SkeletonRun: the contact hitbox on SK_TOUCH_ON frames of every SK_TOUCH_PERIOD, through its motion (it loops: the
-    script again from 0; its 30 / 48 frames are whole periods)"""
+def sk_run_script(frames=None, toggle=False):
+    """SkeletonRun: skeleton v1.7: the contact hitbox once (rehit SK_TOUCH_REHIT); toggle (v1.5 / v1.6, TEST_ONLY): on
+    SK_TOUCH_ON frames of every SK_TOUCH_PERIOD, through its motion (it loops: the script again from 0; its 30 / 48
+    frames are whole periods)"""
     import acmd
     by = {v['name']: k for k, v in acmd.INFO.items()}
+    if not toggle:
+        c = sk_touch_hitbox()
+        c.params[c.info['syntax'].index('Rehit')] = SK_TOUCH_REHIT
+        return [c, acmd.Command(by['Script_End'], [])]
     frames = frames or 48
     out = []
     for f in range(0, frames, SK_TOUCH_PERIOD):
@@ -942,7 +960,7 @@ def sk_run_script(frames=None):
     return out + [acmd.Command(by['Script_End'], [])]
 
 
-def sk_scripts():
+def sk_scripts(toggle=False):
     """{crc: [Command]}: game (the explosion's hitbox), effect / sound empty"""
     import acmd
     by = {v['name']: k for k, v in acmd.INFO.items()}
@@ -951,7 +969,7 @@ def sk_scripts():
             acmd.Command(by['Remove_All_Hitboxes'], []), end]
     game = {acmd.crc(n): [acmd.Command(by['Script_End'], [])] for n in SK_SCRIPTS}
     game[acmd.crc('SkeletonExplode')] = boom
-    game[acmd.crc('SkeletonRun')] = sk_run_script()
+    game[acmd.crc('SkeletonRun')] = sk_run_script(toggle=toggle)
     return game
 
 
@@ -1011,6 +1029,10 @@ def cmd_skeleton(pacman_fighter, out_fighter, test_only=None):
     ow = os.path.join(out_fighter, 'script', 'animcmd', 'weapon', 'skeleton')
     os.makedirs(ow, exist_ok=True)
     acmd.ACMDFile(sk_scripts()).save(os.path.join(ow, 'game.bin'))
+    if test_only:                         # skeleton v1.7: v1.5 / v1.6's toggled contact hitbox (with v1.7's explosion)
+        t = os.path.join(test_only, 'skeleton_toggle', 'fighter', 'gekkouga', 'script', 'animcmd', 'weapon', 'skeleton')
+        os.makedirs(t, exist_ok=True)
+        acmd.ACMDFile(sk_scripts(toggle=True)).save(os.path.join(t, 'game.bin'))
     acmd.ACMDFile(sk_empty()).save(os.path.join(ow, 'effect.bin'))
     acmd.ACMDFile(sk_empty()).save(os.path.join(ow, 'sound.bin'))
     open(os.path.join(ow, 'motion.mtable'), 'wb').write(b''.join(struct.pack('>I', acmd.crc(n)) for n in SK_SCRIPTS))
@@ -1019,6 +1041,20 @@ def cmd_skeleton(pacman_fighter, out_fighter, test_only=None):
     compile_msc(SKELETON_MSC, os.path.join(ms, 'skeleton.mscsb'))
     return len(SK_CARRIER) + 6
 
+
+
+SND_TEST_AT = '    r = ArticleModule(0x2710, 0x8);\n'
+SND_TEST = ('    WorkModule(0, (float)SoundModule(0x2710, 0x768005b) + 0, 0x0f000317); // skeleton v1.7 TEST_ONLY: its spawn '
+            'sound from him (his SoundModule), the answer in VAR_23 (S4GF gen=)\n')
+
+
+def sound_test_msc(src):
+    """skeleton v1.7 TEST_ONLY_DATA sound_via_greninja: his MSC source with the skeleton's first spawn sound (0x0768005B)
+    also played by him as he asks for a skeleton (gk_sk_spawn): it plays -> the bank / table are right"""
+    a, b, c = func_span(src, 'gk_sk_spawn')
+    body = src[b:c]
+    assert body.count(SND_TEST_AT) == 1
+    return src[:b] + body.replace(SND_TEST_AT, SND_TEST_AT + SND_TEST) + src[c:]
 
 
 # ---------------------------------------------------------------- burn v2: the smashes' fire trails (article 9)

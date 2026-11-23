@@ -178,7 +178,7 @@ def all_sets(burn2=True, tiers=True):
 
 def _sk_sets():
     h = SK_BODY_H / (SK_BODY_BOTTOM_V - SK_BODY_TOP_V)
-    body = dict(atlas='skeleton_run', blend=0, size=(h * (2048 / 6) / (2048 / 10), h))
+    body = dict(atlas='skeleton_run', blend=0, size=(h * (2048 / 6) / (2048 / 10), h), rate=SK_RUN_RATE)
     feet_v = feet_cell_v('skeleton_run')
     body['offset'] = (0.0, (feet_v - 0.5) * h)
     bw = SK_BOOM_DIAMETER / SK_BOOM_WIDEST_U
@@ -274,21 +274,37 @@ def chunks(n, size):
     return out
 
 
-def flip_plan(n, k, loop):
+SK_RUN_RATE = 0.58 / 0.7         # skeleton v1.7 (the user: "make the skeleton slightly slower"): its run 0.7 -> 0.58 a
+                                  # frame (weapons/skeleton.c sk_speed); its run flipbook played as much slower (55 cells
+                                  # in 66 entries of 2 frames: every 5th cell shown twice; 110 -> 132 frames a cycle), so its
+                                  # stride keeps to the ground as in v1.2 - v1.6
+
+
+def flip_seq(n, rate=1.0):
+    """the cells a flipbook shows in turn, played at rate (1: each once; under 1 some twice, evenly)"""
+    if rate == 1.0:
+        return list(range(n))
+    m = int(round(n / rate))
+    return [min(n - 1, i * n // m) for i in range(m)]
+
+
+def flip_plan(n, k, loop, seq=None):
     """the emitters of one flipbook (n cells, k frames a cell): [{first, cells, table, start, life, period}]. Up to 32
     cells: one emitter (a loop lives for ever, its table wrapping; a one-shot lives n x k). More: one emitter a run of
     cells (the table holds 32), each born when its run is due (start frame = k x the cells before it), living its run's
     frames plus one, its table the run and its last cell again (that extra frame shows it: a birth a frame late leaves
     no gap, the hand-over frame shows two adjacent cells), a loop's runs born again every n x k frames; a one-shot's
     last run lives its frames only"""
-    if n <= TABLE:
-        return [dict(first=0, cells=n, table=list(range(n)), start=0, life=FOREVER if loop else n * k, period=0)]
+    seq = list(range(n)) if seq is None else list(seq)
+    m = len(seq)                          # (skeleton v1.7: a sequence, e.g. flip_seq's slowed one; n cells: 0 .. n - 1)
+    if m <= TABLE:
+        return [dict(first=0, cells=m, table=seq, start=0, life=FOREVER if loop else m * k, period=0)]
     out = []
-    runs = chunks(n, TABLE - 1)
+    runs = chunks(m, TABLE - 1)
     for i, (a, c) in enumerate(runs):
         held = loop or i < len(runs) - 1
-        out.append(dict(first=a, cells=c, table=list(range(a, a + c)) + ([a + c - 1] if held else []), start=a * k,
-                        life=c * k + (1 if held else 0), period=n * k if loop else 0))
+        out.append(dict(first=a, cells=c, table=seq[a:a + c] + ([seq[a + c - 1]] if held else []), start=a * k,
+                        life=c * k + (1 if held else 0), period=m * k if loop else 0))
     return out
 
 
@@ -392,7 +408,7 @@ def flip_emitters(p, tmpl, name, spec):
     if spec['blend'] == 1:                          # the fires (fire trail fix v1): their bases soft
         img = soften_bottom(img, d)
     out = []
-    plan = flip_plan(n, k, loop)
+    plan = flip_plan(n, k, loop, flip_seq(n, spec.get('rate', 1.0)))
     ring = spec.get('ring')
     blade = spec.get('blade')
     if blade:                                      # skeleton v1.3: a blade flame: its first 31 cells from its start, for

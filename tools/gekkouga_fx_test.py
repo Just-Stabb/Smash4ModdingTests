@@ -350,7 +350,8 @@ def main():
         if spec.get('layers') or spec.get('blade'):
             continue                               # (timing_checks / tier_checks)
         d = G.sidecar(spec['atlas'])
-        plan = G.flip_plan(d['frames'], d['frames_per_cell_at_60fps'], d['playback'] == 'loop')
+        seq = G.flip_seq(d['frames'], spec.get('rate', 1.0))
+        plan = G.flip_plan(d['frames'], d['frames_per_cell_at_60fps'], d['playback'] == 'loop', seq)
         ems = [x['data'] for x in p.sets[si]['emitters']]
         rows = []
         for em, run in zip(ems, plan):
@@ -373,18 +374,20 @@ def main():
               (name, len(plan), d['frames'], d['playback'], spec['blend'], d['atlas_size'],
                [(r['life'], r['start']) for r in plan], spec['size'][0], spec['size'][1]), rows, want)
         n, k = d['frames'], d['frames_per_cell_at_60fps']
+        m = len(seq)                       # (skeleton v1.7: the run's slowed sequence, SK_RUN_RATE)
         loop = d['playback'] == 'loop'
-        frames = range(0, 2 * n * k + 3) if loop else range(0, n * k)
+        frames = range(0, 2 * m * k + 3) if loop else range(0, m * k)
         got = cells_shown(p, si, frames)
         bad = []
         for fr in frames:
-            c = (fr // k) % n
-            ok = got[fr] == [c] or (len(plan) > 1 and fr % k == 0 and sorted(got[fr]) == sorted([c, (c - 1) % n]))
+            c = seq[(fr // k) % m]
+            ok = got[fr] == [c] or (len(plan) > 1 and fr % k == 0 and sorted(set(got[fr])) == sorted({c, seq[(fr // k - 1) % m]}))
             if not ok:
                 bad.append((fr, got[fr], c))
         handovers = sum(1 for fr in frames if len(got[fr]) > 1)
-        check('%s: the flipbook as eft plays it (latte_exec): each of %d frames shows cell (frame / %d) mod %d%s' %
-              (name, len(frames), k, n, ', the hand-overs (%d) also the cell before' % handovers if len(plan) > 1 else ''),
+        check('%s: the flipbook as eft plays it (latte_exec): each of %d frames shows entry (frame / %d) mod %d of its %s%s' %
+              (name, len(frames), k, m, 'cells' if m == n else 'slowed sequence (%d cells, every %dth twice: rate %.3f)' % (
+                  n, round(m / (m - n)) if m > n else 0, spec.get('rate', 1.0)), ', the hand-overs (%d) also the cell before' % handovers if len(plan) > 1 else ''),
               bad[:5], [])
         if not loop:
             check('%s: a one-shot: nothing drawn after its %d frames' % (name, n * k),

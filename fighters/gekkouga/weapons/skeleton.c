@@ -634,14 +634,17 @@ float sk_hit_y;
 
 int sk_fuse() { return 180; }             // 3 s: the explosion (the user)
 float sk_hp() { return 25.0f; }           // its HP (the user); the executable's SK_HP the same
-float sk_speed() { return 0.7f; }         // slow: units a frame (Greninja walks 1.2 / runs 1.6+)
+float sk_speed() { return 0.58f; }        // slow: units a frame (Greninja walks 1.43 / runs 2.08); skeleton v1.7 (the
+                                          // user: "slightly slower"): 0.7 -> 0.58 (17 % slower; its run flipbook
+                                          // slowed as much: tools/gekkouga_fx.py SK_RUN_RATE)
 float sk_gravity() { return 0.18f; }      // off a ledge it falls as he does (his 0x03000018 / 0x03000019)
 float sk_max_fall() { return 1.85f; }
 float sk_snap() { return 3.0f; }          // standing: the floor under its next step this far up / down (slopes, steps)
 float sk_wall_y() { return 5.0f; }        // the wall test's height
 float sk_wall_ahead() { return 2.0f; }    // ... and how far past its step (inside its own walls: x +- 6)
 float sk_mid() { return 14.0f; }          // its middle (28 tall): its explosion / smoke there
-int sk_boom_frames() { return 120; }      // the explosion: removed after this (its hitbox: the game script's frames 1 - 4;
+int sk_boom_frames() { return 120; }      // the explosion: removed after this (its hitbox: the game script's frames 0 - 101,
+                                          // skeleton v1.7 (v1 - v1.6: 1 - 4): tools/gekkouga_build.py SK_BOOM_FRAMES;
                                           // skeleton v1.5: 40 -> 120, its explosion sound's 114 frames: kept hidden so
                                           // the sound isn't cut with it)
 int sk_smoke_frames() { return 36; }      // the smoke: removed after this (no hitbox; v1.5: 3 -> 36, its death sound's 34)
@@ -918,11 +921,11 @@ void sk_snd_spawn()
 {
     if (randi(0, 2) == 0)
     {
-        SoundModule(0x2710, sk_snd_spawn1());
+        sk_play(sk_snd_spawn1());
     }
     else
     {
-        SoundModule(0x2710, sk_snd_spawn2());
+        sk_play(sk_snd_spawn2());
     }
     sk_vc_t = sk_vc_first() + randi(0, sk_vc_first_rand());
 }
@@ -936,12 +939,12 @@ void sk_snd_voice()
     }
     if (randi(0, 2) == 0)
     {
-        SoundModule(0x2710, sk_snd_voice1());
+        sk_play(sk_snd_voice1());
         sk_vc_t = sk_vc_len1();
     }
     else
     {
-        SoundModule(0x2710, sk_snd_voice2());
+        sk_play(sk_snd_voice2());
         sk_vc_t = sk_vc_len2();
     }
     sk_vc_t = sk_vc_t + sk_vc_gap() + randi(0, sk_vc_gap_rand());
@@ -951,5 +954,17 @@ void sk_snd_end(int id)
 {
     SoundModule(0x2714, sk_snd_voice1());
     SoundModule(0x2714, sk_snd_voice2());
-    SoundModule(0x2710, id);
+    sk_play(id);
+}
+
+// skeleton v1.7: a sound played (its SoundModule: from v1.7 a real one, the hydrant's: v1.5 / v1.6 had the null module,
+// every request dropped), and for the TEST_ONLY exe's S4SN line its VAR_13 = requests so far, VAR_14 = the label (the id's
+// low half: row 0x768), VAR_15 = the play's answer
+void sk_play(int id)
+{
+    int r;
+    r = SoundModule(0x2710, id);
+    WorkModule(0, WorkModuleF(0, 0x0f00030d) + 1.0f, 0x0f00030d);
+    WorkModule(0, (float)(id & 0xffff) + 0, 0x0f00030e);
+    WorkModule(0, (float)r + 0, 0x0f00030f);
 }
