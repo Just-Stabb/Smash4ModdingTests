@@ -19,6 +19,7 @@ momentum, reverse tilts, tilts / down smash / shield out of run: the user's roll
 to the same functions, msc_fingerprint 0 differ), then patches the sites below and appends fighters/gekkouga/clones.c.
 The clone article's MSC is fighters/gekkouga/weapons/clone.c (compiled as it is).
 """
+import math
 import os
 import re
 import struct
@@ -703,6 +704,125 @@ FSMASH_EXTRA = 30.0               # forward smash's blade this much longer (its 
 FSMASH_BLADE = 55.0
 
 
+# ---------------------------------------------------------------- neutral air ring v1 (the user: "increase neutral air's
+# hitbox size, and make the outer fire ring into weak hitboxes that can connect from the stronger hit")
+NAIR_STRONG = 12.0                # its strong hits' size (11 %, frames 12-14 and the connected re-hit 17-19; tuning v1
+                                  # 9.375): the water burst's solid disc as drawn (fx_render at 1.8125: its light >= 80 %
+                                  # out to 11.5 - 12.5 at frames 12-15)
+NAIR_LATE = 14.0                  # its late hit's size (6 %, frames 14-17; tuning v1 12.5): the burst's drawn edge (its
+                                  # light ~0.6 at 13 - 14, 80 % of it inside 14.6 - 15.3 at frames 13-16)
+NAIR_FX_FRAME = 11                # the burst / ring's call frame (his effect script)
+NAIR_FX_Y = 8.5                   # ... at joint 0, Y 8.5 (the ring's centre)
+NAIR_FX_SIZE = 1.8125             # ... its size (tuning v1)
+NAIR_RING_PART = 1                # the ring's hitboxes: Part 1, their own hit record (the strong / late hits are Part 0):
+                                  # set_attack (0x02C08848) keeps a Part's record while an ID set again is still out on
+                                  # it, and clears it when a new ID is set on that Part (docs/native-notes.md)
+NAIR_RING_IDS = (1, 2, 3, 4, 5, 6)   # 6 capsules (a hexagon round the ring): the clone (a weapon: IDs 0-6, Parts 0-1)
+                                  # plays this script too
+NAIR_RING_FRAMES = (14, 16, 18, 20, 22)   # the ring boxes set at 14 (all six at once: Part 1's record starts empty), moved
+NAIR_RING_END = 24                # out every 2 frames (the same IDs, still out: the record kept), gone at 24 (the ring's
+                                  # flames: called at 11, 14 frames, under 15 % alpha by 24)
+NAIR_RING_TIP = 4.5               # the ring's flames' lit tips past their centres (fx_render: 4.3 - 4.7 at frames 14-19)
+NAIR_RING_MIN = 2.5               # the capsules' least radius
+NAIR_RING_HIT = dict(Damage=2.5, Angle=60, KBG=25, FKB=0, BKB=25, Effect=5, Trip=0.0, Hitlag=0.5, SDI=1.0, Clang=1,
+                     Rebound=1, ShieldDamage=0, SFXLevel=0, SFXType=8)
+                                  # weak: 2.5 %, the burst's own angle 60 (it carries on the way the burst sent them), KBG /
+                                  # BKB 25, fire (element 5, the burn sound 8, small), half hitlag, no shield damage
+
+
+def ring_radius(frame, ring=None):
+    """the ring's flames' centres' radius at a frame (tools/gekkouga_fx.py FIRE_RING: r0 + v (1 - air^t) / (1 - air), t
+    the frames since the call less one, x the call's size); fx_render's light centre is within ~1.5 of it"""
+    import gekkouga_fx
+    r = ring or gekkouga_fx.FIRE_RING
+    t = max(0, frame - NAIR_FX_FRAME - 1)
+    return NAIR_FX_SIZE * (r['r0'] + r['v'] * (1 - r['air'] ** t) / (1 - r['air']))
+
+
+def ring_stage(frame):
+    """(hexagon vertex radius, capsule radius) of the ring boxes set at frame (held to frame + 1): the band from the burst
+    boxes' edge (NAIR_LATE) to the flames' tips at frame + 1, its middle the hexagon's mean radius ((1 + cos 30) / 2 of
+    the vertices'), half its width the capsules' (at least NAIR_RING_MIN)"""
+    ri, ro = NAIR_LATE, ring_radius(frame + 1) + NAIR_RING_TIP
+    return round((ri + ro) / 2 / ((1 + math.cos(math.radians(30))) / 2), 2), round(max(NAIR_RING_MIN, (ro - ri) / 2), 2)
+
+
+def ring_boxes(frame):
+    """the 6 Extended_Hitbox capsules (Part 1, joint 0) of the ring at frame: hexagon edges round (0, NAIR_FX_Y)"""
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    ident = by['Extended_Hitbox']
+    rv, sz = ring_stage(frame)
+    out = []
+    for k, hid in enumerate(NAIR_RING_IDS):
+        a0, a1 = math.radians(60 * k), math.radians(60 * (k + 1))
+        vals = dict(NAIR_RING_HIT, ID=hid, Part=NAIR_RING_PART, Bone=0, Size=sz,
+                    X=0.0, Y=round(NAIR_FX_Y + rv * math.sin(a0), 3), Z=round(rv * math.cos(a0), 3),
+                    X2=0.0, Y2=round(NAIR_FX_Y + rv * math.sin(a1), 3), Z2=round(rv * math.cos(a1), 3))
+        vals['Ground/Air'], vals['Direct/Indirect'], vals['Type'] = 3, 1, 0
+        out.append(acmd.Command(ident, [vals[n] for n in acmd.INFO[ident]['syntax']]))
+    return out
+
+
+def nair_ring(game):
+    """neutral air: the strong / late hits NAIR_STRONG / NAIR_LATE, and the ring's weak capsules (Part 1) from frame 14 to
+    24 on absolute FRAMEs; his WAITs become FRAMEs (the same frames), the end Remove_All_Hitboxes (19) Remove_Hitbox(0)"""
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    s = game.scripts[acmd.crc('attackairn')]
+    hb = [c for c in s if c.name in HITBOXES]
+    assert [float(c.params[param(c, 'Damage')]) for c in hb] == [11.0, 6.0, 11.0], hb
+    for c in hb:
+        c.params[param(c, 'Size')] = NAIR_LATE if float(c.params[param(c, 'Damage')]) == 6.0 else NAIR_STRONG
+    on, cmp_, tr = (next(c for c in s if c.name == n) for n in ('ON_FLAG', 'Float_Var_Compare', 'True'))
+    off = next(c for c in s if c.name == 'OFF_FLAG')
+    assert int(tr.params[0]) == 2 + 1 + len(hb[2].params), 'the True block: the re-hit only'
+    fr = lambda n: acmd.Command(by['FRAME'], [float(n)])
+    rm = acmd.Command(by['Remove_Hitbox'], [0])
+    new = [fr(10), on, fr(12), hb[0], fr(14), hb[1]] + ring_boxes(14) + [fr(16)] + ring_boxes(16) + \
+          [fr(17), cmp_, tr, hb[2], fr(18)] + ring_boxes(18) + [fr(19), rm, fr(20)] + ring_boxes(20) + [fr(22)] + \
+          ring_boxes(22) + [fr(NAIR_RING_END), acmd.Command(by['Remove_All_Hitboxes'], []), fr(40), off,
+                            acmd.Command(by['Script_End'], [])]
+    s[:] = new
+
+
+# ---------------------------------------------------------------- forward air reach (the user: "Can you also extend
+# forward air's length to hit Donkey Kong?"): as forward smash in tuning v1, longer not bigger
+FAIR_EXTRA = 10.0                 # a second water sword (0x3300007, size 1: 11 long) from 10 along the blade (11 -> 21), its
+                                  # FireBlade flames with it (a second 0x3300022 call there), the Sword_Glow trail to -21, a
+                                  # hitbox ID 2 (ID 0's) at Y -17: reach 22.4 from the hand (was 12.4). The user's screenshot
+                                  # ($S/gk_in/clone_fx/fair_reach.png; the blade 11 = ~122 px, his leg ~ the same scale:
+                                  # 11.1 px a unit): DK's nearest point 221 px = 19.9 from his hand
+FAIR_BLADE = 11.0
+
+
+def fair_reach(game, effect):
+    import acmd
+    g = game.scripts[acmd.crc('attackairf')]
+    h0 = next(c for c in g if c.name in HITBOXES and int(c.params[param(c, 'ID')]) == 0)
+    h1 = next(c for c in g if c.name in HITBOXES and int(c.params[param(c, 'ID')]) == 1)
+    h2 = acmd.Command(h0.ident, list(h0.params))
+    h2.params[param(h2, 'ID')] = 2
+    h2.params[param(h2, 'Y')] = round(float(h0.params[param(h0, 'Y')]) - FAIR_EXTRA, 4)
+    insert_cmds(g, g.index(h1) + 1, [h2])
+    r1 = next((c for c in g if c.name == 'ATK_RESERVE' and int(c.params[0]) == 1), None)
+    if r1 is not None:
+        r0 = next(c for c in g if c.name == 'ATK_RESERVE' and int(c.params[0]) == 0)
+        r2 = acmd.Command(r0.ident, list(r0.params))
+        r2.params[0] = 2
+        r2.params[param(r2, 'Y')] = round(float(r0.params[param(r0, 'Y')]) - FAIR_EXTRA, 4)
+        insert_cmds(g, g.index(r1) + 1, [r2])
+    e = effect.scripts[acmd.crc('attackairf')]
+    for gfx in (FIRE_BLADE, SWORD):
+        k = next(i for i, c in enumerate(e) if c.name == 'External_Graphic' and int(c.params[0]) == gfx)
+        c2 = acmd.Command(e[k].ident, list(e[k].params))
+        c2.params[param(c2, 'Y')] = -FAIR_EXTRA
+        insert_cmds(e, k + 1, [c2])
+    for c in e:
+        if c.name == 'Sword_Glow':
+            c.params[param(c, 'Y2')] = -(FAIR_BLADE + FAIR_EXTRA)
+
+
 def remove_cmds(cmds, keep):
     """cmds without those keep() refuses, every True / Else / False block that held one shorter by its words"""
     while True:
@@ -732,6 +852,8 @@ def tune(game, effect):
     for c in effect.scripts[acmd.crc('attackairn')]:
         if 'Size' in c.info['syntax']:
             c.params[param(c, 'Size')] = round(float(c.params[param(c, 'Size')]) * NAIR_SCALE, 4)
+    nair_ring(game)
+    fair_reach(game, effect)
     g = game.scripts[acmd.crc('attacks4')]
     h0 = next(c for c in g if c.name in HITBOXES and int(c.params[param(c, 'ID')]) == 0)
     h3 = acmd.Command(h0.ident, list(h0.params))

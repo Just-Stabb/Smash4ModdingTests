@@ -8,7 +8,8 @@ flames 0x330001D), a contact sheet and a GIF (--name: the files' name).
       [--view Z0,Z1,Y0,Y1] [--ppu 8] [--hitboxes]
 
 --hitboxes (neutral air ring v1): also draws the game script's AttackAirN hitboxes live at each frame (each at its
-bone's place from model.jtb table 0 and the motion, + X / Y / Z): Part 0 white, Part 1 orange, the ID beside each.
+bone's place from model.jtb table 0 and the motion, + X / Y / Z; an Extended hitbox as its capsule to X2 / Y2 / Z2): Part
+0 white, Part 1 orange, the ID beside each.
 
 VANILLA_FIGHTER: his vanilla fighter/gekkouga (model/body/c00, motion/body/main.pac); BUILT_FIGHTER: the package's
 fighter/gekkouga (effect/gekkouga, script/animcmd/body/effect.bin). Writes OUT_DIR/nair.png and nair.gif.
@@ -184,9 +185,10 @@ def effects(bdir):
 
 
 def hitbox_timeline(bdir, vdir, o, bones, want):
-    """{frame: {(id, part): (z, y, size, damage)}}: AttackAirN's hitboxes as the game script lays them out (FRAME / WAIT,
-    a hitbox command (re)sets its ID, Remove_All_Hitboxes clears them; a Float_Var_Compare's True block taken: drawn as
-    if the attack connected), each at its bone (model.jtb table 0) in the motion's frame + its X / Y / Z offset"""
+    """{frame: {(id, part): (z, y, size, damage, z2, y2)}}: AttackAirN's hitboxes as the game script lays them out (FRAME /
+    WAIT, a hitbox command (re)sets its ID, Remove_Hitbox / Remove_All_Hitboxes clear it / them; a Float_Var_Compare's
+    True block taken: drawn as if the attack connected), each at its bone (model.jtb table 0) in the motion's frame + its
+    X / Y / Z offset (an Extended hitbox's other end: X2 / Y2 / Z2)"""
     import acmd
     import port_check
     mdir = os.path.join(vdir, 'model', 'body', 'c00')
@@ -203,6 +205,8 @@ def hitbox_timeline(bdir, vdir, o, bones, want):
             events.append((frame, 'set', v))
         elif c.name == 'Remove_All_Hitboxes':
             events.append((frame, 'clear', None))
+        elif c.name == 'Remove_Hitbox':
+            events.append((frame, 'remove', int(c.params[0])))
     out = {}
     for fr in want:
         cur = {}
@@ -211,6 +215,8 @@ def hitbox_timeline(bdir, vdir, o, bones, want):
                 break
             if kind == 'clear':
                 cur = {}
+            elif kind == 'remove':
+                cur = {k: x for k, x in cur.items() if k[0] != v}
             else:
                 cur = {k: x for k, x in cur.items() if k[0] != int(v['ID'])}
                 cur[(int(v['ID']), int(v['Part']))] = v
@@ -219,7 +225,8 @@ def hitbox_timeline(bdir, vdir, o, bones, want):
         for k, v in cur.items():
             m = np.array(w[bones[t0[int(v['Bone'])]][0]])
             p = m @ np.array([float(v['X']), float(v['Y']), float(v['Z']), 1.0])
-            out[fr][k] = (p[2], p[1], float(v['Size']), float(v['Damage']))
+            q = m @ np.array([float(v['X2']), float(v['Y2']), float(v['Z2']), 1.0]) if 'X2' in v else p
+            out[fr][k] = (p[2], p[1], float(v['Size']), float(v['Damage']), q[2], q[1])
     return out
 
 
@@ -264,11 +271,18 @@ def main():
         im = Image.fromarray(canv[fr].image())
         dr = ImageDraw.Draw(im)
         c = canv[fr]
-        for (hid, part), (z, y, r, dmg) in sorted(live.get(fr, {}).items()):
+        for (hid, part), (z, y, r, dmg, z2, y2) in sorted(live.get(fr, {}).items()):
             col = (255, 255, 255) if part == 0 else (255, 150, 40)
             sx, sy, sr = (z - c.x0) * c.ppu, (c.y1 - y) * c.ppu, r * c.ppu
-            dr.ellipse([sx - sr, sy - sr, sx + sr, sy + sr], outline=col, width=2)
-            dr.text((sx + 2, sy - 6), '%d' % hid, fill=col)
+            tx, ty = (z2 - c.x0) * c.ppu, (c.y1 - y2) * c.ppu
+            for ex, ey in ((sx, sy), (tx, ty)):
+                dr.ellipse([ex - sr, ey - sr, ex + sr, ey + sr], outline=col, width=2)
+            ln = float(np.hypot(tx - sx, ty - sy))
+            if ln > 1e-6:                   # a capsule (Extended hitbox): its two sides
+                nx, ny = -(ty - sy) / ln * sr, (tx - sx) / ln * sr
+                for sg in (1, -1):
+                    dr.line([(sx + sg * nx, sy + sg * ny), (tx + sg * nx, ty + sg * ny)], fill=col, width=2)
+            dr.text(((sx + tx) / 2 + 2, (sy + ty) / 2 - 6), '%d' % hid, fill=col)
         return im
     tiles = []
     for fr in frames:
@@ -280,7 +294,8 @@ def main():
     for i, t in enumerate(tiles):
         sheet.paste(t, (i * (w + 4), 22))
     ImageDraw.Draw(sheet).text((6, 5), 'Greninja neutral air: ' + ', '.join('0x%X at frame %d' % (int(c[1]), c[0]) for c in calls)
-                               + '; offline render (see notes)', fill=(220, 220, 220))
+                               + '; offline render (see notes)' + ('; hitboxes: Part 0 white, Part 1 orange (as if it '
+                                                                    'connected)' if a.hitboxes else ''), fill=(220, 220, 220))
     sheet.save(os.path.join(a.out, a.name + '.png'))
     gif = []
     for fr in gif_frames:
