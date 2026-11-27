@@ -426,6 +426,16 @@ read off the hitboxes, e.g. with Sm4shCommand's hitbox viewer).
   (se, vc, cheer, joucyu, item) is Namco IDSP (DSP-ADPCM, big-endian header), mono or stereo, 47-48 kHz; a TONE entry's
   data block (u32 8, PACK offset, size, f32 volume in dB, ...) points at it. Sm4shCommand's Sound Effect Viewer (v1.7.32,
   `tools/Sm4shCommand/README.md`) lists a fighter's and the common sounds by id, plays them and adds them to a script.
+- **Adding sounds** (Sm4shCommand v1.7.33's Sound Adder, `tools/Sm4shCommand/README.md` "Sound Adder"; the scripted
+  route: `tools/fighter_own_bank.py`, `tools/gekkouga_sound.py`): a new tone is a TONE entry copied from a one-shot of the
+  bank (name, PACK offset / size, volume, the tail's rate / channels / samples / loop set) with its IDSP appended to PACK
+  (0x10 boundaries; vanilla JUNK sizes put PACK's body at a multiple of 0x10), and a label appended to the bank's row
+  (the row's list written again at the pool's end: the old ids stay). The label is the id's low 16 bits (`0x0311EEC4`
+  splits the id; `0x0311EDC4` checks only label < the row's count): 65536 labels a row at most. TONE's count is the only
+  tone count in a bank (PROP / BINF / GRP / DTON are the same in every bank read; snd_se_SZerosuit's MARK, after TONE,
+  holds none). A costume bank (`_cNN`) is loaded instead of the main one for that costume and plays the same row, so a
+  new label's tone index must be the new tone in it too (the adder gives the costume banks on the row the same tones at
+  the same indexes).
 - **`soundseq_<Name>.sqb`**: header {u16 4, u16 **set id**, u32 count, u32 count x 4}, offsets
   (-1 = none), sequences of weighted choices (sound ID or -1 = silence, weight %). ACMD plays
   sequence n as `0x8000 | set id << 16 | n` (Marth's set 0x28: `Low_Voice_Clip(0x80280000)`,

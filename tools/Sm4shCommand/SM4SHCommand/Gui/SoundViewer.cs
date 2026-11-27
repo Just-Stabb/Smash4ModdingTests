@@ -17,7 +17,11 @@ namespace Sm4shCommand.GUI
     /// plays it by (soundlabeltable.bin: row &lt;&lt; 16 | label), its tone, bank, length, loop and volume, and your alias
     /// (Aliases/sounds/FIGHTER.txt, common.txt). Play decodes the tone (DSP-ADPCM) and plays it at the bank's volume;
     /// Add to Script puts the chosen sound command with the id below the caret in the open script.
-    /// The bank / label-table model (Sound.Nus3Bank, Sound.SoundLabelTable) is the one part 2 (adding tones) writes with.
+    /// v1.7.33, the Sound Adder: Add sounds.. (SoundAdderDialog) adds audio files to one of the fighter's banks as new
+    /// tones with ids no other sound has; they are listed as new / unsaved rows (preview, alias, filter, Add to Script as
+    /// any other) and the Volume column of the fighter's list can be edited (the TONE volume, dB); Save writes the banks
+    /// and soundlabeltable.bin in place (backups first), Save to.. under a folder laid out as the game's data, ready to
+    /// install (Sound.SoundAdder).
     /// </summary>
     public class SoundViewer : Form
     {
@@ -32,7 +36,12 @@ namespace Sm4shCommand.GUI
         readonly ComboBox bankFilter = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 120 };
         readonly TabControl tabs = new TabControl { Dock = DockStyle.Fill };
         readonly TabPage fighterTab = new TabPage("Fighter sounds"), commonTab = new TabPage("Common sounds"), banksTab = new TabPage("Banks");
-        readonly DataGridView fighterGrid = Grid(), commonGrid = Grid();
+        readonly DataGridView fighterGrid = Grid(true), commonGrid = Grid(false);
+        readonly Button addSounds = new Button { Text = "Add sounds..", AutoSize = true };
+        readonly Button save = new Button { Text = "Save", AutoSize = true, Enabled = false };
+        readonly Button saveTo = new Button { Text = "Save to..", AutoSize = true, Enabled = false };
+        readonly Button discard = new Button { Text = "Discard", AutoSize = true, Enabled = false };
+        SoundAdder adder;
         readonly ComboBox commonBank = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly Label commonNote = new Label { AutoSize = true, Padding = new Padding(6, 6, 0, 0), ForeColor = Color.DimGray };
         readonly TextBox banksText = new TextBox { Multiline = true, ReadOnly = true, Dock = DockStyle.Fill, ScrollBars = ScrollBars.Both, WordWrap = false, Font = new Font(FontFamily.GenericMonospace, 8.5f) };
@@ -66,7 +75,7 @@ namespace Sm4shCommand.GUI
             new[] { "Sound_Effect2", "PLAY_STEP: a step sound" },
         };
 
-        static DataGridView Grid()
+        static DataGridView Grid(bool volumeEditable)
         {
             var g = new DataGridView
             {
@@ -88,7 +97,7 @@ namespace Sm4shCommand.GUI
             col("Loop", "Loop", 44, false);
             col("Ch", "Ch", 30, false);
             col("Rate", "Rate", 50, false);
-            col("Volume", "Volume (dB)", 72, false);
+            col("Volume", "Volume (dB)", 72, volumeEditable);      // v1.7.33: the fighter's tones' level, saved with Save
             col("Tone", "Tone #", 50, false);
             col("Note", "Note", 220, false);
             g.Columns["Id"].DefaultCellStyle.Font = new Font(FontFamily.GenericMonospace, 8.5f);
@@ -112,6 +121,12 @@ namespace Sm4shCommand.GUI
         public TabControl Tabs { get { return tabs; } }
         public ComboBox CommandBox { get { return command; } }
         public TextBox Filter { get { return filter; } }
+        /// <summary>v1.7.33: the pending additions / volume changes (the tests).</summary>
+        public SoundAdder Adder { get { return adder; } }
+        /// <summary>v1.7.33: the Add sounds.. dialog the tests fill instead of showing it modally (null: shown).</summary>
+        public Action<SoundAdderDialog> AdderDialogHook;
+        /// <summary>v1.7.33: Save's confirmation (the tests answer it; null asks).</summary>
+        public Func<string, bool> ConfirmSave;
 
         void Build()
         {
@@ -124,6 +139,11 @@ namespace Sm4shCommand.GUI
             top.Controls.Add(filter);
             top.Controls.Add(new Label { Text = "Bank:", AutoSize = true, Padding = new Padding(8, 6, 0, 0) });
             top.Controls.Add(bankFilter);
+            top.Controls.Add(new Label { Text = "", AutoSize = true, Padding = new Padding(6, 0, 0, 0) });
+            top.Controls.Add(addSounds);
+            top.Controls.Add(save);
+            top.Controls.Add(saveTo);
+            top.Controls.Add(discard);
 
             fighterTab.Controls.Add(fighterGrid);
             var commonTop = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 30, WrapContents = false, Padding = new Padding(2, 2, 2, 0) };
@@ -174,10 +194,21 @@ namespace Sm4shCommand.GUI
             tips.SetToolTip(addToScript, "Adds the command with the sound's ID on a new line below the caret in the open script (its sound script, or any ACMD script).");
             tips.SetToolTip(copyId, "Copies the sound ID (0x...), as a sound command takes it.");
             tips.SetToolTip(copyLine, "Copies the command line (Command, with the sound's ID).");
+            tips.SetToolTip(addSounds, "Add audio files (WAV; MP3 / OGG / FLAC ... through Windows or ffmpeg) to one of the fighter's banks as new sounds,\n" +
+                                       "with ids no other sound has. They are listed as new / unsaved until Save.");
+            tips.SetToolTip(save, "Writes the changed banks into the fighter's sound folder and soundlabeltable.bin (the mod's own, above the fighter's folder),\n" +
+                                  "each replaced file backed up first (FILE.yyyyMMdd-HHmmss.bak).");
+            tips.SetToolTip(saveTo, "Writes them under a folder of your choice laid out as the game's data, ready to install:\n" +
+                                    "fighter\\NAME\\sound\\<bank>.nus3bank and sound\\config\\soundlabeltable.bin.");
+            tips.SetToolTip(discard, "Drops the new sounds and volume changes not saved yet.");
+            addSounds.Click += (o, e) => ShowAdder();
+            save.Click += (o, e) => SaveChanges(null);
+            saveTo.Click += (o, e) => SaveTo();
+            discard.Click += (o, e) => { if (adder != null) { adder.Discard(); Fill(); UpdateChanges(); } };
 
             play.Click += (o, e) => Play();
             stop.Click += (o, e) => StopPlaying();
-            reload.Click += (o, e) => LoadFighter(sounds != null ? sounds.Root : null);
+            reload.Click += (o, e) => { if (ConfirmDrop()) LoadFighter(sounds != null ? sounds.Root : null); };
             pickFighter.Click += (o, e) => PickFighter();
             pickData.Click += (o, e) => PickData();
             filter.TextChanged += (o, e) => Fill();
@@ -197,8 +228,8 @@ namespace Sm4shCommand.GUI
             {
                 var grid = g;
                 grid.SelectionChanged += (o, e) => ShowInfo();
-                grid.CellDoubleClick += (o, e) => { if (e.RowIndex >= 0 && grid.Columns[e.ColumnIndex].Name != "Alias") Play(); };
-                grid.CellEndEdit += (o, e) => AliasEdited(grid, e.RowIndex, e.ColumnIndex);
+                grid.CellDoubleClick += (o, e) => { if (e.RowIndex >= 0 && grid.Columns[e.ColumnIndex].ReadOnly) Play(); };
+                grid.CellEndEdit += (o, e) => { AliasEdited(grid, e.RowIndex, e.ColumnIndex); VolumeEdited(grid, e.RowIndex, e.ColumnIndex); };
                 grid.KeyDown += (o, e) => { if (e.KeyCode == Keys.Enter && !grid.IsCurrentCellInEditMode) { Play(); e.Handled = true; } };
                 grid.SortCompare += (o, e) =>
                 {
@@ -213,6 +244,12 @@ namespace Sm4shCommand.GUI
                 };
             }
             FormClosed += (o, e) => StopPlaying();
+            FormClosing += (o, e) =>
+            {
+                if (e.CloseReason == CloseReason.UserClosing && adder != null && adder.HasChanges &&
+                    MessageBox.Show(this, "The new sounds / volume changes aren't saved. Close and lose them?", "Sound Effect Viewer", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                    e.Cancel = true;
+            };
         }
 
         class BankItem
@@ -230,6 +267,7 @@ namespace Sm4shCommand.GUI
         public void LoadFighter(string root)
         {
             StopPlaying();
+            adder = null;
             if (root == null)
             {
                 sounds = null;
@@ -252,6 +290,8 @@ namespace Sm4shCommand.GUI
                 status.Text = "Couldn't load " + root + ": " + ex.Message;
             }
             finally { Cursor = Cursors.Default; }
+            adder = sounds != null ? new SoundAdder(sounds) : null;
+            UpdateChanges();
             fighterLabel.Text = sounds != null ? sounds.Name : "(no fighter)";
             Text = "Sound Effect Viewer - " + (sounds != null ? sounds.Name + " (" + sounds.Root + ")" : "");
             filling = true;
@@ -310,11 +350,22 @@ namespace Sm4shCommand.GUI
             // the picked sound stays picked when it is still in the list (filtering as you type)
             var keepF = RowEntry(fighterGrid);
             var keepC = RowEntry(commonGrid);
-            FillGrid(fighterGrid, sounds != null ? sounds.Fighter.Entries.Where(e => (bank == null || e.Kind == bank) && Matches(e, f)) : Enumerable.Empty<SoundEntry>());
+            var fighterEntries = new List<SoundEntry>();
+            if (sounds != null)
+            {
+                fighterEntries.AddRange(sounds.Fighter.Entries);
+                if (adder != null && adder.Pending.Count > 0)
+                {
+                    // the new sounds after their bank's last id (where they will be once saved)
+                    int at = fighterEntries.FindLastIndex(x => x.Bank == adder.Target && x.Id.HasValue) + 1;
+                    fighterEntries.InsertRange(at > 0 ? at : fighterEntries.Count, adder.PendingEntries());
+                }
+            }
+            FillGrid(fighterGrid, fighterEntries.Where(e => (bank == null || e.Kind == bank) && Matches(e, f)));
             FillGrid(commonGrid, sounds != null && sounds.Common != null ? sounds.Common.Entries.Where(e => Matches(e, f)) : Enumerable.Empty<SoundEntry>());
             Reselect(fighterGrid, keepF);
             Reselect(commonGrid, keepC);
-            int allF = sounds != null ? sounds.Fighter.Entries.Count : 0, allC = sounds != null && sounds.Common != null ? sounds.Common.Entries.Count : 0;
+            int allF = sounds != null ? sounds.Fighter.Entries.Count + (adder != null ? adder.Pending.Count : 0) : 0, allC = sounds != null && sounds.Common != null ? sounds.Common.Entries.Count : 0;
             fighterTab.Text = "Fighter sounds (" + (fighterGrid.Rows.Count == allF ? allF.ToString(CultureInfo.InvariantCulture) : fighterGrid.Rows.Count + " of " + allF) + ")";
             commonTab.Text = "Common sounds (" + (commonGrid.Rows.Count == allC ? allC.ToString(CultureInfo.InvariantCulture) : commonGrid.Rows.Count + " of " + allC) + ")";
             bool joucyu = sounds != null && sounds.CommonBank != null &&
@@ -343,7 +394,7 @@ namespace Sm4shCommand.GUI
             ShowInfo();
         }
 
-        static void FillGrid(DataGridView g, IEnumerable<SoundEntry> entries)
+        void FillGrid(DataGridView g, IEnumerable<SoundEntry> entries)
         {
             g.SuspendLayout();
             g.Rows.Clear();
@@ -366,6 +417,18 @@ namespace Sm4shCommand.GUI
                 r.Cells[9].Value = t != null ? t.Index.ToString(CultureInfo.InvariantCulture) : "";
                 r.Cells[10].Value = e.Note.Length > 0 ? e.Note : (t != null && !audio ? t.Kind.ToString().ToLowerInvariant() + ": nothing to play" : t != null && t.Codec != "IDSP" ? "codec " + t.Codec + ": not decoded" : "");
                 r.Cells[2].ReadOnly = !e.Id.HasValue;
+                r.Cells[8].ReadOnly = g.Columns[8].ReadOnly || t == null || t.DataBlock < 0;
+                float was;
+                if (adder != null && t != null && adder.VolumeEdits.TryGetValue(t, out was))
+                {
+                    r.Cells[8].Style.BackColor = Color.FromArgb(255, 220, 160);
+                    r.Cells[10].Value = string.Format(CultureInfo.InvariantCulture, "volume {0:+0.0;-0.0;0.0} -> {1:+0.0;-0.0;0.0} dB (unsaved)", was, t.VolumeDb) + (e.Note.Length > 0 ? "; " + e.Note : "");
+                }
+                if (e.Pending != null)
+                {
+                    r.DefaultCellStyle.BackColor = Color.FromArgb(220, 240, 255);
+                    r.DefaultCellStyle.Font = new Font(g.Font, FontStyle.Bold);
+                }
                 if (!e.Id.HasValue || !e.Playable) r.DefaultCellStyle.ForeColor = Color.Gray;
                 r.Tag = e;
                 rows.Add(r);
@@ -433,6 +496,8 @@ namespace Sm4shCommand.GUI
                     s += "\nIt loops: Transient_Sound_Effect (PLAY_STATUS) holds it until the status ends; Stop_Sound_Effect stops it.";
             }
             if (e.Note.Length > 0) s += "\n" + e.Note;
+            if (e.Pending != null)
+                s += "\nNew, not saved yet (Save writes it): " + Path.GetFileName(e.Pending.Source) + ": " + e.Pending.How;
             string alias = e.Alias;
             if (alias.Length > 0) s += "\nAlias: " + alias;
             return s;
@@ -451,6 +516,115 @@ namespace Sm4shCommand.GUI
             }
             catch (Exception ex) { status.Text = "Couldn't save the alias: " + ex.Message; }
             ShowInfo();
+        }
+
+        /// <summary>v1.7.33: a Volume cell typed in: the tone's TONE volume (dB), saved with Save (only that float changes).</summary>
+        void VolumeEdited(DataGridView g, int row, int col)
+        {
+            if (row < 0 || g.Columns[col].Name != "Volume" || g.Columns[col].ReadOnly || adder == null) return;
+            var e = g.Rows[row].Tag as SoundEntry;
+            if (e == null || e.Tone == null || e.Tone.DataBlock < 0) return;
+            string text = Convert.ToString(g.Rows[row].Cells[col].Value ?? "", CultureInfo.InvariantCulture).Trim().TrimStart('+');
+            double v;
+            if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out v) && !double.TryParse(text, out v))
+            {
+                status.Text = "Volume: a number of dB (e.g. -3.5).";
+                BeginInvoke((Action)Fill);
+                return;
+            }
+            v = Math.Max(-40, Math.Min(20, v));
+            SetToneVolume(e.Tone, (float)v);
+            status.Text = string.Format(CultureInfo.InvariantCulture, "{0}: volume {1:+0.0;-0.0;0.0} dB (unsaved: Save writes it)", e.Tone.Name, v);
+            BeginInvoke((Action)Fill);
+        }
+
+        /// <summary>v1.7.33: a tone's volume changed (the Volume column; the tests).</summary>
+        public void SetToneVolume(Tone t, float db)
+        {
+            adder.SetVolume(t, db);
+            UpdateChanges();
+        }
+
+        void UpdateChanges()
+        {
+            bool any = adder != null && adder.HasChanges;
+            save.Enabled = saveTo.Enabled = discard.Enabled = any;
+            addSounds.Enabled = adder != null;
+            if (adder != null && any)
+                status.Text = string.Format(CultureInfo.InvariantCulture, "Unsaved: {0} new sound(s), {1} volume change(s). Save writes them (backups first); Save to.. writes them into a folder to install.",
+                    adder.Pending.Count, adder.VolumeEdits.Count);
+        }
+
+        /// <summary>v1.7.33: Add sounds.. (the dialog; AdderDialogHook fills it in the tests).</summary>
+        public void ShowAdder()
+        {
+            if (adder == null) return;
+            var dlg = new SoundAdderDialog(adder, (wav, name) => PlayWav(wav, name), StopPlaying);
+            if (AdderDialogHook != null) { dlg.Show(this); AdderDialogHook(dlg); dlg.Close(); }
+            else dlg.ShowDialog(this);
+            dlg.Dispose();
+            adder.Plan();
+            Fill();
+            UpdateChanges();
+        }
+
+        /// <summary>v1.7.33: writes the changes (outRoot null: in place; else under outRoot as the game's data).</summary>
+        public SoundAdder.Saved SaveChanges(string outRoot)
+        {
+            if (adder == null || !adder.HasChanges) return null;
+            StopPlaying();
+            SoundAdder.Output built;
+            try { built = adder.Build(); }
+            catch (Exception ex) { status.Text = "Not saved: " + ex.Message; MessageBox.Show(this, ex.Message, "Not saved", MessageBoxButtons.OK, MessageBoxIcon.Error); return null; }
+            if (!built.Ok)
+            {
+                status.Text = "Not saved: " + built.Problems[0];
+                MessageBox.Show(this, "Not saved:\n" + string.Join("\n", built.Problems.Take(20).ToArray()), "Sound Adder", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return null;
+            }
+            string where = outRoot ?? sounds.Root;
+            string msg = "Write these into " + where + "?\n\n" + string.Join("\n", built.Checks.ToArray()) +
+                         (outRoot == null ? "\n\nEach file replaced is backed up first (FILE.yyyyMMdd-HHmmss.bak)." : "");
+            bool go = ConfirmSave != null ? ConfirmSave(msg) : MessageBox.Show(this, msg, "Save sounds", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) == DialogResult.OK;
+            if (!go) return null;
+            SoundAdder.Saved saved;
+            try { saved = adder.Save(outRoot); }
+            catch (Exception ex)
+            {
+                status.Text = "Not saved: " + ex.Message;
+                MessageBox.Show(this, ex.Message, "Not saved", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return null;
+            }
+            LoadFighter(saved.FighterRoot);
+            status.Text = "Saved: " + string.Join(", ", saved.Written.ToArray()) + (saved.Backups.Count > 0 ? " (backups: " + saved.Backups.Count + ")" : "");
+            return saved;
+        }
+
+        void SaveTo()
+        {
+            using (var dlg = new FolderBrowserDialog { Description = "A folder to write the sounds into, laid out as the game's data (fighter\\NAME\\sound, sound\\config): ready to install" })
+            {
+                var last = Runtime.GetSettingText("SoundSaveFolder", "");
+                if (last.Length > 0) dlg.SelectedPath = last;
+                if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                try { Runtime.SetSettingText("SoundSaveFolder", dlg.SelectedPath); } catch (Exception) { }
+                SaveChanges(dlg.SelectedPath);
+            }
+        }
+
+        /// <summary>Plays a WAV (the adder's preview).</summary>
+        bool PlayWav(byte[] wav, string name)
+        {
+            try
+            {
+                StopPlaying();
+                playing = new MemoryStream(wav);
+                player = new SoundPlayer(playing);
+                player.Play();
+                status.Text = "Playing " + name;
+                return true;
+            }
+            catch (Exception ex) { status.Text = "Couldn't play " + name + ": " + ex.Message; return false; }
         }
 
         /// <summary>The line Add to Script / Copy Line give: Sound_Effect(SFX=0x7680061).</summary>
@@ -542,8 +716,16 @@ namespace Sm4shCommand.GUI
             playing = null;
         }
 
+        /// <summary>v1.7.33: true when there is nothing unsaved, or the user drops it.</summary>
+        public bool ConfirmDrop()
+        {
+            return adder == null || !adder.HasChanges ||
+                   MessageBox.Show(this, "The new sounds / volume changes aren't saved. Drop them?", "Sound Effect Viewer", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
+        }
+
         void PickFighter()
         {
+            if (!ConfirmDrop()) return;
             using (var dlg = new FolderBrowserDialog { Description = "The fighter's folder (fighter\\NAME, with its sound folder)" })
             {
                 if (sounds != null) dlg.SelectedPath = sounds.Root;

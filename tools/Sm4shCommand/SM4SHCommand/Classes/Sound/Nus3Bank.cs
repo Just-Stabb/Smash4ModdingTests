@@ -37,6 +37,8 @@ namespace Sm4shCommand.Sound
         public string Codec = "";       // "IDSP" (Namco's DSP-ADPCM wrapper: every tone seen so far), else the magic
         public int Channels, SampleRate, Samples, LoopStart, LoopEnd;
         public bool Loops;
+        /// <summary>v1.7.33 (the Sound Adder): a tone not saved yet, its IDSP in memory (ReadAudio returns it).</summary>
+        public byte[] PendingAudio;
 
         public double Seconds { get { return SampleRate > 0 ? Samples / (double)SampleRate : 0; } }
 
@@ -246,6 +248,7 @@ namespace Sm4shCommand.Sound
         public byte[] ReadAudio(Tone t)
         {
             if (!t.HasAudio) return null;
+            if (t.PendingAudio != null) return t.PendingAudio;
             if (packOffset < 0 || t.DataOffset + (long)t.DataSize > packSize)
                 throw new InvalidDataException(t.Name + ": its audio isn't inside PACK");
             using (var s = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
@@ -262,16 +265,19 @@ namespace Sm4shCommand.Sound
 
         /// <summary>The TONE section from Tones (count, offset / size table, the entries back to back: the game's
         /// layout).</summary>
-        public byte[] BuildTone()
+        public byte[] BuildTone() { return BuildTone(Tones); }
+
+        /// <summary>A TONE section from these entries (v1.7.33: the Sound Adder's, the bank's tones and the new ones).</summary>
+        public static byte[] BuildTone(IList<Tone> tones)
         {
-            int n = Tones.Count, total = 4 + 8 * n;
-            foreach (var t in Tones) total += t.Entry.Length;
+            int n = tones.Count, total = 4 + 8 * n;
+            foreach (var t in tones) total += t.Entry.Length;
             var b = new byte[total];
             Put32(b, 0, (uint)n);
             int at = 4 + 8 * n;
             for (int i = 0; i < n; i++)
             {
-                var e = Tones[i].Entry;
+                var e = tones[i].Entry;
                 Put32(b, 4 + 8 * i, (uint)at);
                 Put32(b, 8 + 8 * i, (uint)e.Length);
                 Array.Copy(e, 0, b, at, e.Length);
@@ -282,13 +288,18 @@ namespace Sm4shCommand.Sound
 
         /// <summary>The whole bank from this model: BINF with Id, TONE from Tones, PACK from the file unless given (part 2
         /// passes the PACK with its new audio appended).</summary>
-        public byte[] Build(byte[] pack = null)
+        public byte[] Build(byte[] pack = null) { return Build(Tones, pack, false); }
+
+        /// <summary>v1.7.33 (the Sound Adder): the bank with these tones and this PACK; alignPack sizes JUNK (zeros, at
+        /// least 4 bytes, a multiple of 4; kept when it already fits) so PACK's body starts at a multiple of 0x10, as in
+        /// every vanilla bank.</summary>
+        public byte[] Build(IList<Tone> tones, byte[] pack, bool alignPack)
         {
             var bodies = new List<KeyValuePair<string, byte[]>>();
             foreach (var sec in Sections)
             {
                 byte[] body = sec.Value;
-                if (sec.Key == "TONE") body = BuildTone();
+                if (sec.Key == "TONE") body = BuildTone(tones);
                 else if (sec.Key == "PACK") body = pack ?? ReadPack();
                 else if (sec.Key == "BINF" && binfIdAt >= 0)
                 {
@@ -296,6 +307,20 @@ namespace Sm4shCommand.Sound
                     Put32(body, binfIdAt, Id);
                 }
                 bodies.Add(new KeyValuePair<string, byte[]>(sec.Key, body));
+            }
+            int junk = bodies.FindIndex(b => b.Key == "JUNK");
+            if (alignPack && junk >= 0 && junk + 1 < bodies.Count && bodies[junk + 1].Key == "PACK")
+            {
+                long at = 24 + 8 * bodies.Count;
+                for (int i = 0; i < junk; i++) at += 8 + bodies[i].Value.Length;
+                int size = bodies[junk].Value.Length;
+                bool zeros = Array.TrueForAll(bodies[junk].Value, x => x == 0);
+                if ((at + 8 + size + 8) % 16 != 0 || size < 4 || size % 4 != 0 || !zeros)
+                {
+                    size = 4;
+                    while ((at + 8 + size + 8) % 16 != 0) size += 4;
+                    bodies[junk] = new KeyValuePair<string, byte[]>("JUNK", new byte[size]);
+                }
             }
             var ms = new MemoryStream();
             var w = new BinaryWriter(ms);

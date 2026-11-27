@@ -19,13 +19,15 @@ namespace Sm4shCommand.Sound
         public string Kind = "";        // se, se c01, vc, cheer, se_common, Kirby copy, common ...
         public string AliasSet;         // the alias file (fighter folder name or "common")
         public string Note = "";
+        /// <summary>v1.7.33: a sound added in the Sound Adder, not saved yet (its alias is kept with it until saved).</summary>
+        public PendingSound Pending;
 
         public string IdText { get { return Id.HasValue ? string.Format(CultureInfo.InvariantCulture, "0x{0:X8}", Id.Value) : "-"; } }
         public string Name { get { return Tone != null ? (Tone.Name.Length > 0 ? Tone.Name : "(" + Tone.Kind.ToString().ToLowerInvariant() + " slot)") : "(no tone " + Note + ")"; } }
         public string Alias
         {
-            get { return Id.HasValue ? SoundAliases.Get(AliasSet, Id.Value) : ""; }
-            set { if (Id.HasValue) SoundAliases.Set(AliasSet, Id.Value, value); }
+            get { return Pending != null ? Pending.Alias ?? "" : Id.HasValue ? SoundAliases.Get(AliasSet, Id.Value) : ""; }
+            set { if (Pending != null) Pending.Alias = value ?? ""; else if (Id.HasValue) SoundAliases.Set(AliasSet, Id.Value, value); }
         }
         public bool Playable { get { return Tone != null && Tone.HasAudio && Tone.Codec == "IDSP"; } }
     }
@@ -131,6 +133,7 @@ namespace Sm4shCommand.Sound
     public class FighterSounds
     {
         public string Root, Name, SoundFolder, TablePath, CommonBankPath, CommonFolder;
+        public bool TableFromPicked;            // v1.7.33: the table came from the picked game data folder (not the mod's own)
         public SoundLabelTable Table;
         public SoundSet Fighter, Common;
         public Nus3Bank CommonBank;
@@ -220,6 +223,7 @@ namespace Sm4shCommand.Sound
             fs.SoundFolder = Path.Combine(root, "sound");
             bool fromPicked;
             fs.TablePath = FindData(root, Rel("sound", "config", "soundlabeltable.bin"), picked, out fromPicked);
+            fs.TableFromPicked = fromPicked;
             if (fs.TablePath != null)
             {
                 try

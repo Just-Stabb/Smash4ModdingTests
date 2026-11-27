@@ -1245,7 +1245,8 @@ namespace Sm4shCommand
             string root = Sound.FighterSounds.FindFighterRoot(folder) ?? Sound.FighterSounds.FindFighterRoot(_lastOpened);
             if (soundViewerForm != null && !soundViewerForm.IsDisposed)
             {
-                if (root != null && (soundViewerForm.Sounds == null || !string.Equals(soundViewerForm.Sounds.Root, root, StringComparison.OrdinalIgnoreCase)))
+                if (root != null && (soundViewerForm.Sounds == null || !string.Equals(soundViewerForm.Sounds.Root, root, StringComparison.OrdinalIgnoreCase)) &&
+                    soundViewerForm.ConfirmDrop())      // (v1.7.33: not over the Sound Adder's unsaved sounds unless dropped)
                     soundViewerForm.LoadFighter(root);
                 soundViewerForm.Activate();
                 return;
