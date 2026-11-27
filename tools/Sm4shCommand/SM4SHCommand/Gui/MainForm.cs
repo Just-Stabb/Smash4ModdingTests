@@ -201,6 +201,13 @@ namespace Sm4shCommand
             var hitboxViewer = new ToolStripMenuItem("Hitbox Viewer..", null, hitboxViewer_Click);
             hitboxViewer.ShortcutKeys = Keys.Control | Keys.Shift | Keys.H;
             toolsToolStripMenuItem.DropDownItems.Add(hitboxViewer);
+            // v1.7.32: the fighter's (and the common) sounds: preview, aliases, add to the script
+            var soundViewer = new ToolStripMenuItem("Sound Effect Viewer..", null, soundViewer_Click)
+            {
+                ShortcutKeys = Keys.Control | Keys.Shift | Keys.E,
+                ToolTipText = "The open fighter's sounds and the common ones: their sound IDs, preview, your aliases, add one to the script.",
+            };
+            toolsToolStripMenuItem.DropDownItems.Add(soundViewer);
 
             toolsToolStripMenuItem.DropDownItems.Add(new ToolStripSeparator());
             toolsToolStripMenuItem.DropDownItems.Add(new ToolStripMenuItem("Reload Tooltips", null, (o, e) =>
@@ -294,6 +301,7 @@ namespace Sm4shCommand
             Tooltips.Load();
             LogMessage($"Tooltips: {Tooltips.Entries.Count} value tooltips from {Tooltips.Folder}.");
             LoadAliases();
+            Sound.SoundTips.PickedData = Runtime.GetSettingText("SoundDataFolder", "");   // (v1.7.32)
             Runtime.LoadCommandDefinitions();
         }
         private void LoadAliases()
@@ -812,6 +820,7 @@ namespace Sm4shCommand
         {
             _lastOpened = openedPath;
             Tooltips.Fighter = Tooltips.FighterFromPath(openedPath);
+            Sound.SoundTips.OpenedPath = openedPath;      // (v1.7.32: the sound ids' tooltips use this fighter's banks)
             if (!Runtime.GetSetting("AutoParseAnimations", true))
                 return;
             string motion = Runtime.FindMotionFolder(openedPath);
@@ -1223,6 +1232,37 @@ namespace Sm4shCommand
         }
 
         HitboxViewer hitboxViewerForm;
+        SoundViewer soundViewerForm;
+
+        /// <summary>
+        /// v1.7.32: Tools > Sound Effect Viewer: the open fighter's sound banks (fighter/NAME/sound) and the common bank,
+        /// found from the open script's folder (else the last opened path; else a folder is asked for). One viewer;
+        /// Add to Script writes to the script tab selected here.
+        /// </summary>
+        private void soundViewer_Click(object sender, EventArgs e)
+        {
+            string folder = Viewer.ViewerScripts.FolderFor(ScriptFiles);
+            string root = Sound.FighterSounds.FindFighterRoot(folder) ?? Sound.FighterSounds.FindFighterRoot(_lastOpened);
+            if (soundViewerForm != null && !soundViewerForm.IsDisposed)
+            {
+                if (root != null && (soundViewerForm.Sounds == null || !string.Equals(soundViewerForm.Sounds.Root, root, StringComparison.OrdinalIgnoreCase)))
+                    soundViewerForm.LoadFighter(root);
+                soundViewerForm.Activate();
+                return;
+            }
+            if (root == null)
+            {
+                using (var dlg = new FolderBrowserDialog { Description = "The fighter's folder (fighter\\NAME, with its sound folder)" })
+                {
+                    if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                    root = Sound.FighterSounds.FindFighterRoot(Path.Combine(dlg.SelectedPath, "x")) ?? dlg.SelectedPath;
+                }
+            }
+            Sound.SoundTips.PickedData = Runtime.GetSettingText("SoundDataFolder", "");
+            soundViewerForm = new SoundViewer(root, ActiveAcmdEditor);
+            soundViewerForm.FormClosed += (o, a) => soundViewerForm = null;
+            soundViewerForm.Show(this);
+        }
         string hitboxViewerGame;        // the game.bin it shows
         Func<uint, IList<ICommand>> hitboxViewerExpr;     // v1.6.2: its expression scripts
         Func<uint, IList<ICommand>> hitboxViewerSound;    // v1.7.2: its sound scripts

@@ -10,7 +10,7 @@ namespace Sm4shCommand.Classes
     /// <summary>
     /// Variable aliases: names for variable parameters, e.g. SET_FLOAT(Value=1.5, Variable=LASTHIT_HITSTUN_MUL)
     /// instead of 0x0F000052. Loaded from every .txt file in the Aliases folder next to the exe, in name
-    /// order, custom.txt last (so it wins). One alias per line:
+    /// order, custom.txt last (so it wins); not Aliases/sounds (the sound aliases, Sound.SoundAliases). One alias per line:
     ///     NAME = 0x0F000052          # comment
     ///     MY_FLAG = RA-Flag[13]       (any variable form works)
     /// Names are letters, digits and _ (not starting with a digit). # or // starts a comment. When
@@ -28,7 +28,10 @@ namespace Sm4shCommand.Classes
             FighterVariable.ClearAliases();
             if (!Directory.Exists(Folder))
                 return problems;
+            // (v1.7.32: Aliases/sounds holds the Sound Effect Viewer's sound aliases, not variables)
+            string sounds = Path.Combine(Folder, "sounds") + Path.DirectorySeparatorChar;
             var files = Directory.GetFiles(Folder, "*.txt", SearchOption.AllDirectories)
+                .Where(f => !f.StartsWith(sounds, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(f => Path.GetFileName(f).Equals("custom.txt", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
                 .ThenBy(f => f, StringComparer.OrdinalIgnoreCase);
             foreach (var f in files)

@@ -170,6 +170,14 @@ namespace Sm4shCommand.Classes
                   .Append("\nThis object's own (each fighter / article has its 64). MSC: WorkModuleF(0, 0x")
                   .Append(value.ToString("X8")).Append(nv.Type == 1 ? ") / WorkModule(6, 0x" + value.ToString("X8") + ")" : ")")
                   .Append(".");
+            // v1.7.32: a sound id: the tone it plays (the open fighter's banks / the common bank) and its alias
+            if (Sound.SoundTips.IsSoundParam(command, param))
+            {
+                string snd = "";
+                try { snd = Sound.SoundTips.Describe(value); } catch (Exception) { }
+                if (snd.Length > 0)
+                    sb.Append("\n\n").Append(snd);
+            }
             if (found.Count == 0)
                 return sb.ToString();
             foreach (var e in found.Take(3))

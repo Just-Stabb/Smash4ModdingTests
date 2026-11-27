@@ -14,7 +14,9 @@ sheets in reference/:
   fighters/NAME.txt      fighter_param_vl sheet (reference/fighter_param_vl/): each fighter's special
                          move params 0x05-0x09xxxxxx, with the defaults
 
-Also writes SM4SHCommand/Aliases/variables.txt: names for the position / combat / animation-rate
+Also writes SM4SHCommand/Viewer/SoundBanks.txt (v1.7.32, the Sound Effect Viewer): the ported fighters' banks' own BINF
+ids and the ids their soundlabeltable rows use (reference/port_sound_ids.json, tools/sound_bank_ids.py), and
+SM4SHCommand/Aliases/variables.txt: names for the position / combat / animation-rate
 variables (0x0F0000xx), e.g. OPP_HITSTUN (format: see Classes/VariableAliases.cs; Aliases/custom.txt
 is never touched).
 
@@ -550,8 +552,31 @@ def fighters():
     return total
 
 
+def sound_banks():
+    """Viewer/SoundBanks.txt: own bank id = the id its soundlabeltable row uses (the alias sound_alias_cave.py gives it)"""
+    import json
+    js = json.load(open(os.path.join(REF, "port_sound_ids.json")))
+    lines = ["# The ported fighters' sound banks: their own BINF id = the id their soundlabeltable row is under (the bank's",
+             "# alias in the executable: tools/sound_alias_cave.py). From reference/port_sound_ids.json (tools/sound_bank_ids.py)",
+             "# by make_tooltips.py; Sm4shCommand's Sound Effect Viewer lists such a bank's sounds under that row's ids.", ""]
+    n = 0
+    for name, rec in sorted(js["fighters"].items(), key=lambda kv: kv[1]["kind"]):
+        for bank, own in sorted(rec.get("banks", {}).items(), key=lambda kv: kv[1]):
+            typ = ("se_common" if "_common" in bank else "se") if bank.startswith("snd_se_") else \
+                  ("ouen" if bank.endswith("_ouen") else "vc")
+            alias = rec.get("alias", {}).get(typ)
+            if alias is None:
+                continue
+            lines.append("%d = %d   # %s %s (%s)" % (own, alias, name, bank, typ))
+            n += 1
+    with open(os.path.join(HERE, "SM4SHCommand", "Viewer", "SoundBanks.txt"), "w", newline="\n") as f:
+        f.write("\n".join(lines) + "\n")
+    return n
+
+
 def main():
     counts = OrderedDict()
+    counts["sound_banks"] = sound_banks()
     counts["variables"] = variables()
     counts["position_variables"] = position()
     counts["aliases"] = aliases()

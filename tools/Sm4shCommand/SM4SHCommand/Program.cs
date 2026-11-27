@@ -12,7 +12,7 @@ namespace Sm4shCommand
 {
     static class Program
     {
-        public static readonly string Version = "v1.7.31";
+        public static readonly string Version = "v1.7.32";
         public static readonly string Title;
         public static readonly string Description;
         public static readonly string Copyright;
