@@ -420,6 +420,12 @@ read off the hitboxes, e.g. with Sm4shCommand's hitbox viewer).
   keep the base's BINF id and have at least as many labels / tones as its row (or the row must
   be edited, as `tools/minecraft_sound.py` does for a stage bank). Whether two loaded banks may
   share a BINF id (a clone and its base in one match) is untested; new ids need new rows.
+- **Common sounds**: row 0 is `sound/se/snd_se_joucyu.nus3bank` (BINF 2000, 404 tones, 415 labels): ids
+  `0x00000000`-`0x0000019E`, which every fighter's scripts play with the same commands (`Sound_Effect(SFX=0x46)`,
+  futtobi_l; vanilla Dr. Mario's and Kirby's sound scripts use row 0 222 times). Every tone of the vanilla banks read
+  (se, vc, cheer, joucyu, item) is Namco IDSP (DSP-ADPCM, big-endian header), mono or stereo, 47-48 kHz; a TONE entry's
+  data block (u32 8, PACK offset, size, f32 volume in dB, ...) points at it. Sm4shCommand's Sound Effect Viewer (v1.7.32,
+  `tools/Sm4shCommand/README.md`) lists a fighter's and the common sounds by id, plays them and adds them to a script.
 - **`soundseq_<Name>.sqb`**: header {u16 4, u16 **set id**, u32 count, u32 count x 4}, offsets
   (-1 = none), sequences of weighted choices (sound ID or -1 = silence, weight %). ACMD plays
   sequence n as `0x8000 | set id << 16 | n` (Marth's set 0x28: `Low_Voice_Clip(0x80280000)`,

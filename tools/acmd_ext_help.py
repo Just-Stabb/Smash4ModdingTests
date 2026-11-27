@@ -3637,3 +3637,66 @@ VANILLA_EXAMPLES = {
         'Unknown22=0, Unknown23=0, Unknown24=0xB, Unknown25=1, Unknown26=0)',
     ],
 }
+
+# --- sound ids (v1.7.32): the Sound Effect Viewer, names and aliases in the sound ids' tooltips ---------------------
+# No command changed: Sound_Effect and the other sound commands take the same ids. Their help says how an id is made,
+# where the common sounds are, and what Sm4shCommand v1.7.32 shows for one; an example each uses a fighter's own and a
+# common id.
+_ov = GROUP_HELP[NEW_GROUP]
+_ov[_ov.index('## More'):_ov.index('## More')] = [
+    '- Sound ids (Sm4shCommand v1.7.32, no command changed): Tools > Sound Effect Viewer (Ctrl+Shift+E) lists the '
+    'fighter\'s and the common sounds with their ids, plays them, keeps your aliases and adds a sound command to the '
+    'script; hovering a sound id (Sound_Effect\'s SFX, PLAY_SE_REMAIN\'s Se ...) shows its tone and alias. See '
+    'Sound_Effect (group "Sound").',
+    '',
+]
+_SOUND_IDS = [
+    '## Sound ids (new in v1.7.32: their names in tooltips, the Sound Effect Viewer)',
+    'A sound id is (row << 16) | label: sound/config/soundlabeltable.bin gives each sound bank (by the BINF id inside '
+    'its .nus3bank) a row, and each label of the row a tone of the bank. Greninja\'s snd_se_Gekkouga (BINF 2058) is '
+    'row 0x768: 0x07680000 + label (his IceBoom, label 97, is 0x07680061); his voices snd_vc_Gekkouga (6071) have '
+    'their own row. Costume banks (_c01 ...) share the main bank\'s ids.',
+    '- Common sounds: row 0, the common bank sound/se/snd_se_joucyu.nus3bank (BINF 2000): ids 0x00000000 - '
+    '0x0000019E, played by every fighter with the same commands (0x46 futtobi_l, the strong-launch sound; 0x61 the '
+    'dizzy loop; 0x0F an intangible hit). No other command or form is needed for a common sound.',
+    '- Ids from 0x80000000 are voice sequences (Low_Voice_Clip / PLAY_FLY_VOICE): 0x80000000 | set << 16 | index into '
+    'the fighter\'s soundseq_<Name>.sqb, a random pick of voice clips.',
+    '- An id whose label has no tone, or whose row\'s bank isn\'t loaded for the fighter, plays nothing (no error).',
+    'Sm4shCommand v1.7.32: hover an id for its tone (name, bank, length, volume) and your alias; Tools > Sound Effect '
+    'Viewer (Ctrl+Shift+E) lists every sound of the fighter and the common bank, plays it, names it (Aliases/sounds/) '
+    'and adds this command with its id at the caret (Add to Script).',
+]
+VANILLA_HELP.update({
+    'Sound_Effect': _SOUND_IDS + ['', 'Sound_Effect (PLAY_SE) plays the sound once from the fighter (a looping tone loops '
+                                  'until stopped: use Transient_Sound_Effect for those, which ends with the status).'],
+    'Transient_Sound_Effect': _SOUND_IDS + ['', 'Transient_Sound_Effect (PLAY_STATUS) plays a looping sound until the status '
+                                            'ends (or Stop_Sound_Effect with the same id); the Sound Effect Viewer\'s Loop '
+                                            'column shows which tones loop.'],
+    'Stop_Sound_Effect': _SOUND_IDS + ['', 'Stop_Sound_Effect (STOP_SE) stops the sound with that id (one started by '
+                                       'Sound_Effect / Transient_Sound_Effect).'],
+})
+VANILLA_EXAMPLES.update({
+    'Sound_Effect': [
+        '// Greninja (sound script): his own ice detonation sound, label 97 of his se row 0x768 (skeleton / ice',
+        '// detonation sound build: tools/gekkouga_sound.py), then the common strong-launch sound futtobi_l (row 0, the common',
+        '// bank snd_se_joucyu; every fighter plays these with the same command). The Sound Effect Viewer\'s Add to',
+        '// Script writes such lines; hover an id for its tone and alias',
+        'FRAME(Frames=12)',
+        'Sound_Effect(SFX=0x7680061)',
+        'FRAME(Frames=20)',
+        'Sound_Effect(SFX=0x46)',
+    ],
+    'Transient_Sound_Effect': [
+        '// the common dizzy loop (0x61, snd_se_common_furafura: it loops) for as long as the status lasts, ended early',
+        '// at frame 90 with Stop_Sound_Effect',
+        'Transient_Sound_Effect(SFX=0x61)',
+        'FRAME(Frames=90)',
+        'Stop_Sound_Effect(SFX=0x61)',
+    ],
+    'Stop_Sound_Effect': [
+        '// Greninja: his own skeleton voice (0x0768005D, SkVoice1) cut off at frame 40',
+        'Sound_Effect(SFX=0x768005D)',
+        'FRAME(Frames=40)',
+        'Stop_Sound_Effect(SFX=0x768005D)',
+    ],
+})

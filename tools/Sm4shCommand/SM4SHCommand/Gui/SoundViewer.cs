@@ -53,7 +53,7 @@ namespace Sm4shCommand.GUI
         bool filling;
 
         /// <summary>The sound commands Add to Script offers: (command, what it does). The game's own scripts use each
-        /// (vanilla Mario / Kirby sound.bin: Sound_Effect 222 times with common ids, row 0, besides their own).</summary>
+        /// (vanilla Dr. Mario's and Kirby's sound.bin: Sound_Effect 222 times with common ids, row 0, besides their own).</summary>
         public static readonly string[][] Commands =
         {
             new[] { "Sound_Effect", "PLAY_SE: plays it once (common or own)" },
@@ -120,7 +120,7 @@ namespace Sm4shCommand.GUI
             top.Controls.Add(pickFighter);
             top.Controls.Add(pickData);
             top.Controls.Add(reload);
-            top.Controls.Add(new Label { Text = "Filter:", AutoSize = true, Padding = new Padding(12, 6, 0, 0) });
+            top.Controls.Add(new Label { Text = "Filter (name, alias, ID):", AutoSize = true, Padding = new Padding(12, 6, 0, 0) });
             top.Controls.Add(filter);
             top.Controls.Add(new Label { Text = "Bank:", AutoSize = true, Padding = new Padding(8, 6, 0, 0) });
             top.Controls.Add(bankFilter);
@@ -163,6 +163,8 @@ namespace Sm4shCommand.GUI
             bankFilter.Items.Add("All banks");
             bankFilter.SelectedIndex = 0;
 
+            tips.SetToolTip(filter, "Shows the sounds whose tone name, alias, bank or sound ID has this (both tabs, as you type; case doesn't matter).\n" +
+                                    "IDs: hex with or without 0x, any part (0768, 5B, 0x768005B), or decimal. Empty: every sound.");
             tips.SetToolTip(pickFighter, "Open another fighter's folder (fighter\\NAME, with its sound folder).");
             tips.SetToolTip(pickData, "The game's data folder (a dump's content\\patch\\data ...) for sound\\config\\soundlabeltable.bin and the common bank\n" +
                                       "sound\\se\\snd_se_joucyu.nus3bank, when they aren't above the fighter's folder (a mod folder). Remembered.");
@@ -274,11 +276,30 @@ namespace Sm4shCommand.GUI
                     sounds.Name, sounds.Fighter.Entries.Count, sounds.Fighter.Banks.Count, sounds.Common != null ? sounds.Common.Entries.Count : 0);
         }
 
-        bool Matches(SoundEntry e, string f)
+        /// <summary>
+        /// The filter (both tabs, as you type, case doesn't matter): a match anywhere in the tone name, your alias, the
+        /// bank kind, or the sound ID: hex with or without 0x, any part of it ("0768", "5B", "0x7680061", "0x0768005B"),
+        /// or the ID in decimal (124256353). Empty: everything.
+        /// </summary>
+        public static bool Matches(SoundEntry e, string f)
         {
+            f = (f ?? "").Trim();
             if (f.Length == 0) return true;
-            return e.IdText.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0 || e.Name.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   e.Alias.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0 || e.Kind.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0;
+            if (e.Name.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0 || e.Alias.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                e.Kind.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+            if (!e.Id.HasValue) return false;
+            uint id = e.Id.Value;
+            string hex = f.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? f.Substring(2) : f;
+            if (hex.Length > 0 && hex.All(Uri.IsHexDigit))
+            {
+                // padded (0768005B) or not (768005B); "0x0768005B" and "0x768005B" both find it
+                string full = id.ToString("X8", CultureInfo.InvariantCulture), bare = id.ToString("X", CultureInfo.InvariantCulture);
+                string h = hex.ToUpperInvariant();
+                if (full.Contains(h) || bare.Contains(h))
+                    return true;
+            }
+            return f.All(char.IsDigit) && id.ToString(CultureInfo.InvariantCulture).Contains(f);
         }
 
         /// <summary>Fills both lists and the Banks tab (with the filter).</summary>
@@ -286,10 +307,16 @@ namespace Sm4shCommand.GUI
         {
             string f = filter.Text.Trim();
             string bank = bankFilter.SelectedIndex > 0 ? (string)bankFilter.SelectedItem : null;
+            // the picked sound stays picked when it is still in the list (filtering as you type)
+            var keepF = RowEntry(fighterGrid);
+            var keepC = RowEntry(commonGrid);
             FillGrid(fighterGrid, sounds != null ? sounds.Fighter.Entries.Where(e => (bank == null || e.Kind == bank) && Matches(e, f)) : Enumerable.Empty<SoundEntry>());
             FillGrid(commonGrid, sounds != null && sounds.Common != null ? sounds.Common.Entries.Where(e => Matches(e, f)) : Enumerable.Empty<SoundEntry>());
-            fighterTab.Text = "Fighter sounds (" + fighterGrid.Rows.Count + ")";
-            commonTab.Text = "Common sounds (" + commonGrid.Rows.Count + ")";
+            Reselect(fighterGrid, keepF);
+            Reselect(commonGrid, keepC);
+            int allF = sounds != null ? sounds.Fighter.Entries.Count : 0, allC = sounds != null && sounds.Common != null ? sounds.Common.Entries.Count : 0;
+            fighterTab.Text = "Fighter sounds (" + (fighterGrid.Rows.Count == allF ? allF.ToString(CultureInfo.InvariantCulture) : fighterGrid.Rows.Count + " of " + allF) + ")";
+            commonTab.Text = "Common sounds (" + (commonGrid.Rows.Count == allC ? allC.ToString(CultureInfo.InvariantCulture) : commonGrid.Rows.Count + " of " + allC) + ")";
             bool joucyu = sounds != null && sounds.CommonBank != null &&
                           Path.GetFileName(sounds.CommonBank.Path).Equals(FighterSounds.CommonBankFile, StringComparison.OrdinalIgnoreCase);
             commonNote.Text = sounds == null || sounds.CommonBank == null ? "No common bank found: pick the game's data folder (Game data..)." :
@@ -345,6 +372,23 @@ namespace Sm4shCommand.GUI
             }
             g.Rows.AddRange(rows.ToArray());
             g.ResumeLayout();
+        }
+
+        static SoundEntry RowEntry(DataGridView g)
+        {
+            var r = g.CurrentRow ?? (g.SelectedRows.Count > 0 ? g.SelectedRows[0] : null);
+            return r != null ? r.Tag as SoundEntry : null;
+        }
+
+        static void Reselect(DataGridView g, SoundEntry e)
+        {
+            if (e == null) return;
+            foreach (DataGridViewRow r in g.Rows)
+                if (r.Tag == e)
+                {
+                    try { g.CurrentCell = r.Cells["Name"]; } catch (Exception) { }
+                    return;
+                }
         }
 
         DataGridView CurrentGrid { get { return tabs.SelectedTab == commonTab ? commonGrid : fighterGrid; } }
@@ -431,11 +475,20 @@ namespace Sm4shCommand.GUI
             return commandName + "(" + string.Join(", ", parts.ToArray()) + ")";
         }
 
+        /// <summary>Where Add to Script writes, instead of the open script's editor (the tests: FastColoredTextBox can't be
+        /// made under Mono); true when the line went in.</summary>
+        public Func<string, bool> InsertLine;
+
         void AddToScript()
         {
             var e = Selected;
             if (e == null || !e.Id.HasValue) return;
             string line = CommandLine(SelectedCommand, e.Id.Value);
+            if (InsertLine != null)
+            {
+                if (InsertLine(line)) status.Text = "Added: " + line;
+                return;
+            }
             var editor = activeEditor != null ? activeEditor() : null;
             if (editor == null)
             {

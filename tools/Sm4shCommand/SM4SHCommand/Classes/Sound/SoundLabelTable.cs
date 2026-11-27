@@ -11,7 +11,7 @@ namespace Sm4shCommand.Sound
     /// (bank id 0xFFFFFFFF = an empty row), then the labels: per row, from its offset, one s32 tone index per label (-1 =
     /// none). A sound id is (row &lt;&lt; 16) | label: Greninja's snd_se_Gekkouga (BINF 2058) is row 0x768, so his IceBoom
     /// (label 97, tone 110) is 0x07680061; row 0 is the common bank snd_se_joucyu (2000), which every fighter plays
-    /// (0x00000046, the strong-hit sound). The game finds the row from the id, then the bank among the ones the
+    /// (0x00000046, futtobi_l: the strong-launch sound). The game finds the row from the id, then the bank among the ones the
     /// fighter loaded by the row's bank id (cross_f.rpx 0x0311EC30 / 0x0311EDC4, docs/params/fighter_files.md "Sound").
     /// Build() writes it back (byte-identical when unchanged); SetLabels / UseRow are part 2's.
     /// </summary>
