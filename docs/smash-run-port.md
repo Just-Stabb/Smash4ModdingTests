@@ -49,6 +49,11 @@ ground truth.
   - enemy_fs.cro is relocated at load, so the script must find its base first.
 - **RAM dumps:** a RAM dump at a chosen moment lets the enemy structs and params be read with their real values.
 - Mark what the emulator confirmed in hand_read.json, as Unicorn checks are marked now.
+- **The user's emulator is Azahar** (the Citra / Lime3DS successor). In Citra the GDB stub was under Configure >
+  Debug ("Enable GDB stub", port 24689 by default).
+  - Before writing the trace script, confirm with the user that Azahar's build still has the stub and which port
+    it uses.
+  - The script targets gdb-multiarch (ARM11, `set architecture arm`), connecting with `target remote :PORT`.
 
 ## Where Smash Run's code is
 
