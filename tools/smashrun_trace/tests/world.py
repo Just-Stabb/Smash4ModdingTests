@@ -23,6 +23,19 @@ import fake_azahar as F           # noqa: E402
 
 CRS_ADDR = 0x08400000
 CRO_BASES = {'enemy_fs': (0x0A3C1000, 0x0A600000, 0x0A640000), 'main_field': (0x0A700000, 0x0A780000, 0x0A7C0000)}
+# the layout the user's Azahar log suggests: code.bin (or code) mapped 0x00100000-0x01100000, the heap
+# 0x08000000-0x08600000 without CROs, the main thread's stack just below 0x10000000, the modules in the linear heap
+LAYOUTS = {
+    'classic': {'crs': CRS_ADDR, 'cros': CRO_BASES, 'code_end': 0x00C80000, 'extra': []},
+    'azahar': {'crs': 0x14200000, 'cros': {'enemy_fs': (0x14A3C000, 0x14C00000, 0x14C40000),
+                                           'main_field': (0x14D00000, 0x14D80000, 0x14DC0000)},
+               'code_end': 0x01100000, 'extra': [(0x08000000, 0x00600000), (0x0FFFC000, 0x4000)]},
+    # the worst plausible case for the fallback scan: a 64 MB linear heap mapped in one piece, the modules 40 MB in
+    'azahar_full': {'crs': 0x16800000, 'cros': {'enemy_fs': (0x16A3C000, 0x16C00000, 0x16C40000),
+                                                'main_field': (0x16D00000, 0x16D80000, 0x16DC0000)},
+                    'code_end': 0x01100000, 'extra': [(0x08000000, 0x00600000), (0x0FFFC000, 0x4000),
+                                                      (0x14000000, 0x04000000)]},
+}
 ARM_BX_LR = struct.pack('<I', 0xE12FFF1E)
 THUMB_BX_LR = struct.pack('<H', 0x4770)
 
@@ -33,19 +46,25 @@ def demangled(names):
 
 
 class World:
-    def __init__(s, dump, kinds=('kuribo',)):
+    def __init__(s, dump, kinds=('kuribo',), layout='classic'):
         s.dump = dump
+        s.layout = L = LAYOUTS[layout]
+        s.crs_addr = L['crs']
+        s.cro_bases = L['cros']
         s.m = F.Machine()
         m = s.m
-        m.map(0x00100000, 0x00B80000)              # code.bin text / rodata / data / bss (stubs and singletons)
-        m.map(CRS_ADDR, 0x00100000)
-        for name, (b, d, bs) in CRO_BASES.items():
+        m.map(0x00100000, L['code_end'] - 0x00100000)   # code.bin text / rodata / data / bss (stubs and singletons)
+        for lo, n in L['extra']:
+            m.map(lo, n)
+        mp = lambda a, n: None if m.mapped(a, n) else m.map(a, n)
+        mp(s.crs_addr, 0x00100000)
+        for name, (b, d, bs) in s.cro_bases.items():
             p = os.path.join(dump, 'cro', name + '.cro')
             if os.path.exists(p):
                 sz = os.path.getsize(p)
-                m.map(b, sz)
-                m.map(d, 0x20000)
-                m.map(bs, 0x10000)
+                mp(b, sz)
+                mp(d, 0x20000)
+                mp(bs, 0x10000)
         m.map(0, 0x10000)                          # null-pointer chains of the stubbed framework land here
         m.map(F.HEAP, 0x00200000)
         m.map(F.STACK_TOP - 0x00100000, 0x00100000)
@@ -53,7 +72,7 @@ class World:
         m.write(F.RET_MAGIC, ARM_BX_LR)
         m.enable_vfp()
         crs_x = open(os.path.join(dump, 'static.crs'), 'rb').read()
-        s.crs = croload.load_crs(m, crs_x, CRS_ADDR)
+        s.crs = croload.load_crs(m, crs_x, s.crs_addr)
         s.dem = demangled(list(s.crs.exports))
         s.by_dem = {}
         for mang, d in s.dem.items():
@@ -65,7 +84,7 @@ class World:
             if 0x00100000 <= a < 0x00A83000:
                 m.write(a & ~1, THUMB_BX_LR if a & 1 else ARM_BX_LR)
         s.cros = []
-        for name, (b, d, bs) in CRO_BASES.items():
+        for name, (b, d, bs) in s.cro_bases.items():
             p = os.path.join(dump, 'cro', name + '.cro')
             if os.path.exists(p):
                 x = open(p, 'rb').read()
@@ -75,6 +94,34 @@ class World:
         s.ef = s.cros[0]
         s.specials()
         s.next_alloc_value = None
+
+    def bl_return(s, mod, near=0):
+        """a return address in the module's text: the word after an ARM BL at or after `near`"""
+        lm = [c for c in s.cros if c.name == mod][0]
+        x = open(os.path.join(s.dump, 'cro', mod + '.cro'), 'rb').read()
+        o = max(0x180, near)
+        while True:
+            w = struct.unpack_from('<I', x, o)[0]
+            if w >> 24 == 0xEB:
+                return lm.base + o + 4
+            o += 4
+
+    def threads(s, with_cro_thread=True):
+        """halted-at-connect registers as Azahar showed them (thread 1: PC / LR in code.bin, SP 0x0FFFFE28 when the
+        layout maps that stack), plus a game thread whose LR returns into enemy_fs and whose stack holds a heap
+        pointer and a return address into main_field. Returns the server's {thread id: regs} for the others."""
+        m = s.m
+        sp1 = 0x0FFFFE28 if m.mapped(0x0FFFFE28, 4) else F.STACK_TOP - 0x2000
+        m.set_reg(15, 0x001720A8)
+        m.set_reg(14, 0x00147908)
+        m.set_reg(13, sp1)
+        m.write(sp1, struct.pack('<4I', 0x00147908, 0x00100004, 0, 0x08000100))
+        if not with_cro_thread:
+            return {}
+        sp2 = m.alloc(0x800)
+        words = [0x0C000040, 0, s.bl_return('main_field', 0x2000), 0x00200000, 0x08001000]
+        m.write(sp2, struct.pack('<%dI' % len(words), *words))
+        return {'2': {15: 0x00180000, 14: s.bl_return('enemy_fs', 0x33000), 13: sp2}}
 
     def addr(s, dem):
         return s.by_dem[dem]

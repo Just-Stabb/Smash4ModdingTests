@@ -63,7 +63,7 @@ class Mock:
         s.ls.listen(1)
         s.port = s.ls.getsockname()[1]
         s.noack = False
-        s.th = threading.Thread(target=s.serve, daemon=True)
+        s.th = threading.Thread(target=s.serve_safe, daemon=True)
         s.th.start()
 
     def frame(s, body, corrupt=False):
@@ -77,12 +77,21 @@ class Mock:
             cs ^= 0xFF
         return b'$' + b + b'#' + ('%02x' % cs).encode()
 
+    def serve_safe(s):
+        try:
+            s.serve()
+        except OSError:
+            pass                    # the client closed the connection (after its detach)
+
     def serve(s):
         c, _ = s.ls.accept()
         buf = b''
         first = True
         while True:
-            d = c.recv(4096)
+            try:
+                d = c.recv(4096)
+            except OSError:
+                return
             if not d:
                 return
             buf += d
@@ -164,6 +173,8 @@ class Mock:
             # console output first, then a stop with registers / thread
             return [s.frame('O' + b'hello\n'.hex()), s.frame('T05' + '0f:%s;0d:%s;thread:p1.2;swbreak:;' % (
                 struct.pack('<I', 0x2000).hex(), struct.pack('<I', 0x7000).hex()))]
+        if p in ('vCont;s', 's') and getattr(s, 'no_step', False):
+            return None                  # a stub that never answers a single step
         if p in ('vCont;s', 's'):
             s.regs[15] += 4
             return 'T050f:%s;' % struct.pack('<I', s.regs[15]).hex()
@@ -269,6 +280,32 @@ def main():
     time.sleep(0.2)
     check('vCont;c' in m.log and not any(x.startswith(('Z', 'z', 'M')) for x in m.log),
           'trace.py resume: continue sent, nothing written: %s' % m.log)
+    # v1.1.0: a stub that doesn't answer 's' (Azahar's vCont? has no step): the step-over falls back to temporary
+    # breakpoints on the next instruction (here an ARM BL: both pc + 4 and its target)
+    m = Mock(nack_first=False, bad_checksum_once=False)
+    m.no_step = True
+    m.regs[15] = 0x2000
+    for k, v in enumerate(struct.pack('<I', 0xEB000010)):        # bl 0x2048
+        m.mem[0x2000 + k] = v
+    c = rsp.RSPClient('127.0.0.1', m.port, timeout=5)
+    t = rsp.Target(c, log=lambda *a: None)
+    t.attach()
+    t.has_vcont = False
+    check(t.add_bp(0x2000), 'step fallback: bp')
+    n0 = len(m.log)
+    t.cont(0x2000)
+    t.wait(5)
+    seq = m.log[n0:]
+    check(t.step_ok is False and 'Z0,2004,4' in seq and 'Z0,2048,4' in seq and 'z0,2004,4' in seq and
+          'z0,2048,4' in seq and 'Z0,2000,4' in seq, 'step fallback: temporary breakpoints at pc+4 and the BL target: %s'
+          % seq)
+    check(t.next_pcs(0x2000, False) == {0x2004, 0x2048}, 'next_pcs of a BL')
+    t.remove_all()
+    t.detach()
+    c.close()
+    # Azahar replies T00 (signal 0) at connect: a stop like any other
+    sr = rsp.StopReply('T000f:a8201700;0d:28feff0f;0e:08791400;thread:1;')
+    check(sr.signal == 0 and sr.thread == '1' and sr.regs[15] == 'a8201700', 'T00 stop reply (Azahar at connect)')
     print('rsp: %d checks, %d failed' % (N[0], len(FAILS)))
     return 1 if FAILS else 0
 

@@ -57,7 +57,7 @@ DEFAULTS = {
     'rsp_log': None,
     'dry': False,                   # probe: resolve everything, plant nothing
     'eager_kinds': False,           # all kinds' state hooks at once (default: a kind's when its first one spawns)
-    'samples': 20,                  # CPU samples looking for a CRO before the page scan
+    'samples': 3,                   # thread / stack samples looking for a CRO before the bulk scan
 }
 
 
@@ -177,6 +177,8 @@ class Tracer:
             raise rsp.RSPError('the stub reports no running game (%s)' % stop.raw)
         cache = os.path.join(os.path.dirname(os.path.abspath(s.cfg['out'])), locate.CACHE_NAME)
         s.loc = locate.Locator(s.t, s.say, cache, s.catalog, s.maps, s.cfg['regions'])
+        s.loc.stop_thread = stop.thread
+        # Azahar: '?' -> T00 at connect, the game halted (user's --rsp-log); signal 0 counts as a stop too
         s.loc.measure(stop_state_running=False)
         s.loc.steps.start('read size')
         n = s.t.find_max_read()
@@ -187,6 +189,8 @@ class Tracer:
     def find_modules(s):
         s.mods = s.loc.find(s.cfg['samples'])
         s.loc.remember(s.mods)
+        if s.loc.osdata_text is not None:
+            s.log.write({'t': 'note', 'f': 0, 'msg': 'qXfer:osdata', 'osdata': s.loc.osdata_text})
         return s.mods
 
     def module_addrs(s, m, hooks):

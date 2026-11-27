@@ -131,8 +131,8 @@ def run_trace(dump, z0=True, extra_cfg=None, more_steps=None):
     if more_steps:
         steps = steps[:2] + more_steps(w, mp, acc) + steps[2:]
     sc = F.Scenario(w.m, steps)
-    srv = F.GDBServer(w.m, sc, z0=z0).start()
-    out = tempfile.mktemp(suffix='.jsonl')
+    srv = F.GDBServer(w.m, sc, z0=z0, threads=w.threads()).start()
+    out = os.path.join(tempfile.mkdtemp(), 'trace.jsonl')       # its own folder: a cold module cache
     cfg = {'port': srv.port, 'out': out, 'map': 'auto', 'mode': 'light', 'reconnect': False, 'dump_on_stage': False,
            'rescan_every': 1e9, 'cats': None}
     cfg.update(extra_cfg or {})

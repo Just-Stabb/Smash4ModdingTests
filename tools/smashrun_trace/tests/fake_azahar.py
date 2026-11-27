@@ -13,10 +13,20 @@ when the scenario is over.
 import socket
 import struct
 import threading
+import time
 
 import unicorn as U
 from unicorn import arm_const as A
 
+AZAHAR_TARGET_XML = ('<?xml version="1.0"?>\n<!DOCTYPE target SYSTEM "gdb-target.dtd">\n<target version="1.0">\n'
+                     '<architecture>arm</architecture>\n<osabi>3DS</osabi>\n<feature name="org.gnu.gdb.arm.core">\n' +
+                     ''.join('<reg name="r%d" bitsize="32"/>\n' % i for i in range(13)) +
+                     '<reg name="sp" bitsize="32" type="data_ptr"/>\n<reg name="lr" bitsize="32"/>\n'
+                     '<reg name="pc" bitsize="32" type="code_ptr"/>\n<reg name="cpsr" bitsize="32" regnum="25"/>\n'
+                     '</feature>\n<feature name="org.gnu.gdb.arm.vfp">\n' +
+                     ''.join('<reg name="d%d" bitsize="64" type="float"/>\n' % i for i in range(16)) +
+                     '<reg name="fpscr" bitsize="32" type="int" group="float"/>\n'
+                     '<reg name="fpexc" bitsize="32" type="int" group="float"/>\n</feature>\n</target>\n')
 RET_MAGIC = 0x0B0FFF00          # every scenario call returns here
 HEAP = 0x0C000000
 STACK_TOP = 0x0D100000
@@ -202,10 +212,24 @@ class Scenario:
 class GDBServer:
     """Citra's stub, as far as the tracer uses it: qSupported, ?, g, p, m, M, Z0 / z0, c, s, vCont?, \\x03, D, k"""
 
-    def __init__(s, machine, scenario, port=0, z0=True, ack=True):
+    def __init__(s, machine, scenario, port=0, z0=True, ack=True, azahar=False, latency_halted=0.0,
+                 latency_running=0.0, threads=None, idle_until_bp=True):
+        """azahar=True models what the user's --rsp-log of Azahar shows: PacketSize=9800 with qXfer features / osdata
+        / threads, vCont? -> vCont;c;C (no vCont step), '?' -> T00 (halted at connect), EMPTY replies for unmapped
+        memory. latency_*: seconds before each reply (one packet per run-loop pass while running).
+        threads: {id: {reg n: value}} for threads other than 1 (thread 1 = the machine's registers).
+        idle_until_bp: a continue before any breakpoint exists lets the 'game' run idle (no scenario, no reply until
+        an interrupt), as a game runs freely while the probe looks around."""
         s.m, s.sc = machine, scenario
         s.z0 = z0
         s.ack = ack
+        s.azahar = azahar
+        s.lat_h, s.lat_r = latency_halted, latency_running
+        s.threads = threads or {}
+        s.cur_thread = '1'
+        s.idle_until_bp = idle_until_bp
+        s.idle = False
+        s.planted = 0
         s.lsock = socket.socket()
         s.lsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.lsock.bind(('127.0.0.1', port))
@@ -233,7 +257,10 @@ class GDBServer:
 
     def send(s, c, payload):
         body = payload.encode('latin1')
-        c.sendall(b'$' + body + b'#' + ('%02x' % (sum(body) & 0xFF)).encode())
+        try:
+            c.sendall(b'$' + body + b'#' + ('%02x' % (sum(body) & 0xFF)).encode())
+        except OSError:
+            pass                            # the client went away (after its detach)
 
     def handle_conn(s, c):
         buf = b''
@@ -252,7 +279,9 @@ class GDBServer:
                     continue
                 if buf[:1] == b'\x03':
                     buf = buf[1:]
-                    s.send(c, 'S02')
+                    s.packets.append('\\x03')
+                    s.idle = False
+                    s.send(c, 'T02thread:1;' if s.azahar else 'S02')
                     continue
                 i = buf.find(b'$')
                 j = buf.find(b'#', i)
@@ -261,7 +290,10 @@ class GDBServer:
                 body = buf[i + 1:j]
                 buf = buf[j + 3:]
                 if not noack:
-                    c.sendall(b'+')
+                    try:
+                        c.sendall(b'+')
+                    except OSError:
+                        return
                 pkt = body.decode('latin1')
                 s.packets.append(pkt)
                 r = s.reply(pkt)
@@ -271,6 +303,9 @@ class GDBServer:
                     continue
                 if r is None:
                     continue
+                lat = s.lat_r if s.idle else s.lat_h
+                if lat:
+                    time.sleep(lat)
                 s.send(c, r)
                 if pkt in ('D', 'k'):
                     c.close()
@@ -280,6 +315,10 @@ class GDBServer:
 
     def regs_hex(s):
         m = s.m
+        if s.cur_thread != '1' and s.cur_thread in s.threads:
+            t = s.threads[s.cur_thread]
+            return ''.join(struct.pack('<I', t.get(i, 0)).hex() for i in range(16)) + '10000000' + '0' * 16 * 16 + \
+                '00000000' * 2
         h = ''.join(struct.pack('<I', m.reg(i)).hex() for i in range(16))
         h += struct.pack('<I', m.uc.reg_read(A.UC_ARM_REG_CPSR)).hex()
         h += ''.join(struct.pack('<Q', m.dreg(i)).hex() for i in range(16))
@@ -296,13 +335,28 @@ class GDBServer:
     def reply(s, p):
         m = s.m
         if p.startswith('qSupported'):
+            if s.azahar:
+                return 'PacketSize=9800;qXfer:features:read+;qXfer:osdata:read+;qXfer:threads:read+;vContSupported+'
             return 'PacketSize=1000;qXfer:features:read-;swbreak+' + (';QStartNoAckMode+' if not s.ack else '')
+        if p.startswith('qXfer:features:read:target.xml'):
+            return 'l' + AZAHAR_TARGET_XML
+        if p.startswith('qXfer:threads:read'):
+            return 'l<?xml version="1.0"?>\n<threads>\n' + ''.join(
+                '<thread id="%s" core="0" name="t%s"></thread>\n' % (t, t) for t in ['1'] + sorted(s.threads)) + \
+                '</threads>'
+        if p.startswith('qXfer:osdata:read'):
+            return 'l<?xml version="1.0"?>\n<osdata type="types"></osdata>'
+        if p.startswith('Hg'):
+            s.cur_thread = p[2:] if p[2:] not in ('0', '-1') else '1'
+            return 'OK'
         if p == 'QStartNoAckMode':
             return None
         if p == '?':
+            if s.azahar:
+                return 'T000f:%s;0d:%s;0e:%s;thread:1;' % tuple(struct.pack('<I', s.m.reg(n)).hex() for n in (15, 13, 14))
             return 'T05thread:1;'
         if p == 'vCont?':
-            return ''
+            return 'vCont;c;C' if s.azahar else ''
         if p == 'g':
             return s.regs_hex()
         if p.startswith('p'):
@@ -316,6 +370,14 @@ class GDBServer:
             return 'E01'
         if p.startswith('m'):
             a, n = [int(x, 16) for x in p[1:].split(',')]
+            if s.azahar:
+                if 2 * n > 0x9800 - 8 or not m.mapped(a, 1):
+                    return ''                          # Azahar: an empty reply for unmapped memory
+                out = bytearray()
+                for k in range(a, a + n, 0x1000):     # a block running into unmapped memory: zeros there
+                    ln = min(0x1000 - (k & 0xFFF), a + n - k)
+                    out += m.read(k, ln) if m.mapped(k, ln) else bytes(ln)
+                return out[:n].hex()
             if not m.mapped(a, n):
                 return 'E01'
             return m.read(a, n).hex()
@@ -325,6 +387,8 @@ class GDBServer:
             if not m.mapped(a, n):
                 return 'E01'
             m.write(a, bytes.fromhex(data))
+            if bytes.fromhex(data) in (struct.pack('<I', 0xE1200070), b'\x00\xbe'):
+                s.planted += 1
             return 'OK'
         if p.startswith('Z0') or p.startswith('z0'):
             if not s.z0:
@@ -333,6 +397,9 @@ class GDBServer:
             (m.bps.add if p[0] == 'Z' else m.bps.discard)(a)
             return 'OK'
         if p == 'c' or p == 'vCont;c':
+            if s.idle_until_bp and not m.bps and not s.planted:
+                s.idle = True                          # the game runs; nothing to stop at
+                return None
             return s.stop_reply(s.sc.cont())
         if p == 's' or p == 'vCont;s':
             pc = m.reg(15)

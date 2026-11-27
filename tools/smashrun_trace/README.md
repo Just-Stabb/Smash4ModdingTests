@@ -53,12 +53,28 @@ game files).
    ```
 
    It connects, finds the game's code modules in RAM, prints them, says which enemy map matches, counts the hooks
-   it could place, then disconnects without changing anything. Any game version works for the probe.
+   it could place, then lets the game run again and disconnects. It changes nothing. Any game version works for
+   the probe.
+   - **How long:** a few seconds normally (well under a minute). The game pauses while the probe reads and runs
+     again at the end. The console shows each step with its packet count and time (`[probe] latency: 21 packets,
+     0.4 s ...`). The first probe on a PC may have to search the RAM: it then prints `scan: ... % ... at most
+     about N s left` lines. Let it finish (Ctrl+C still stops it cleanly and prints what it found so far).
+   - **The second probe and every run after it are much faster:** what the probe found is kept in
+     `smashrun_trace_cache.json` next to the logs (where the modules are, checked against their fingerprint each
+     time). Delete that file if anything looks wrong. It is rebuilt.
    - `enemy_fs` only appears once you are **in Smash Run** (the mode loads it). Run the probe again from inside a
      Smash Run match: the line `map: update` (or `map: base`) must appear. `map: none` means your game version
      doesn't match the maps. Send me the probe's output.
    - If it says it cannot connect, check the port and that Azahar's stub is on (step 2).
-3. Copy what the probe prints and keep it (or send it with your first logs).
+3. Copy what the probe prints (from `==== probe summary` to `====`) and send it with your first logs. It contains
+   the stub's speed (`stub latency: ... ms a packet halted, ... ms running`), the modules, the map and the cost of
+   each step.
+4. **Still slow, or the game stutters for more than a minute?** Press Ctrl+C, then run the probe again with a packet
+   log and send me that file:
+
+   ```
+   python trace.py probe --rsp-log probe_log.txt
+   ```
 
 ## 5. Record
 
@@ -166,7 +182,7 @@ redead, killer). Not sure of a name? Leave out
 - Every `.jsonl` log (zip them: they compress very well), with a line each saying what you did in it (the
   checklist item, the areas, anything odd).
 - The `probe` output from inside Smash Run (step 4), once.
-- `smashrun_trace_modules.json` (next to the logs; it remembers where the modules were).
+- `smashrun_trace_cache.json` (next to the logs; it remembers where the modules were).
 - Any error the console printed (copy the window's text).
 - Videos of the same runs help, if you record them anyway.
 
@@ -177,8 +193,9 @@ redead, killer). Not sure of a name? Leave out
 - **The game froze after `probe` / `dump` and stayed frozen (v1.0.0)**: Azahar pauses the game while the tracer is
   connected and only resumes it when told to continue; v1.0.0 disconnected without saying so. Fixed in v1.0.1 (every
   command now ends with a continue). If a game is stuck like that, run `python trace.py resume` instead of rebooting.
-- **Azahar is frozen right after the tracer connects**: wait a few seconds; with thousands of breakpoints the first
-  seconds are slow. If it stays frozen, press Ctrl+C in the tracer window (the game resumes), then try
+- **Azahar is frozen right after the tracer connects**: wait a few seconds; it reads what it needs with the game
+  paused, then lets it run (v1.1.0: a few hundred packets at most; a kind's breakpoints only go in when one of
+  that kind first spawns, so the start is quick; `--eager-kinds` puts them all in at once). If it stays frozen, press Ctrl+C in the tracer window (the game resumes), then try
   `--kinds kuribo` to trace less.
 - **The probe works but the run never logs any `state` events while enemies are clearly moving**: Azahar's fast
   CPU mode may skip debugger breakpoints. In the same Debug settings, untick **"Enable CPU JIT"** (if there is
@@ -195,8 +212,12 @@ redead, killer). Not sure of a name? Leave out
 - `srtrace/rsp.py`: the GDB Remote Serial Protocol over TCP (packets, acks, escapes, run-length encoding, `qSupported`,
   `g` / `p` / `m`, `Z0` / `z0` with a BKPT fallback, `c` / `s` / `vCont`, stop replies, interrupt, detach). Every
   breakpoint is stepped over on continue (removed, single step, put back).
-- `srtrace/cro.py`: finds the CROs in RAM (the "CRO0" header at +0x80 of a page, the RO service's next / previous
-  chain from static.crs), reads their run-time segment tables and named export tables. The export tags give each
+- `srtrace/locate.py` + `srtrace/cro.py`: finds the CROs in RAM with few packets: the cache first (each module
+  checked by the 0x80-byte hash block at its base), else every thread's PC / LR and a bulk read of its stack
+  (qXfer:threads + Hg + g) for a pointer into a CRO's code, walked back with bulk reads to its "CRO0" header, then the
+  RO service's next / previous chain; only then a bulk scan (one packet per 16 KB, the linear heaps first). The
+  stub's latency halted / running is measured and the faster state used. It reads the run-time segment tables, and
+  the export tables only when the loaded file isn't the one the catalogue / maps were built from (same hash block). The export tags give each
   name's file offset, which identifies the module version; `srtrace/maps/enemy_fs_<version>.json` is used only when
   every kind's `create` export sits at the map's offset.
 - `srtrace/catalog.json`: the framework hooks by mangled name, resolved through the game's own static.crs (code.bin's

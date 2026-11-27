@@ -26,6 +26,7 @@ Run options:
   --no-step-over           continue without stepping over the breakpoint (only if the stub does it itself)
   --map auto|update|base   which enemy_fs.cro map (default: the one whose exports match the loaded module)
   --rsp-log FILE           log every packet (debugging the connection)
+  --eager-kinds            every kind's state hooks at once (default: a kind's go in when its first one spawns)
 """
 import argparse
 import os
@@ -64,6 +65,9 @@ def build(argv=None):
     ap.add_argument('--no-stage-dump', dest='dump_on_stage', action='store_false')
     ap.add_argument('--seconds', type=float, default=20)
     ap.add_argument('--rsp-log')
+    ap.add_argument('--eager-kinds', action='store_true',
+                    help="every kind's state hooks at once (default: a kind's when its first one spawns)")
+    ap.add_argument('--samples', type=int, default=3, help='thread / stack samples before the bulk scan')
     ap.add_argument('--title-id')
     return ap.parse_args(argv)
 
@@ -75,8 +79,8 @@ def probe(tr):
     print('==== probe summary (toolkit v%s) ====' % VERSION)
     if loc and loc.latency:
         la = loc.latency
-        print('stub latency: %s ms a packet as connected, %s ms halted -> bulk reads done %s' % (
-            la.get('as_connected_ms'), la.get('halted_ms'), la.get('mode')))
+        print('stub latency: %s ms a packet halted, %s ms running (the game was %s at connect) -> bulk reads done %s'
+              % (la.get('halted_ms'), la.get('running_ms'), la.get('at_connect'), la.get('mode')))
     print('read size: up to 0x%X bytes a packet' % (t.max_read or 0))
     print('modules (%s):' % (loc.how.get('modules') if loc else '?'))
     for n, m in sorted(tr.mods.items(), key=lambda x: x[1].base):

@@ -16,7 +16,7 @@ def main():
     dump = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('S3DS_DUMP', '')
     bad = 0
     for t, needs_dump in (('test_rsp.py', False), ('test_analyse.py', False), ('test_cro.py', True),
-                          ('test_fake_azahar.py', True)):
+                          ('test_fake_azahar.py', True), ('test_probe_budget.py', True)):
         cmd = [sys.executable, os.path.join(HERE, t)] + ([dump] if needs_dump and dump else [])
         print('==', t)
         r = subprocess.run(cmd)

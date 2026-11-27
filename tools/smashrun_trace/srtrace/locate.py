@@ -30,6 +30,10 @@ CODE_LO = 0x00100000
 CODE_HI_GUESS = 0x00D00000          # code.bin's text + rodata + data + bss end below this (base 0xC6Axxx, update ~0xCxxxxx)
 NEEDED = ('|static|', 'enemy_fs', 'main_field', 'menu')
 CACHE_NAME = 'smashrun_trace_cache.json'
+# fallback scan order (user's v1.0.1 log: code.bin 0x00100000-0x01100000 has no CRO, the heap 0x08000000-0x08600000
+# none either; the linear heaps were never reached): linear heaps first
+SCAN_REGIONS = [(0x14000000, 0x1C000000), (0x30000000, 0x38000000), (0x08000000, 0x10000000),
+                (0x01100000, 0x04000000), (0x00100000, 0x01100000)]
 
 
 class Steps:
@@ -108,6 +112,9 @@ class Locator:
         s.mode = None
         s.code_hi = CODE_HI_GUESS
         s.how = {}
+        s.use_threads = True
+        s.stop_thread = None
+        s.osdata_text = None
 
     # ------------------------------------------------------------------------------------------------ latency
     def _time(s, n=10, addr=CODE_LO):
@@ -119,25 +126,33 @@ class Locator:
         ts.sort()
         return ts[len(ts) // 2]
 
-    def measure(s, stop_state_running):
-        """time reads as connected, then halted; stay in the faster state. Returns 'halted' / 'running'."""
+    def measure(s, stop_state_running=False):
+        """10 reads in the state the stub was in at connect (Azahar: halted, '?' -> T00), 10 in the other one, then
+        stay in the faster state for the bulk reads. Returns 'halted' / 'running'."""
         s.steps.start('latency')
-        as_conn = s._time()
-        st = s.t.halt(3.0)
-        halted = s._time() if st is not None else None
-        s.latency = {'as_connected_ms': round(as_conn * 1000, 2),
-                     'halted_ms': round(halted * 1000, 2) if halted is not None else None,
-                     'connected_state': 'running' if stop_state_running else 'unknown'}
-        if halted is None:
-            s.mode = 'running'                  # the stub didn't answer the interrupt: keep going as connected
-        elif halted <= as_conn * 1.25:
+        first = s._time()
+        if stop_state_running:
+            st = s.t.halt(3.0)
+            other = s._time() if st is not None else None
+            run_ms, halt_ms = first, other
+        else:
+            s.t.resume_nowait()
+            other = s._time()
+            st = s.t.halt(3.0)
+            run_ms, halt_ms = other, first
+            if st is None:                      # no answer to the interrupt: it stays running
+                halt_ms = None
+        s.latency = {'halted_ms': round(halt_ms * 1000, 2) if halt_ms is not None else None,
+                     'running_ms': round(run_ms * 1000, 2) if run_ms is not None else None,
+                     'at_connect': 'running' if stop_state_running else 'halted'}
+        if halt_ms is not None and (run_ms is None or halt_ms <= run_ms * 1.25):
             s.mode = 'halted'
         else:
             s.mode = 'running'
             s.t.resume_nowait()
         s.latency['mode'] = s.mode
-        s.steps.end('%.1f ms a packet as connected, %s halted -> bulk reads %s' % (
-            as_conn * 1000, ('%.1f ms' % (halted * 1000)) if halted is not None else 'no answer', s.mode))
+        s.steps.end('%s ms halted, %s ms running -> bulk reads %s' % (
+            s.latency['halted_ms'], s.latency['running_ms'], s.mode))
         return s.mode
 
     def ensure_halted(s):
@@ -149,25 +164,32 @@ class Locator:
         if s.mode == 'running' and not s.t.running:
             s.t.resume_nowait()
 
+    def block(s):
+        """the bulk read size: the largest multiple of a page the stub answers in one packet"""
+        return max(0x1000, ((s.t.max_read or 0x1000) // 0x1000) * 0x1000)
+
     # ------------------------------------------------------------------------------------------------ modules
     def from_cache(s):
         mods = {}
         for base, h in s.cache.d.get('last_bases', []):
-            if hash80(s.t, base) != h:
-                continue
             info = s.cache.d['modules'].get(h, {})
-            m = s._module_known(base, info.get('name'))
+            if not info.get('name'):
+                continue
+            # one read: the header holds the hash block; the segment table read only for the hooked modules
+            m = s._module_known(base, info.get('name'), expect_hash=h)
             if m:
                 mods[m.name] = m
         return mods
 
-    def _module_known(s, base, name=None):
+    def _module_known(s, base, name=None, expect_hash=None):
         """the module at base: header + segment table (+ the name unless known)"""
         try:
             hdr = s.t.read(base, cro.HEADER_SIZE)
         except rsp.RSPError:
             return None
         if hdr[cro.HDR:cro.HDR + 4] != cro.MAGIC:
+            return None
+        if expect_hash and hdr[:0x80].hex() != expect_hash:
             return None
         m = cro.Module(base, hdr)
         m.hash80 = hdr[:0x80].hex()
@@ -235,17 +257,39 @@ class Locator:
                 return True
         return False
 
-    def sample_candidates(s, mods, max_cands=12):
-        regs = s.t.read_regs()
-        pc, lr, sp = regs.get('r15', 0), regs.get('r14', 0), regs.get('r13', 0)
+    def thread_regs(s):
+        """(thread id, registers) of every thread the stub lists (one Hg + one g each), the stop thread first"""
+        out = []
+        tids = s.t.threads() if s.use_threads else []
+        if not tids:
+            return [(None, s.t.read_regs())]
+        for tid in tids:
+            if s.t.set_thread(tid):
+                try:
+                    out.append((tid, s.t.read_regs()))
+                except rsp.RSPError:
+                    pass
+        if s.stop_thread and s.stop_thread in tids:
+            s.t.set_thread(s.stop_thread)
+        return out or [(None, s.t.read_regs())]
+
+    def stack_words(s, sp):
+        """the words above sp: one bulk read (shorter if it would run off the mapped stack)"""
+        if not sp:
+            return []
+        b = s.t.try_read(sp & ~3, s.block())
+        if not b:
+            b = s.t.try_read(sp & ~3, 0x1000 - (sp & 0xFFC))
+        return [struct.unpack_from('<I', b, i)[0] for i in range(0, len(b) - 3, 4)] if b else []
+
+    def sample_candidates(s, mods, max_cands=24):
         cands = []
-        for v in (pc, lr):
-            if 0x00100000 <= v < 0x40000000 and not s.in_known(v & ~1, mods):
-                cands.append(v & ~1)
-        stk = s.t.try_read(sp & ~3, 0x400) if sp else None
-        if stk:
-            words = [struct.unpack_from('<I', stk, i)[0] for i in range(0, len(stk), 4)]
-            for w in words:
+        for tid, regs in s.thread_regs():
+            for v in (regs.get('r15', 0), regs.get('r14', 0)):
+                a = v & ~1
+                if 0x00100000 <= a < 0x40000000 and not s.in_known(a, mods) and a not in cands:
+                    cands.append(a)
+            for w in s.stack_words(regs.get('r13', 0)):
                 a = w & ~1
                 if len(cands) >= max_cands:
                     break
@@ -254,35 +298,56 @@ class Locator:
                 prev = s.t.try_read(a - 4, 4)
                 if prev and is_call_return(struct.unpack('<I', prev)[0]):
                     cands.append(a)
+        # outside code.bin's possible range first (the update's code.bin may reach 0x01100000)
+        cands.sort(key=lambda a: CODE_LO <= a < 0x01100000)
         return cands
 
-    def walk_back(s, a, limit=1500):
-        p = a & ~0xFFF
-        for _ in range(limit):
-            if p < 0x00100000:
+    def walk_back(s, a, limit_pages=1536):
+        """the CRO0 header at or below a: bulk reads downwards, each page's +0x80 checked locally"""
+        B = s.block()
+        top = a & ~0xFFF
+        pages = 0
+        while pages < limit_pages and top >= 0x00100000:
+            start = max(0x00100000, top - B + 0x1000)
+            b = s.t.try_read(start, top - start + 0x84)
+            if not b:
+                # the block's start is unmapped: page by page down from top until unmapped
+                for p in range(top, start - 1, -0x1000):
+                    w = s.t.try_read(p + cro.HDR, 4)
+                    if w is None:
+                        return None
+                    if w == cro.MAGIC:
+                        return p
                 return None
-            w = s.t.try_read(p + cro.HDR, 4)
-            if w == cro.MAGIC:
-                return p
-            if w is None:
-                return None
-            p -= 0x1000
+            for p in range(top, start - 1, -0x1000):
+                if b[p - start + cro.HDR:p - start + cro.HDR + 4] == cro.MAGIC:
+                    return p
+            pages += (top - start) // 0x1000 + 1
+            top = start - 0x1000
         return None
+
+    def osdata(s):
+        """what qXfer:osdata:read offers (logged once; Azahar lists it, its content is unknown)"""
+        if not s.t.c.features.get('qXfer:osdata:read'):
+            return None
+        x = s.t.xfer('osdata', '', limit=0x2000)
+        s.osdata_text = (x or '')[:4000]
+        return x
 
     def find(s, samples=20):
         mods = {}
         s.steps.start('modules: cache')
         mods = s.from_cache()
         s.steps.end('%d cached modules still loaded' % len(mods))
-        if '|static|' in mods and all(n in mods for n in NEEDED if n != 'enemy_fs' and n != 'menu'):
+        if '|static|' in mods:
             s.how['modules'] = 'cache'
-            # enemy_fs may have been loaded since: check the chain cheaply only if it is missing
-            if 'enemy_fs' not in mods:
-                s.steps.start('modules: chain (enemy_fs not cached)')
+            if 'enemy_fs' not in mods or 'main_field' not in mods:
+                s.steps.start('modules: chain (enemy_fs / main_field not cached)')
                 s.chain(mods['|static|'], mods)
                 s.steps.end('%d modules' % len(mods))
             return mods
-        s.steps.start('modules: CPU samples')
+        s.osdata()
+        s.steps.start('modules: thread / stack samples')
         tried = 0
         for i in range(samples):
             if not s.ensure_halted():
@@ -299,50 +364,76 @@ class Locator:
                         break
             if '|static|' in mods:
                 break
-            # let the game run ~100 ms so the CPU is somewhere else next time
+            # let the game run ~100 ms so the threads are somewhere else next time
             s.t.resume_nowait()
             time.sleep(0.1)
-        s.steps.end('%d candidates walked, %d modules' % (tried, len(mods)))
+        s.steps.end('%d candidates walked back, %d modules' % (tried, len(mods)))
         if '|static|' in mods:
             s.how['modules'] = 'samples'
             return mods
-        s.steps.start('modules: page scan (fallback)')
+        s.steps.start('modules: bulk scan (fallback)')
         s.ensure_halted()
         found = s.scan(mods)
         s.steps.end('%d modules' % len(found))
         s.how['modules'] = 'scan'
         return found
 
+    def first_mapped(s, lo, hi):
+        """the first mapped page in (lo, hi] when lo is unmapped and hi mapped (binary search on page starts)"""
+        while hi - lo > 0x1000:
+            mid = ((lo + hi) // 2) & ~0xFFF
+            if mid <= lo:
+                break
+            if s.t.try_read(mid, 4) is None:
+                lo = mid
+            else:
+                hi = mid
+        return hi
+
     def scan(s, mods):
-        regions = s.regions or cro.DEFAULT_REGIONS
-        total = sum((hi - lo) // 0x1000 for lo, hi in regions)
-        done, t0, last = 0, time.time(), 0
+        """bulk reads (one packet a block of pages, the +0x80 words checked locally); unmapped stretches skipped
+        with growing steps (4 KB .. 256 KB), and the start of the next mapped stretch found by binary search, so a
+        block that is only partly mapped is still read from its first mapped page"""
+        regions = s.regions or SCAN_REGIONS
+        B = s.block()
+        total = sum(hi - lo for lo, hi in regions)
+        done, t0, last = 0, time.time(), time.time()
         for lo, hi in regions:
-            blk = lo
-            while blk < hi:
-                if s.t.try_read(blk, 4) is None and s.t.try_read(blk + 0x80000, 4) is None:
-                    blk += 0x100000
-                    done += 0x100
-                    continue
-                for a in range(blk, min(blk + 0x100000, hi), 0x1000):
-                    done += 1
-                    if s.t.try_read(a + cro.HDR, 4) == cro.MAGIC:
-                        m = s._module_known(a)
-                        if m:
-                            if m.name:
-                                mods[m.name] = m
-                            s.chain(m, mods)
-                            if '|static|' in mods:
-                                return mods
-                    if time.time() - last > 5:
-                        last = time.time()
-                        rate = done / max(1e-3, last - t0)
-                        s.say('[probe] scan: %d / %d pages, about %.0f s left' % (done, total, (total - done) / rate))
-                blk += 0x100000
+            a = lo
+            step = 0x1000
+            while a < hi:
+                b = s.t.try_read(a, min(B, hi - a))
+                if b:
+                    for p in range(0, len(b) - 0x83, 0x1000):
+                        if b[p + cro.HDR:p + cro.HDR + 4] == cro.MAGIC:
+                            m = s._module_known(a + p)
+                            if m:
+                                if m.name:
+                                    mods[m.name] = m
+                                s.chain(m, mods)
+                                if '|static|' in mods:
+                                    return mods
+                    a += len(b) & ~0xFFF or 0x1000
+                    done += len(b)
+                    step = 0x1000
+                else:
+                    nxt = min(hi, a + step)
+                    if nxt < hi and s.t.try_read(nxt, 4) is not None:
+                        a = s.first_mapped(a, nxt)
+                    else:
+                        done += nxt - a
+                        a = nxt
+                        step = min(step * 2, 0x40000)
+                if time.time() - last > 5:
+                    last = time.time()
+                    rate = done / max(1e-3, last - t0)
+                    s.say('[probe] scan: 0x%08X, %d%% of the regions, at most about %.0f s left (%d packets so far)'
+                          % (a, 100 * done // max(1, total), (total - done) / max(rate, 1), s.t.c.n_packets))
         return mods
 
     def remember(s, mods):
-        s.cache.d['last_bases'] = [[m.base, getattr(m, 'hash80', None) or hash80(s.t, m.base)] for m in mods.values()]
+        s.cache.d['last_bases'] = [[m.base, getattr(m, 'hash80', None) or hash80(s.t, m.base)] for m in mods.values()
+                                   if m.name in NEEDED]
         for m in mods.values():
             h = getattr(m, 'hash80', None)
             if h and m.name:

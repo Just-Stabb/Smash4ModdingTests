@@ -118,6 +118,21 @@ the user's Windows PC), speaking GDB's Remote Serial Protocol to Azahar's stub i
   against `<kind>.json` / hand_read.json (exact call sites when the trace ran on the update map).
   `--apply-confirmations` writes each kind's `azahar_trace` {confirmed, mismatches, sessions} into hand_read.json;
   fix the mismatches in the hand reads / ports, then mark the entry "confirmed by Azahar trace".
+- **v1.1.0 (the user's v1.0.1 `--rsp-log` of Azahar):** Azahar's stub offers `PacketSize=9800` (one `m` returns up
+  to 0x4BFC bytes), `qXfer:features:read` (target.xml: r0-r15, cpsr regnum 25, d0-d15, fpscr, fpexc),
+  `qXfer:osdata:read`, `qXfer:threads:read`; `vCont?` -> `vCont;c;C` (no vCont step: plain `s`, with a fallback to
+  temporary breakpoints on the next instruction(s) if `s` goes unanswered); `?` -> `T00` (the game halted at
+  connect); unmapped memory -> an empty reply. code 0x00100000-0x01100000 and the heap 0x08000000-0x08600000 hold no
+  CRO; the 1 MB block test skipped the stack's block (partly mapped). v1.0's probe read 4 bytes a packet over every
+  page (~5,300 packets before Ctrl+C) and the game crawled. v1.1.0 (`srtrace/locate.py`): latency measured halted /
+  running (10 reads each), bulk reads (16 KB a packet), the threads' PC / LR / stacks sampled for a CRO pointer and
+  walked back to its header, the RO chain, a bulk scan (linear heaps first; unmapped stretches skipped by growing
+  steps and the next mapped page found by binary search) only as the fallback; names from the catalogue when the
+  loaded static.crs / enemy_fs has the dump's hash block, else the export tables, cached per hash in
+  `smashrun_trace_cache.json`; a kind's state hooks installed when its first one spawns. Cost in the Azahar-like
+  fake (`tests/test_probe_budget.py`, 4.5 ms a packet halted, 16.6 running): cold 66 packets / 0.6 s with a game
+  thread, 102 / 1.5 s when only the scan finds them, 2628 / 20 s with the modules 40 MB into a fully mapped 64 MB
+  linear heap; warm 35 / 0.4 s (21 of them the latency measurement).
 - **Unconfirmed until it runs on Azahar**: that Azahar's stub takes Z0 (else the BKPT fallback, which relies on the
   stub's M flushing the JIT cache), its `g` layout (Citra's assumed: r0-r15, cpsr, d0-d15, fpscr), breakpoints with
   the CPU JIT on, where the RO service maps the CROs (the scan covers 0x00100000-0x10000000 and the linear heaps),

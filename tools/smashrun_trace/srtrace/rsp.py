@@ -264,6 +264,7 @@ class Target:
         s.has_vcont = False
         s.mem_errors = 0
         s.max_read = None
+        s.step_ok = None
 
     # ---------------------------------------------------------------- setup
     def attach(s):
@@ -368,6 +369,44 @@ class Target:
         s.max_read = base
         return base
 
+    def xfer(s, obj, annex='', limit=0x10000):
+        """qXfer:<obj>:read:<annex>:off,len paged; None when the stub doesn't offer it"""
+        data, off = '', 0
+        while off < limit:
+            try:
+                r = s.c.command('qXfer:%s:read:%s:%x,%x' % (obj, annex, off, 0x800))
+            except (RSPError, socket.timeout):
+                return data or None
+            if not r or r[0] not in 'lm':
+                return data or None
+            data += r[1:]
+            off += len(r) - 1
+            if r[0] == 'l':
+                break
+        return data
+
+    def threads(s):
+        """thread ids from qXfer:threads:read (Azahar offers it), else qfThreadInfo / qsThreadInfo"""
+        ids = []
+        if s.c.features.get('qXfer:threads:read'):
+            x = s.xfer('threads') or ''
+            ids = re.findall(r'<thread\s[^>]*id="([^"]+)"', x)
+        if not ids:
+            try:
+                r = s.c.command('qfThreadInfo')
+                while r and r[0] == 'm':
+                    ids += r[1:].split(',')
+                    r = s.c.command('qsThreadInfo')
+            except (RSPError, socket.timeout):
+                pass
+        return [i for i in ids if i]
+
+    def set_thread(s, tid):
+        try:
+            return s.c.command('Hg%s' % tid) == 'OK'
+        except (RSPError, socket.timeout):
+            return False
+
     def resume_nowait(s):
         """continue without waiting for a stop (the probe's 'running' mode, the detach)"""
         if not s.running:
@@ -471,9 +510,61 @@ class Target:
             s.c.send_packet('s' if step else 'c')
         s.running = True
 
-    def step(s, timeout=10.0):
-        s._resume(step=True)
-        return s.wait(timeout)
+    def step(s, timeout=3.0):
+        """one instruction. Plain 's' (Azahar's vCont? offers only c / C, so vCont;s is never used there); a stub that
+        doesn't answer 's' gets temporary breakpoints on the possible next instructions instead"""
+        if s.step_ok is not False:
+            s._resume(step=True)
+            st = s.wait(timeout)
+            if st is not None:
+                s.step_ok = True
+                return st
+            if s.step_ok is None:
+                s.log('[rsp] the stub did not answer a single step: using temporary breakpoints instead')
+                s.step_ok = False
+                s.halt(3.0)                    # stop whatever it is doing, then step the other way
+        return s.step_by_breakpoints()
+
+    def next_pcs(s, pc, thumb):
+        """where the instruction at pc can go next (enough for the functions the tracer hooks: their entries are
+        pushes / moves; branches and returns handled)"""
+        out = {pc + (2 if thumb else 4)}
+        regs = None
+        if thumb:
+            return out
+        b = s.try_read(pc, 4)
+        if not b:
+            return out
+        w = struct.unpack('<I', b)[0]
+        if (w >> 25) & 7 == 5:                                   # B / BL
+            off = w & 0xFFFFFF
+            if off & 0x800000:
+                off -= 1 << 24
+            out.add(pc + 8 + 4 * off)
+        elif w & 0x0FFFFFF0 in (0x012FFF10, 0x012FFF30) or w & 0x0E108000 == 0x08108000 or \
+                w & 0x0FFFFFFF == 0x01A0F00E:                    # bx / blx reg, ldm .. pc, mov pc, lr
+            regs = s.read_regs()
+            out.add(regs.get('r14', 0) & ~1)
+            if w & 0x0FFFFFF0 in (0x012FFF10, 0x012FFF30):
+                out.add(regs.get('r%d' % (w & 0xF), 0) & ~1)
+        elif w & 0x0FFFF000 == 0x051F0000:                      # ldr pc, [pc, #-imm] (import veneer)
+            lit = s.try_read(pc + 8 - (w & 0xFFF), 4)
+            if lit:
+                out.add(struct.unpack('<I', lit)[0] & ~1)
+        return out
+
+    def step_by_breakpoints(s):
+        regs = s.read_regs()
+        pc = regs.get('r15', 0)
+        thumb = bool(regs.get('cpsr', 0) & 0x20)
+        temps = [a for a in s.next_pcs(pc, thumb) if (a & ~1) not in s.bps]
+        for a in temps:
+            s.add_bp(a, thumb)
+        s._resume()
+        st = s.wait(10.0)
+        for a in temps:
+            s.remove_bp(a)
+        return st
 
     def cont(s, pc=None):
         """resume; when stopped on one of our breakpoints, step over it first"""
@@ -483,9 +574,9 @@ class Target:
             s.remove_bp(a)
             st = s.step()
             s.add_bp(a, b['kind'] == 2)
-            if st is not None and st.signal not in (5, None):
+            if st is not None and st.signal not in (5, 0, None):
                 return st
-            if st is not None and st.signal == 5:
+            if st is not None and st.signal in (5, 0):
                 npc = s.pc_of(st)
                 if npc is not None and (npc & ~1) in s.bps and (npc & ~1) != a:
                     return st              # stepped straight onto another breakpoint
@@ -506,9 +597,19 @@ class Target:
         s.running = False
         return StopReply(r)
 
-    def halt(s, timeout=5.0):
+    def halt(s, timeout=5.0, drain=0.15):
+        """interrupt; the first stop reply, then any queued after it (a stop the stub sent on its own before the
+        interrupt reached it, then the interrupt's own) is drained so it can't be read as the next command's reply"""
         s.c.interrupt()
-        return s.wait(timeout)
+        st = s.wait(timeout)
+        if st is not None:
+            while True:
+                more = s.wait(drain)
+                if more is None:
+                    break
+                st = more
+            s.running = False
+        return st
 
     def pc_of(s, stop):
         if 15 in stop.regs:
