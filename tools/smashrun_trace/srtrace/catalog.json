@@ -1,0 +1,4943 @@
+{
+"about": "Framework hooks by mangled name (tools/smashrun_trace/dev/build_data.py catalog). Resolved at run time through the loaded static.crs / CRO export tables.",
+"counts": {
+"ai": 18,
+"article": 4,
+"attack": 14,
+"chest": 13,
+"clock": 3,
+"damage": 10,
+"door": 18,
+"effect": 27,
+"facing": 3,
+"hazard": 136,
+"item": 21,
+"kinetic": 7,
+"leave": 7,
+"motion": 4,
+"param": 4,
+"result": 13,
+"rng": 18,
+"sound": 13,
+"spawn": 12,
+"stage": 2,
+"stat": 8,
+"state": 3
+},
+"hooks": [
+{
+"cat": "stat",
+"expected": {
+"base": "0x00133C44"
+},
+"hot": false,
+"mangled": "_ZN3app12FighterEntry8set_goldEifffff",
+"module": "static",
+"name": "app::FighterEntry::set_gold(int, float, float, float, float, float)",
+"prio": 48,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "stat",
+"expected": {
+"base": "0x0014C6EC"
+},
+"hot": false,
+"mangled": "_ZN3app18FighterInformation17set_power_up_tempENS_22FighterPowerUpTempKindENS_18FighterPowerUpKindEfb",
+"module": "static",
+"name": "app::FighterInformation::set_power_up_temp(app::FighterPowerUpTempKind, app::FighterPowerUpKind, float, bool)",
+"prio": 44,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "sound",
+"expected": {
+"base": "0x00164DF0",
+"update_readme": "0x004C4B84"
+},
+"hot": false,
+"mangled": "_ZN3app15SoundModuleImpl7play_seEjbbbb",
+"module": "static",
+"name": "app::SoundModuleImpl::play_se(unsigned int, bool, bool, bool, bool)",
+"prio": 33,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x00164F44"
+},
+"hot": false,
+"mangled": "_ZN3app16EffectModuleImpl10req_commonEif",
+"module": "static",
+"name": "app::EffectModuleImpl::req_common(int, float)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x001652D0"
+},
+"hot": false,
+"mangled": "_ZN3app16EffectModuleImpl13remove_commonEi",
+"module": "static",
+"name": "app::EffectModuleImpl::remove_common(int)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x001A9BD4"
+},
+"hot": true,
+"mangled": "_ZN3app11GameManager5randiEj",
+"module": "static",
+"name": "app::GameManager::randi(unsigned int)",
+"prio": 3,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x001B9608"
+},
+"hot": true,
+"mangled": "_ZN3app11GameManager5randfEf",
+"module": "static",
+"name": "app::GameManager::randf(float)",
+"prio": 3,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x003A354C"
+},
+"hot": true,
+"mangled": "_ZN3app10GconAttack10pre_updateEf",
+"module": "static",
+"name": "app::GconAttack::pre_update(float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x003A3650"
+},
+"hot": false,
+"mangled": "_ZN3app10GconAttack21set_center_pos_offsetERKN3lib7Vector3E",
+"module": "static",
+"name": "app::GconAttack::set_center_pos_offset(lib::Vector3 const&)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x003A3670"
+},
+"hot": false,
+"mangled": "_ZN3app10GconAttack23set_pos_from_bone_indexEPKc",
+"module": "static",
+"name": "app::GconAttack::set_pos_from_bone_index(char const*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x003A3698"
+},
+"hot": false,
+"mangled": "_ZN3app10GconAttack23set_pos_from_bone_indexEi",
+"module": "static",
+"name": "app::GconAttack::set_pos_from_bone_index(int)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x003A36A0"
+},
+"hot": false,
+"mangled": "_ZN3app10GconAttackC1EPKci",
+"module": "static",
+"name": "app::GconAttack::GconAttack(char const*, int)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x003A3770"
+},
+"hot": false,
+"mangled": "_ZN3app10GconAttackC1EPNS_14StageDrawModelEi",
+"module": "static",
+"name": "app::GconAttack::GconAttack(app::StageDrawModel*, int)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x003A3EEC"
+},
+"hot": true,
+"mangled": "_ZN3app10GconPillar10pre_updateEf",
+"module": "static",
+"name": "app::GconPillar::pre_update(float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x003A3EF0"
+},
+"hot": false,
+"mangled": "_ZN3app10GconPillarC1EN3lib7Vector3ES2_",
+"module": "static",
+"name": "app::GconPillar::GconPillar(lib::Vector3, lib::Vector3)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x003A426C"
+},
+"hot": false,
+"mangled": "_ZN3app10GconTarget11ItemEjectorC1Ev",
+"module": "static",
+"name": "app::GconTarget::ItemEjector::ItemEjector()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x003A4270"
+},
+"hot": false,
+"mangled": "_ZN3app10GconTarget11ItemEjectorD1Ev",
+"module": "static",
+"name": "app::GconTarget::ItemEjector::~ItemEjector()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x003A445C"
+},
+"hot": false,
+"mangled": "_ZN3app10GconTargetC1EPNS_9StageBaseEPNS_16StageSoundPlayerEPKcbffNS_8EffectIdEjfRKN10level_data4PathEfbRKNS0_20ItemEjectionSettingsERNS0_11ItemEjectorE",
+"module": "static",
+"name": "app::GconTarget::GconTarget(app::StageBase*, app::StageSoundPlayer*, char const*, bool, float, float, app::EffectId, unsigned int, float, level_data::Path const&, float, bool, app::GconTarget::ItemEjectionSettings const&, app::GconTarget::ItemEjector&)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x003A4578"
+},
+"hot": false,
+"mangled": "_ZN3app10GconTargetC1EPNS_9StageBaseEPNS_16StageSoundPlayerEPKcbffNS_8EffectIdEjfRKN3lib7Vector2ERKNS0_20ItemEjectionSettingsERNS0_11ItemEjectorE",
+"module": "static",
+"name": "app::GconTarget::GconTarget(app::StageBase*, app::StageSoundPlayer*, char const*, bool, float, float, app::EffectId, unsigned int, float, lib::Vector2 const&, app::GconTarget::ItemEjectionSettings const&, app::GconTarget::ItemEjector&)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x003B2F98"
+},
+"hot": true,
+"mangled": "_ZN3app11GameManager15set_random_seedEj",
+"module": "static",
+"name": "app::GameManager::set_random_seed(unsigned int)",
+"prio": 3,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x003B3060"
+},
+"hot": true,
+"mangled": "_ZN3app11GconCapsule10pre_updateEf",
+"module": "static",
+"name": "app::GconCapsule::pre_update(float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x003B3064"
+},
+"hot": false,
+"mangled": "_ZN3app11GconCapsuleC1EN3lib7Vector3ES2_f",
+"module": "static",
+"name": "app::GconCapsule::GconCapsule(lib::Vector3, lib::Vector3, float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x003B3DC4"
+},
+"hot": false,
+"mangled": "_ZN3app11ItemManager11create_itemERKNS_15ItemCreateParamEb",
+"module": "static",
+"name": "app::ItemManager::create_item(app::ItemCreateParam const&, bool)",
+"prio": 37,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x003B4440",
+"update_readme": "0x003C94C8"
+},
+"hot": false,
+"mangled": "_ZN3app11ItemManager11remove_itemEj",
+"module": "static",
+"name": "app::ItemManager::remove_item(unsigned int)",
+"prio": 37,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x003B50D0"
+},
+"hot": false,
+"mangled": "_ZN3app11ItemManager15lot_create_itemERSt6vectorIPNS_4ItemEN3lib12StlAllocatorIS3_NS4_16StlHeapAllocatorEEEEiRKNS4_7Vector3Ejf",
+"module": "static",
+"name": "app::ItemManager::lot_create_item(std::vector<app::Item*, lib::StlAllocator<app::Item*, lib::StlHeapAllocator> >&, int, lib::Vector3 const&, unsigned int, float)",
+"prio": 37,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x003B5130"
+},
+"hot": false,
+"mangled": "_ZN3app11ItemManager15lot_create_itemEiRKN3lib7Vector3Ejf",
+"module": "static",
+"name": "app::ItemManager::lot_create_item(int, lib::Vector3 const&, unsigned int, float)",
+"prio": 37,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x003B51E0"
+},
+"hot": false,
+"mangled": "_ZN3app11ItemManager15out_pocket_itemEiRKNS_15ItemCreateParamE",
+"module": "static",
+"name": "app::ItemManager::out_pocket_item(int, app::ItemCreateParam const&)",
+"prio": 37,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x003B56F0"
+},
+"hot": false,
+"mangled": "_ZN3app11ItemManager16request_lost_allEv",
+"module": "static",
+"name": "app::ItemManager::request_lost_all()",
+"prio": 37,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x003B5EC4"
+},
+"hot": false,
+"mangled": "_ZN3app11ItemManager19set_lot_delay_frameEi",
+"module": "static",
+"name": "app::ItemManager::set_lot_delay_frame(int)",
+"prio": 37,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x003B6E18"
+},
+"hot": false,
+"mangled": "_ZN3app11ItemManager35lot_create_item_with_arrival_effectERKNS_18ItemLotCreateParamE",
+"module": "static",
+"name": "app::ItemManager::lot_create_item_with_arrival_effect(app::ItemLotCreateParam const&)",
+"prio": 37,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "clock",
+"expected": {
+"base": "0x003BC744"
+},
+"hot": false,
+"mangled": "_ZN3app11RushManager20process_fix_positionEv",
+"module": "static",
+"name": "app::RushManager::process_fix_position()",
+"prio": 1,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "sound",
+"expected": {
+"base": "0x003BF4A0"
+},
+"hot": false,
+"mangled": "_ZN3app11SoundSystem7play_seEj",
+"module": "static",
+"name": "app::SoundSystem::play_se(unsigned int)",
+"prio": 34,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "sound",
+"expected": {
+"base": "0x003BF6C4"
+},
+"hot": false,
+"mangled": "_ZN3app11SoundSystem7play_seEjRN3lib7Vector3E",
+"module": "static",
+"name": "app::SoundSystem::play_se(unsigned int, lib::Vector3&)",
+"prio": 34,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "spawn",
+"expected": {
+"base": "0x003BF820"
+},
+"hot": false,
+"mangled": "_ZN3app11StageBaseFs26request_fieldsmash_gimmickEiib",
+"module": "static",
+"name": "app::StageBaseFs::request_fieldsmash_gimmick(int, int, bool)",
+"prio": 24,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "spawn",
+"expected": {
+"base": "0x003BF854"
+},
+"hot": false,
+"mangled": "_ZN3app11StageBaseFsC1Ev",
+"module": "static",
+"name": "app::StageBaseFs::StageBaseFs()",
+"prio": 24,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x003BFAE0"
+},
+"hot": true,
+"mangled": "_ZN3app11StageRandom3getEj",
+"module": "static",
+"name": "app::StageRandom::get(unsigned int)",
+"prio": 4,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x003BFB2C"
+},
+"hot": true,
+"mangled": "_ZN3app11StageRandom3getEv",
+"module": "static",
+"name": "app::StageRandom::get()",
+"prio": 4,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "damage",
+"expected": {
+"base": "0x003C4314",
+"update_readme": "0x003DA850"
+},
+"hot": false,
+"mangled": "_ZN3app12BehaviorImpl15notify_on_deathEv",
+"module": "static",
+"name": "app::BehaviorImpl::notify_on_death()",
+"prio": 11,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "damage",
+"expected": {
+"base": "0x003C4388",
+"update_readme": "0x003DA8BC"
+},
+"hot": false,
+"mangled": "_ZN3app12BehaviorImpl16notify_on_damageEv",
+"module": "static",
+"name": "app::BehaviorImpl::notify_on_damage()",
+"prio": 11,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "state",
+"expected": {
+"base": "0x003C4EB0",
+"update_readme": "0x003DB3D8"
+},
+"hot": false,
+"mangled": "_ZN3app12BehaviorImpl17change_state_baseEiMS0_FvPNS_8AiModule7AiInputEEMS0_FvvES7_",
+"module": "static",
+"name": "app::BehaviorImpl::change_state_base(int, void (app::BehaviorImpl::*)(app::AiModule::AiInput*), void (app::BehaviorImpl::*)(), void (app::BehaviorImpl::*)())",
+"prio": 10,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "state",
+"expected": {
+"base": "0x003C557C",
+"update_readme": "0x003DBAA0"
+},
+"hot": false,
+"mangled": "_ZN3app12BehaviorImpl19change_common_stateENS0_14BehCommonStateE",
+"module": "static",
+"name": "app::BehaviorImpl::change_common_state(app::BehaviorImpl::BehCommonState)",
+"prio": 10,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "state",
+"expected": {
+"base": "0x003C6F5C",
+"update_readme": "0x003DD678"
+},
+"hot": false,
+"mangled": "_ZN3app12BehaviorImpl27change_state_interrupt_baseEiMS0_FvPNS_8AiModule7AiInputEEMS0_FvvES7_",
+"module": "static",
+"name": "app::BehaviorImpl::change_state_interrupt_base(int, void (app::BehaviorImpl::*)(app::AiModule::AiInput*), void (app::BehaviorImpl::*)(), void (app::BehaviorImpl::*)())",
+"prio": 10,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "leave",
+"expected": {
+"base": "0x003CBCF0"
+},
+"hot": false,
+"mangled": "_ZN3app12EnemyManager14add_kill_countEi",
+"module": "static",
+"name": "app::EnemyManager::add_kill_count(int)",
+"prio": 20,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "leave",
+"expected": {
+"base": "0x003CBD08"
+},
+"hot": false,
+"mangled": "_ZN3app12EnemyManager14cancel_requestEi",
+"module": "static",
+"name": "app::EnemyManager::cancel_request(int)",
+"prio": 20,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "spawn",
+"expected": {
+"base": "0x003CBE90",
+"update_readme": "0x003E3E14"
+},
+"hot": false,
+"mangled": "_ZN3app12EnemyManager14create_requestERKNS_5Enemy16EnemyCreateParamE",
+"module": "static",
+"name": "app::EnemyManager::create_request(app::Enemy::EnemyCreateParam const&)",
+"prio": 21,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "leave",
+"expected": {
+"base": "0x003CD2EC",
+"update_readme": "0x003E53EC"
+},
+"hot": false,
+"mangled": "_ZN3app12EnemyManager18remove_enemy_by_idEj",
+"module": "static",
+"name": "app::EnemyManager::remove_enemy_by_id(unsigned int)",
+"prio": 20,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "spawn",
+"expected": {
+"base": "0x003CD754",
+"update_readme": "0x003E5898"
+},
+"hot": false,
+"mangled": "_ZN3app12EnemyManager19request_defeat_bossENS_9EnemyKindEi",
+"module": "static",
+"name": "app::EnemyManager::request_defeat_boss(app::EnemyKind, int)",
+"prio": 21,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "leave",
+"expected": {
+"base": "0x003CD970"
+},
+"hot": false,
+"mangled": "_ZN3app12EnemyManager20notify_stage_commandEiNS_21EnemyStageCommandTypeE",
+"module": "static",
+"name": "app::EnemyManager::notify_stage_command(int, app::EnemyStageCommandType)",
+"prio": 20,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "leave",
+"expected": {
+"base": "0x003CDB3C",
+"update_readme": "0x003E5C84"
+},
+"hot": false,
+"mangled": "_ZN3app12EnemyManager21set_already_dead_flagEj",
+"module": "static",
+"name": "app::EnemyManager::set_already_dead_flag(unsigned int)",
+"prio": 20,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "spawn",
+"expected": {
+"base": "0x003CDD6C"
+},
+"hot": false,
+"mangled": "_ZN3app12EnemyManager24reserve_request_no_setupENS_9EnemyKindEib",
+"module": "static",
+"name": "app::EnemyManager::reserve_request_no_setup(app::EnemyKind, int, bool)",
+"prio": 21,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x003DEF1C",
+"update_readme": "0x003FEB08"
+},
+"hot": false,
+"mangled": "_ZN3app12FighterEntry21req_power_down_effectEv",
+"module": "static",
+"name": "app::FighterEntry::req_power_down_effect()",
+"prio": 30,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x003EF580"
+},
+"hot": false,
+"mangled": "_ZN3app12NetInterface20set_global_rand_seedEj",
+"module": "static",
+"name": "app::NetInterface::set_global_rand_seed(unsigned int)",
+"prio": 9,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "spawn",
+"expected": {
+"base": "0x003F6844"
+},
+"hot": false,
+"mangled": "_ZN3app11StageBaseFsD1Ev",
+"module": "static",
+"name": "app::StageBaseFs::~StageBaseFs()",
+"prio": 24,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "clock",
+"expected": {
+"base": "0x003F7F8C"
+},
+"hot": false,
+"mangled": "_ZN3app12StageManager20process_fix_positionEv",
+"module": "static",
+"name": "app::StageManager::process_fix_position()",
+"prio": 0,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x004040DC"
+},
+"hot": false,
+"mangled": "_ZN3app13FsItemAutoSet12get_lot_itemERj",
+"module": "static",
+"name": "app::FsItemAutoSet::get_lot_item(unsigned int&)",
+"prio": 39,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x00404190"
+},
+"hot": false,
+"mangled": "_ZN3app13FsItemAutoSet12lot_all_itemEjh",
+"module": "static",
+"name": "app::FsItemAutoSet::lot_all_item(unsigned int, unsigned char)",
+"prio": 39,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x004044F4"
+},
+"hot": false,
+"mangled": "_ZN3app13FsItemAutoSet12set_lot_itemEj",
+"module": "static",
+"name": "app::FsItemAutoSet::set_lot_item(unsigned int)",
+"prio": 39,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x004045C4"
+},
+"hot": false,
+"mangled": "_ZN3app13FsItemAutoSetC1Ev",
+"module": "static",
+"name": "app::FsItemAutoSet::FsItemAutoSet()",
+"prio": 39,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x00404628"
+},
+"hot": false,
+"mangled": "_ZN3app13FsItemAutoSetD1Ev",
+"module": "static",
+"name": "app::FsItemAutoSet::~FsItemAutoSet()",
+"prio": 39,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x00406CE8"
+},
+"hot": false,
+"mangled": "_ZN3app13GconEventDoor10setup_dataEN3lib7Vector3Ejb",
+"module": "static",
+"name": "app::GconEventDoor::setup_data(lib::Vector3, unsigned int, bool)",
+"prio": 50,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "sound",
+"expected": {
+"base": "0x00406E30"
+},
+"hot": false,
+"mangled": "_ZN3app13GconEventDoor14set_sound_dataEPNS_16StageSoundPlayerEjj",
+"module": "static",
+"name": "app::GconEventDoor::set_sound_data(app::StageSoundPlayer*, unsigned int, unsigned int)",
+"prio": 36,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x00406E3C"
+},
+"hot": false,
+"mangled": "_ZN3app13GconEventDoor16set_gimmick_dataEPNS_18stGimmickNomalDataEbjbN3lib7Vector2E",
+"module": "static",
+"name": "app::GconEventDoor::set_gimmick_data(app::stGimmickNomalData*, bool, unsigned int, bool, lib::Vector2)",
+"prio": 50,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x00406ED0"
+},
+"hot": false,
+"mangled": "_ZN3app13GconEventDoor17set_miniroom_exitEv",
+"module": "static",
+"name": "app::GconEventDoor::set_miniroom_exit()",
+"prio": 50,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x00407134"
+},
+"hot": false,
+"mangled": "_ZN3app13GconEventDoor9set_sleepEv",
+"module": "static",
+"name": "app::GconEventDoor::set_sleep()",
+"prio": 50,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x00407180"
+},
+"hot": false,
+"mangled": "_ZN3app13GconEventDoorC1EPKcPNS_16StageSoundPlayerEb",
+"module": "static",
+"name": "app::GconEventDoor::GconEventDoor(char const*, app::StageSoundPlayer*, bool)",
+"prio": 50,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x004071F4"
+},
+"hot": false,
+"mangled": "_ZN3app13GconEventWarp25notify_event_gimmick_areaERN3lib14EventInterfaceE",
+"module": "static",
+"name": "app::GconEventWarp::notify_event_gimmick_area(lib::EventInterface&)",
+"prio": 51,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x004071F8"
+},
+"hot": false,
+"mangled": "_ZN3app13GconEventWarpC1EPKcb",
+"module": "static",
+"name": "app::GconEventWarp::GconEventWarp(char const*, bool)",
+"prio": 51,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00407220"
+},
+"hot": true,
+"mangled": "_ZN3app13GconMoveFloor10pre_updateEf",
+"module": "static",
+"name": "app::GconMoveFloor::pre_update(float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00407390"
+},
+"hot": false,
+"mangled": "_ZN3app13GconMoveFloor12update_edgesEv",
+"module": "static",
+"name": "app::GconMoveFloor::update_edges()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004073C8"
+},
+"hot": false,
+"mangled": "_ZN3app13GconMoveFloor14set_bone_indexEPKc",
+"module": "static",
+"name": "app::GconMoveFloor::set_bone_index(char const*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004073F0"
+},
+"hot": false,
+"mangled": "_ZN3app13GconMoveFloor5sleepEv",
+"module": "static",
+"name": "app::GconMoveFloor::sleep()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00407450"
+},
+"hot": false,
+"mangled": "_ZN3app13GconMoveFloor7wake_upEv",
+"module": "static",
+"name": "app::GconMoveFloor::wake_up()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004074B0"
+},
+"hot": false,
+"mangled": "_ZN3app13GconMoveFloor9set_transEN3lib7Vector3E",
+"module": "static",
+"name": "app::GconMoveFloor::set_trans(lib::Vector3)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00407530"
+},
+"hot": false,
+"mangled": "_ZN3app13GconMoveFloorC1EPKcbjS2_",
+"module": "static",
+"name": "app::GconMoveFloor::GconMoveFloor(char const*, bool, unsigned int, char const*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x004076A0"
+},
+"hot": true,
+"mangled": "_ZN3app13GconMultiDoor11entry_chackEi",
+"module": "static",
+"name": "app::GconMultiDoor::entry_chack(int)",
+"prio": 50,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x00407738"
+},
+"hot": true,
+"mangled": "_ZN3app13GconMultiDoor13get_entry_numEv",
+"module": "static",
+"name": "app::GconMultiDoor::get_entry_num()",
+"prio": 50,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x00407794"
+},
+"hot": true,
+"mangled": "_ZN3app13GconMultiDoor13get_entry_posEj",
+"module": "static",
+"name": "app::GconMultiDoor::get_entry_pos(unsigned int)",
+"prio": 50,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x00407804"
+},
+"hot": false,
+"mangled": "_ZN3app13GconMultiDoor14set_entry_dataENS0_11stEntryDataE",
+"module": "static",
+"name": "app::GconMultiDoor::set_entry_data(app::GconMultiDoor::stEntryData)",
+"prio": 50,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x00407B88"
+},
+"hot": false,
+"mangled": "_ZN3app13GconMultiDoor9set_entryEbi",
+"module": "static",
+"name": "app::GconMultiDoor::set_entry(bool, int)",
+"prio": 50,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x00407D20"
+},
+"hot": false,
+"mangled": "_ZN3app13GconMultiDoorC1EPNS_16StageSoundPlayerEPN3lib7Vector2E",
+"module": "static",
+"name": "app::GconMultiDoor::GconMultiDoor(app::StageSoundPlayer*, lib::Vector2*)",
+"prio": 50,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x0040819C"
+},
+"hot": true,
+"mangled": "_ZN3app13GconShapeLite10pre_updateEf",
+"module": "static",
+"name": "app::GconShapeLite::pre_update(float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00408284"
+},
+"hot": false,
+"mangled": "_ZN3app13GconShapeLite11on_activateEv",
+"module": "static",
+"name": "app::GconShapeLite::on_activate()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004082EC"
+},
+"hot": false,
+"mangled": "_ZN3app13GconShapeLite16initialize_shapeEv",
+"module": "static",
+"name": "app::GconShapeLite::initialize_shape()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00408364"
+},
+"hot": false,
+"mangled": "_ZN3app13GconShapeLiteC1EPNS_14StageDrawModelERN3lib8Matrix34EPKNS_15StageShapeInfo3ES8_S8_j",
+"module": "static",
+"name": "app::GconShapeLite::GconShapeLite(app::StageDrawModel*, lib::Matrix34&, app::StageShapeInfo3 const*, app::StageShapeInfo3 const*, app::StageShapeInfo3 const*, unsigned int)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x0040C740",
+"update_readme": "0x00432860"
+},
+"hot": false,
+"mangled": "_ZN3app11ItemManager13ejection_itemERKNS_17ItemEjectionParamE",
+"module": "static",
+"name": "app::ItemManager::ejection_item(app::ItemEjectionParam const&)",
+"prio": 37,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00434030"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickAreaModuleImpl18reset_gimmick_dataEPNS_18stGimmickNomalDataEj",
+"module": "static",
+"name": "app::GimmickAreaModuleImpl::reset_gimmick_data(app::stGimmickNomalData*, unsigned int)",
+"prio": 55,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "spawn",
+"expected": {
+"base": "0x004398B0",
+"update_readme": "0x00466228"
+},
+"hot": false,
+"mangled": "_ZN3app14EnemyGenerator12create_childEiiRKN3lib7Vector3Effifb",
+"module": "static",
+"name": "app::EnemyGenerator::create_child(int, int, lib::Vector3 const&, float, float, int, float, bool)",
+"prio": 22,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "spawn",
+"expected": {
+"base": "0x0043A588",
+"update_readme": "0x00466F14"
+},
+"hot": false,
+"mangled": "_ZN3app14EnemyGenerator19get_next_enemy_kindEiib",
+"module": "static",
+"name": "app::EnemyGenerator::get_next_enemy_kind(int, int, bool)",
+"prio": 22,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "spawn",
+"expected": {
+"base": "0x0043ABD0",
+"update_readme": "0x0046755C"
+},
+"hot": false,
+"mangled": "_ZN3app14EnemyGenerator36get_remeine_gen_count_from_appear_idEiib",
+"module": "static",
+"name": "app::EnemyGenerator::get_remeine_gen_count_from_appear_id(int, int, bool)",
+"prio": 22,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "stat",
+"expected": {
+"base": "0x00441FCC"
+},
+"hot": false,
+"mangled": "_ZN3app14FighterManager23set_power_up_streetpassEiffffff",
+"module": "static",
+"name": "app::FighterManager::set_power_up_streetpass(int, float, float, float, float, float, float)",
+"prio": 45,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00444628"
+},
+"hot": true,
+"mangled": "_ZN3app14GconDamageBase10pre_updateEf",
+"module": "static",
+"name": "app::GconDamageBase::pre_update(float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00444678"
+},
+"hot": false,
+"mangled": "_ZN3app14GconDamageBase12set_positionERKN3lib7Vector3E",
+"module": "static",
+"name": "app::GconDamageBase::set_position(lib::Vector3 const&)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x0044468C"
+},
+"hot": false,
+"mangled": "_ZN3app14GconDamageBaseC1EPKNS_20StageDamageShapeInfoERKN3lib7Vector3E",
+"module": "static",
+"name": "app::GconDamageBase::GconDamageBase(app::StageDamageShapeInfo const*, lib::Vector3 const&)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004450FC"
+},
+"hot": false,
+"mangled": "_ZN3app14GconMultiBlock29get_additional_resources_infoEjRjS1_",
+"module": "static",
+"name": "app::GconMultiBlock::get_additional_resources_info(unsigned int, unsigned int&, unsigned int&)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00445320"
+},
+"hot": false,
+"mangled": "_ZN3app14GconMultiBlock6Entity8activateEv",
+"module": "static",
+"name": "app::GconMultiBlock::Entity::activate()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00445480"
+},
+"hot": false,
+"mangled": "_ZN3app14GconMultiBlock8generateERKN3lib7Vector2E",
+"module": "static",
+"name": "app::GconMultiBlock::generate(lib::Vector2 const&)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x0044560C"
+},
+"hot": false,
+"mangled": "_ZN3app14GconMultiBlockC1EPNS_9StageBaseERKN3lib4RectEffPKcS8_PNS_16StageSoundPlayerE",
+"module": "static",
+"name": "app::GconMultiBlock::GconMultiBlock(app::StageBase*, lib::Rect const&, float, float, char const*, char const*, app::StageSoundPlayer*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x004478C8"
+},
+"hot": false,
+"mangled": "_ZN3app14ItemModuleImpl10throw_itemEfffibf",
+"module": "static",
+"name": "app::ItemModuleImpl::throw_item(float, float, float, int, bool, float)",
+"prio": 38,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x0044A4DC"
+},
+"hot": false,
+"mangled": "_ZN3app14ItemModuleImpl9drop_itemEffi",
+"module": "static",
+"name": "app::ItemModuleImpl::drop_item(float, float, int)",
+"prio": 38,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x0044A628"
+},
+"hot": false,
+"mangled": "_ZN3app14ItemModuleImpl9have_itemEPNS_4ItemEibbb",
+"module": "static",
+"name": "app::ItemModuleImpl::have_item(app::Item*, int, bool, bool, bool)",
+"prio": 38,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x0044A72C"
+},
+"hot": false,
+"mangled": "_ZN3app14ItemModuleImpl9have_itemEjPNS_4ItemEibbb",
+"module": "static",
+"name": "app::ItemModuleImpl::have_item(unsigned int, app::Item*, int, bool, bool, bool)",
+"prio": 38,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004739FC"
+},
+"hot": false,
+"mangled": "_ZN3app15GconEventBarrel15set_barrel_dataEPNS_19stGimmickBarrelDataE",
+"module": "static",
+"name": "app::GconEventBarrel::set_barrel_data(app::stGimmickBarrelData*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004742B0"
+},
+"hot": false,
+"mangled": "_ZN3app15GconEventBarrel8is_entryEv",
+"module": "static",
+"name": "app::GconEventBarrel::is_entry()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00474330"
+},
+"hot": false,
+"mangled": "_ZN3app15GconEventBarrel8set_exitEv",
+"module": "static",
+"name": "app::GconEventBarrel::set_exit()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004748B8"
+},
+"hot": false,
+"mangled": "_ZN3app15GconEventBarrel9set_curveEffhjb",
+"module": "static",
+"name": "app::GconEventBarrel::set_curve(float, float, unsigned char, unsigned int, bool)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00474984"
+},
+"hot": false,
+"mangled": "_ZN3app15GconEventBarrel9set_entryEf",
+"module": "static",
+"name": "app::GconEventBarrel::set_entry(float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004749B0"
+},
+"hot": false,
+"mangled": "_ZN3app15GconEventBarrelC1EPKcb",
+"module": "static",
+"name": "app::GconEventBarrel::GconEventBarrel(char const*, bool)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00475370"
+},
+"hot": false,
+"mangled": "_ZN3app15GconEventSpring5setupEN3lib7Vector3Efb",
+"module": "static",
+"name": "app::GconEventSpring::setup(lib::Vector3, float, bool)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00475510"
+},
+"hot": false,
+"mangled": "_ZN3app15GconEventSpringC1EPKcbS2_b",
+"module": "static",
+"name": "app::GconEventSpring::GconEventSpring(char const*, bool, char const*, bool)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x0047565C"
+},
+"hot": false,
+"mangled": "_ZN3app15GconMultiBarrel14set_entry_dataENS_27GimmickMultiBarrelEntryDataE",
+"module": "static",
+"name": "app::GconMultiBarrel::set_entry_data(app::GimmickMultiBarrelEntryData)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00475928"
+},
+"hot": false,
+"mangled": "_ZN3app15GconMultiBarrel9set_entryEbi",
+"module": "static",
+"name": "app::GconMultiBarrel::set_entry(bool, int)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00475A80"
+},
+"hot": false,
+"mangled": "_ZN3app15GconMultiBarrelC1EPNS_16StageSoundPlayerE",
+"module": "static",
+"name": "app::GconMultiBarrel::GconMultiBarrel(app::StageSoundPlayer*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00475CFC"
+},
+"hot": false,
+"mangled": "_ZN3app15GconMultiSpring14set_entry_dataENS0_11stEntryDataE",
+"module": "static",
+"name": "app::GconMultiSpring::set_entry_data(app::GconMultiSpring::stEntryData)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00475EF0"
+},
+"hot": false,
+"mangled": "_ZN3app15GconMultiSpringC1EPNS_16StageSoundPlayerE",
+"module": "static",
+"name": "app::GconMultiSpring::GconMultiSpring(app::StageSoundPlayer*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "sound",
+"expected": {
+"base": "0x0048C634",
+"update_readme": "0x004C3148"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior7stop_seEii",
+"module": "static",
+"name": "app::Behavior::stop_se(int, int)",
+"prio": 32,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "sound",
+"expected": {
+"base": "0x0048F0C4",
+"update_readme": "0x004C4D9C"
+},
+"hot": false,
+"mangled": "_ZN3app15SoundModuleImpl7stop_seEjj",
+"module": "static",
+"name": "app::SoundModuleImpl::stop_se(unsigned int, unsigned int)",
+"prio": 33,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00492834"
+},
+"hot": false,
+"mangled": "_ZN3app15StageDangerZone10set_offsetERKN3lib7Vector2E",
+"module": "static",
+"name": "app::StageDangerZone::set_offset(lib::Vector2 const&)",
+"prio": 56,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004928E0"
+},
+"hot": false,
+"mangled": "_ZN3app15StageDangerZone6enableEv",
+"module": "static",
+"name": "app::StageDangerZone::enable()",
+"prio": 56,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00492998"
+},
+"hot": false,
+"mangled": "_ZN3app15StageDangerZone7disableEv",
+"module": "static",
+"name": "app::StageDangerZone::disable()",
+"prio": 56,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004929D8"
+},
+"hot": false,
+"mangled": "_ZN3app15StageDangerZone8set_zoneERKN3lib7Vector2ES4_",
+"module": "static",
+"name": "app::StageDangerZone::set_zone(lib::Vector2 const&, lib::Vector2 const&)",
+"prio": 56,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00492A8C"
+},
+"hot": false,
+"mangled": "_ZN3app15StageDangerZoneC1ENS0_15StageDangerKindE",
+"module": "static",
+"name": "app::StageDangerZone::StageDangerZone(app::StageDangerZone::StageDangerKind)",
+"prio": 56,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00492AE0"
+},
+"hot": false,
+"mangled": "_ZN3app15StageDangerZoneC1EffffNS0_15StageDangerKindE",
+"module": "static",
+"name": "app::StageDangerZone::StageDangerZone(float, float, float, float, app::StageDangerZone::StageDangerKind)",
+"prio": 56,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00492B24"
+},
+"hot": false,
+"mangled": "_ZN3app15StageDangerZoneD1Ev",
+"module": "static",
+"name": "app::StageDangerZone::~StageDangerZone()",
+"prio": 56,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "attack",
+"expected": {
+"base": "0x00495480",
+"update_readme_candidates": [
+"0x004CB5D4",
+"0x004CB7E8"
+]
+},
+"hot": false,
+"mangled": "_ZN3app16AttackModuleImpl10set_attackEii",
+"module": "static",
+"name": "app::AttackModuleImpl::set_attack(int, int)",
+"prio": 26,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "attack",
+"expected": {
+"base": "0x00495694",
+"update_readme_candidates": [
+"0x004CB5D4",
+"0x004CB7E8"
+]
+},
+"hot": false,
+"mangled": "_ZN3app16AttackModuleImpl10set_attackEiiRKNS_10AttackDataE",
+"module": "static",
+"name": "app::AttackModuleImpl::set_attack(int, int, app::AttackData const&)",
+"prio": 26,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "attack",
+"expected": {
+"base": "0x00495768",
+"update_readme": "0x004CB8B8"
+},
+"hot": true,
+"mangled": "_ZN3app16AttackModuleImpl10set_offsetEiRKN3lib7Vector3E",
+"module": "static",
+"name": "app::AttackModuleImpl::set_offset(int, lib::Vector3 const&)",
+"prio": 26,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "attack",
+"expected": {
+"base": "0x0049579C",
+"update_readme": "0x004CB8E8"
+},
+"hot": true,
+"mangled": "_ZN3app16AttackModuleImpl10set_vectorEii",
+"module": "static",
+"name": "app::AttackModuleImpl::set_vector(int, int)",
+"prio": 26,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "attack",
+"expected": {
+"base": "0x004957B8"
+},
+"hot": true,
+"mangled": "_ZN3app16AttackModuleImpl11set_offset2EiRKN3lib7Vector3E",
+"module": "static",
+"name": "app::AttackModuleImpl::set_offset2(int, lib::Vector3 const&)",
+"prio": 26,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "attack",
+"expected": {
+"base": "0x0049822C",
+"update_readme": "0x004CE5AC"
+},
+"hot": false,
+"mangled": "_ZN3app16AttackModuleImpl5clearEib",
+"module": "static",
+"name": "app::AttackModuleImpl::clear(int, bool)",
+"prio": 26,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "attack",
+"expected": {
+"base": "0x00498D80"
+},
+"hot": false,
+"mangled": "_ZN3app16AttackModuleImpl8set_sizeEif",
+"module": "static",
+"name": "app::AttackModuleImpl::set_size(int, float)",
+"prio": 26,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "attack",
+"expected": {
+"base": "0x00499198",
+"update_readme": "0x004CF6A0"
+},
+"hot": false,
+"mangled": "_ZN3app16AttackModuleImpl9clear_allEv",
+"module": "static",
+"name": "app::AttackModuleImpl::clear_all()",
+"prio": 26,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "attack",
+"expected": {
+"base": "0x00499278"
+},
+"hot": false,
+"mangled": "_ZN3app16AttackModuleImpl9set_powerEifb",
+"module": "static",
+"name": "app::AttackModuleImpl::set_power(int, float, bool)",
+"prio": 26,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x0049F294",
+"update_readme": "0x004D5BDC"
+},
+"hot": false,
+"mangled": "_ZN3app16EffectModuleImpl10detach_allEj",
+"module": "static",
+"name": "app::EffectModuleImpl::detach_all(unsigned int)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x0049F2D8",
+"update_readme": "0x004D5E2C"
+},
+"hot": false,
+"mangled": "_ZN3app16EffectModuleImpl10req_followEijRKN3lib7Vector3ES4_fbjiiiib",
+"module": "static",
+"name": "app::EffectModuleImpl::req_follow(int, unsigned int, lib::Vector3 const&, lib::Vector3 const&, float, bool, unsigned int, int, int, int, int, bool)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x0049FC64",
+"update_readme": "0x004D6B18"
+},
+"hot": false,
+"mangled": "_ZN3app16EffectModuleImpl13set_rate_lastEf",
+"module": "static",
+"name": "app::EffectModuleImpl::set_rate_last(float)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x0049FCA4",
+"update_readme": "0x004D6B4C"
+},
+"hot": false,
+"mangled": "_ZN3app16EffectModuleImpl14set_alpha_lastEf",
+"module": "static",
+"name": "app::EffectModuleImpl::set_alpha_last(float)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x004A2420",
+"update_readme": "0x004D96A8"
+},
+"hot": false,
+"mangled": "_ZN3app16EffectModuleImpl25req_after_image_no_parentEjjjRKN3lib7Vector3ES4_jijS4_S4_fhhfiii",
+"module": "static",
+"name": "app::EffectModuleImpl::req_after_image_no_parent(unsigned int, unsigned int, unsigned int, lib::Vector3 const&, lib::Vector3 const&, unsigned int, int, unsigned int, lib::Vector3 const&, lib::Vector3 const&, float, unsigned char, unsigned char, float, int, int, int)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x004A2634",
+"update_readme_candidates": [
+"0x004D98CC",
+"0x004D9A98"
+]
+},
+"hot": false,
+"mangled": "_ZN3app16EffectModuleImpl3reqEiRKN3lib7Vector3ES4_fjibi",
+"module": "static",
+"name": "app::EffectModuleImpl::req(int, lib::Vector3 const&, lib::Vector3 const&, float, unsigned int, int, bool, int)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x004A27FC",
+"update_readme_candidates": [
+"0x004D98CC",
+"0x004D9A98"
+]
+},
+"hot": false,
+"mangled": "_ZN3app16EffectModuleImpl3reqEijRKN3lib7Vector3ES4_fS4_S4_bji",
+"module": "static",
+"name": "app::EffectModuleImpl::req(int, unsigned int, lib::Vector3 const&, lib::Vector3 const&, float, lib::Vector3 const&, lib::Vector3 const&, bool, unsigned int, int)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x004A3CFC",
+"update_readme": "0x004DAF8C"
+},
+"hot": true,
+"mangled": "_ZN3app16EffectModuleImpl7set_posEjRKN3lib7Vector3E",
+"module": "static",
+"name": "app::EffectModuleImpl::set_pos(unsigned int, lib::Vector3 const&)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x004A3D08",
+"update_readme": "0x004DAF98"
+},
+"hot": true,
+"mangled": "_ZN3app16EffectModuleImpl7set_rotEjRKN3lib7Vector3E",
+"module": "static",
+"name": "app::EffectModuleImpl::set_rot(unsigned int, lib::Vector3 const&)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x004A41C0",
+"update_readme": "0x004DB438"
+},
+"hot": false,
+"mangled": "_ZN3app16EffectModuleImpl9set_scaleEjRKN3lib7Vector3E",
+"module": "static",
+"name": "app::EffectModuleImpl::set_scale(unsigned int, lib::Vector3 const&)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "spawn",
+"expected": {
+"base": "0x004DC9D4"
+},
+"hot": false,
+"mangled": "_ZN3app16StageEnemyLayout18find_appear_regionERKN10level_data3TagE",
+"module": "static",
+"name": "app::StageEnemyLayout::find_appear_region(level_data::Tag const&)",
+"prio": 23,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "spawn",
+"expected": {
+"base": "0x004DCA10"
+},
+"hot": false,
+"mangled": "_ZN3app16StageEnemyLayout19find_trigger_regionERKN10level_data3TagE",
+"module": "static",
+"name": "app::StageEnemyLayout::find_trigger_region(level_data::Tag const&)",
+"prio": 23,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "sound",
+"expected": {
+"base": "0x004DCBB0"
+},
+"hot": false,
+"mangled": "_ZN3app16StageSoundPlayer12notify_eventEjRKN3lib7Vector3E",
+"module": "static",
+"name": "app::StageSoundPlayer::notify_event(unsigned int, lib::Vector3 const&)",
+"prio": 35,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "sound",
+"expected": {
+"base": "0x004DCC28"
+},
+"hot": false,
+"mangled": "_ZN3app16StageSoundPlayer12notify_eventEji",
+"module": "static",
+"name": "app::StageSoundPlayer::notify_event(unsigned int, int)",
+"prio": 35,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "sound",
+"expected": {
+"base": "0x004DCD20"
+},
+"hot": false,
+"mangled": "_ZN3app16StageSoundPlayer15register_objectERNS_21StageSoundObjectParamE",
+"module": "static",
+"name": "app::StageSoundPlayer::register_object(app::StageSoundObjectParam&)",
+"prio": 35,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "sound",
+"expected": {
+"base": "0x004DCD40"
+},
+"hot": false,
+"mangled": "_ZN3app16StageSoundPlayer17unregister_objectEi",
+"module": "static",
+"name": "app::StageSoundPlayer::unregister_object(int)",
+"prio": 35,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "sound",
+"expected": {
+"base": "0x004DCD7C"
+},
+"hot": true,
+"mangled": "_ZN3app16StageSoundPlayer19set_object_positionEiRKN3lib7Vector3E",
+"module": "static",
+"name": "app::StageSoundPlayer::set_object_position(int, lib::Vector3 const&)",
+"prio": 35,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "chest",
+"expected": {
+"base": "0x004F0120",
+"update_readme": "0x00528BA0"
+},
+"hot": false,
+"mangled": "_ZN3app17FieldSmashManager29get_treasurebox_ejection_dataEiPNS_33FieldSmashTreasureboxEjectionDataE",
+"module": "static",
+"name": "app::FieldSmashManager::get_treasurebox_ejection_data(int, app::FieldSmashTreasureboxEjectionData*)",
+"prio": 42,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "sound",
+"expected": {
+"base": "0x004F1CD4"
+},
+"hot": false,
+"mangled": "_ZN3app17GconEventTreasure14set_sound_dataEPNS_16StageSoundPlayerEj",
+"module": "static",
+"name": "app::GconEventTreasure::set_sound_data(app::StageSoundPlayer*, unsigned int)",
+"prio": 36,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "chest",
+"expected": {
+"base": "0x004F1EF0"
+},
+"hot": false,
+"mangled": "_ZN3app17GconEventTreasure5setupEN3lib7Vector3Efb",
+"module": "static",
+"name": "app::GconEventTreasure::setup(lib::Vector3, float, bool)",
+"prio": 43,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "chest",
+"expected": {
+"base": "0x004F2794"
+},
+"hot": false,
+"mangled": "_ZN3app17GconEventTreasure9set_entryEb",
+"module": "static",
+"name": "app::GconEventTreasure::set_entry(bool)",
+"prio": 43,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "chest",
+"expected": {
+"base": "0x004F27B4"
+},
+"hot": false,
+"mangled": "_ZN3app17GconEventTreasure9set_sleepEv",
+"module": "static",
+"name": "app::GconEventTreasure::set_sleep()",
+"prio": 43,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "chest",
+"expected": {
+"base": "0x004F27F8"
+},
+"hot": false,
+"mangled": "_ZN3app17GconEventTreasureC1EPKcb",
+"module": "static",
+"name": "app::GconEventTreasure::GconEventTreasure(char const*, bool)",
+"prio": 43,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "chest",
+"expected": {
+"base": "0x004F290C"
+},
+"hot": true,
+"mangled": "_ZN3app17GconMultiTreasure11entry_chackEi",
+"module": "static",
+"name": "app::GconMultiTreasure::entry_chack(int)",
+"prio": 43,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "chest",
+"expected": {
+"base": "0x004F2994"
+},
+"hot": true,
+"mangled": "_ZN3app17GconMultiTreasure13get_entry_numEv",
+"module": "static",
+"name": "app::GconMultiTreasure::get_entry_num()",
+"prio": 43,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "chest",
+"expected": {
+"base": "0x004F29D4"
+},
+"hot": true,
+"mangled": "_ZN3app17GconMultiTreasure13get_entry_posEj",
+"module": "static",
+"name": "app::GconMultiTreasure::get_entry_pos(unsigned int)",
+"prio": 43,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "chest",
+"expected": {
+"base": "0x004F2A30"
+},
+"hot": false,
+"mangled": "_ZN3app17GconMultiTreasure14set_entry_dataENS0_11stEntryDataE",
+"module": "static",
+"name": "app::GconMultiTreasure::set_entry_data(app::GconMultiTreasure::stEntryData)",
+"prio": 43,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "chest",
+"expected": {
+"base": "0x004F2B10"
+},
+"hot": true,
+"mangled": "_ZN3app17GconMultiTreasure17get_entry_is_openEj",
+"module": "static",
+"name": "app::GconMultiTreasure::get_entry_is_open(unsigned int)",
+"prio": 43,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "chest",
+"expected": {
+"base": "0x004F2D4C"
+},
+"hot": false,
+"mangled": "_ZN3app17GconMultiTreasure9set_entryEbi",
+"module": "static",
+"name": "app::GconMultiTreasure::set_entry(bool, int)",
+"prio": 43,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "chest",
+"expected": {
+"base": "0x004F2E50"
+},
+"hot": false,
+"mangled": "_ZN3app17GconMultiTreasureC1EPNS_16StageSoundPlayerE",
+"module": "static",
+"name": "app::GconMultiTreasure::GconMultiTreasure(app::StageSoundPlayer*)",
+"prio": 43,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004F3070"
+},
+"hot": false,
+"mangled": "_ZN3app17GconSearchCapsuleC1EN3lib7Vector3ES2_f",
+"module": "static",
+"name": "app::GconSearchCapsule::GconSearchCapsule(lib::Vector3, lib::Vector3, float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004F31D0"
+},
+"hot": true,
+"mangled": "_ZN3app17GconTransformable10pre_updateEf",
+"module": "static",
+"name": "app::GconTransformable::pre_update(float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004F33A4"
+},
+"hot": false,
+"mangled": "_ZN3app17GconTransformable11on_activateEv",
+"module": "static",
+"name": "app::GconTransformable::on_activate()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004F33D8"
+},
+"hot": false,
+"mangled": "_ZN3app17GconTransformable13on_deactivateEv",
+"module": "static",
+"name": "app::GconTransformable::on_deactivate()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004F3408"
+},
+"hot": false,
+"mangled": "_ZN3app17GconTransformable14add_draw_modelEPNS_14StageDrawModelE",
+"module": "static",
+"name": "app::GconTransformable::add_draw_model(app::StageDrawModel*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004F34A4"
+},
+"hot": false,
+"mangled": "_ZN3app17GconTransformable15set_ground_edgeEPKNS_25StageGroundEdgeCollectionE",
+"module": "static",
+"name": "app::GconTransformable::set_ground_edge(app::StageGroundEdgeCollection const*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004F34AC"
+},
+"hot": false,
+"mangled": "_ZN3app17GconTransformable16set_trans_sourceEPNS_27GimmickTransformationSourceE",
+"module": "static",
+"name": "app::GconTransformable::set_trans_source(app::GimmickTransformationSource*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004F34B4"
+},
+"hot": false,
+"mangled": "_ZN3app17GconTransformable21set_item_popup_regionEPKNS_30StageItemPopupRegionCollectionE",
+"module": "static",
+"name": "app::GconTransformable::set_item_popup_region(app::StageItemPopupRegionCollection const*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004F34C4"
+},
+"hot": false,
+"mangled": "_ZN3app17GconTransformable22set_draw_model_visibleEb",
+"module": "static",
+"name": "app::GconTransformable::set_draw_model_visible(bool)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004F34D8"
+},
+"hot": false,
+"mangled": "_ZN3app17GconTransformable22set_ground_edge_ignoreEb",
+"module": "static",
+"name": "app::GconTransformable::set_ground_edge_ignore(bool)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004F34EC"
+},
+"hot": false,
+"mangled": "_ZN3app17GconTransformableC1ENS_11GimmickKindEjj",
+"module": "static",
+"name": "app::GconTransformable::GconTransformable(app::GimmickKind, unsigned int, unsigned int)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x004F3600"
+},
+"hot": false,
+"mangled": "_ZN3app17GconTransformableD1Ev",
+"module": "static",
+"name": "app::GconTransformable::~GconTransformable()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "param",
+"expected": {
+"base": "0x004F5FCC",
+"update_readme": "0x0052EABC"
+},
+"hot": false,
+"mangled": "_ZN3app17ItemParamAccessor10game_paramEv",
+"module": "static",
+"name": "app::ItemParamAccessor::game_param()",
+"prio": 59,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "param",
+"expected": {
+"base": "0x004F6654"
+},
+"hot": false,
+"mangled": "_ZN3app17ItemParamAccessor30get_state_param_buffer_addressENS_8ItemKindEj",
+"module": "static",
+"name": "app::ItemParamAccessor::get_state_param_buffer_address(app::ItemKind, unsigned int)",
+"prio": 59,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x004F9F28"
+},
+"hot": true,
+"mangled": "_ZN3app17ItemParamAccessor9get_paramEiNS_12ItemParamIntE",
+"module": "static",
+"name": "app::ItemParamAccessor::get_param(int, app::ItemParamInt)",
+"prio": 41,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x004F9F6C"
+},
+"hot": true,
+"mangled": "_ZN3app17ItemParamAccessor9get_paramEiNS_14ItemParamFloatE",
+"module": "static",
+"name": "app::ItemParamAccessor::get_param(int, app::ItemParamFloat)",
+"prio": 41,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x0051FAB4"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase23as_set_target_mask_selfENS_15CollisionTargetEj",
+"module": "static",
+"name": "app::GimmickControllerBase::as_set_target_mask_self(app::CollisionTarget, unsigned int)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x0051FC7C"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase27as_set_target_mask_opponentENS_15CollisionTargetEj",
+"module": "static",
+"name": "app::GimmickControllerBase::as_set_target_mask_opponent(app::CollisionTarget, unsigned int)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x00521C20"
+},
+"hot": false,
+"mangled": "_ZN3app18DamageEffectorImpl23req_common_effect_paramERNS_26BattleObjectModuleAccessorEfffRKNS_10AttackDataERKNS_6HitLogE",
+"module": "static",
+"name": "app::DamageEffectorImpl::req_common_effect_param(app::BattleObjectModuleAccessor&, float, float, float, app::AttackData const&, app::HitLog const&)",
+"prio": 31,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x00521C38"
+},
+"hot": false,
+"mangled": "_ZN3app18DamageEffectorImpl23req_common_effect_paramERNS_26BattleObjectModuleAccessorEfffRKNS_10AttackDataERKNS_6HitLogEffffffff",
+"module": "static",
+"name": "app::DamageEffectorImpl::req_common_effect_param(app::BattleObjectModuleAccessor&, float, float, float, app::AttackData const&, app::HitLog const&, float, float, float, float, float, float, float, float)",
+"prio": 31,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "param",
+"expected": {
+"base": "0x0052372C"
+},
+"hot": false,
+"mangled": "_ZN3app18EnemyParamAccessor22get_sub_model_data_setEi",
+"module": "static",
+"name": "app::EnemyParamAccessor::get_sub_model_data_set(int)",
+"prio": 58,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "stat",
+"expected": {
+"base": "0x00527D34"
+},
+"hot": false,
+"mangled": "_ZN3app18FighterInformation14power_up_levelENS_18FighterPowerUpKindEb",
+"module": "static",
+"name": "app::FighterInformation::power_up_level(app::FighterPowerUpKind, bool)",
+"prio": 44,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "stat",
+"expected": {
+"base": "0x00527FF0",
+"update_readme": "0x00562EFC"
+},
+"hot": false,
+"mangled": "_ZN3app18FighterInformation18set_power_up_pointENS_18FighterPowerUpKindEfb",
+"module": "static",
+"name": "app::FighterInformation::set_power_up_point(app::FighterPowerUpKind, float, bool)",
+"prio": 44,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "stat",
+"expected": {
+"base": "0x0052C108"
+},
+"hot": false,
+"mangled": "_ZN3app18GlobalParameterLib8add_goldEj",
+"module": "static",
+"name": "app::GlobalParameterLib::add_gold(unsigned int)",
+"prio": 49,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "stat",
+"expected": {
+"base": "0x0052C134"
+},
+"hot": false,
+"mangled": "_ZN3app18GlobalParameterLib8sub_goldEj",
+"module": "static",
+"name": "app::GlobalParameterLib::sub_gold(unsigned int)",
+"prio": 49,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x00544540"
+},
+"hot": true,
+"mangled": "_ZN3app18StagePrivateRandom8instanceEv",
+"module": "static",
+"name": "app::StagePrivateRandom::instance()",
+"prio": 5,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "result",
+"expected": {
+"base": "0x00593600"
+},
+"hot": false,
+"mangled": "_ZN3app20RecFieldSmashFlagAcc26set_favorite_flag_by_indexEjb",
+"module": "static",
+"name": "app::RecFieldSmashFlagAcc::set_favorite_flag_by_index(unsigned int, bool)",
+"prio": 60,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "result",
+"expected": {
+"base": "0x00593660"
+},
+"hot": false,
+"mangled": "_ZN3app20RecFieldSmashMenuAcc36set_watched_tutorial_how_to_set_flagEb",
+"module": "static",
+"name": "app::RecFieldSmashMenuAcc::set_watched_tutorial_how_to_set_flag(bool)",
+"prio": 60,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "result",
+"expected": {
+"base": "0x00593678"
+},
+"hot": false,
+"mangled": "_ZN3app20RecFieldSmashMenuAcc37set_watched_tutorial_how_to_play_flagEb",
+"module": "static",
+"name": "app::RecFieldSmashMenuAcc::set_watched_tutorial_how_to_play_flag(bool)",
+"prio": 60,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "stat",
+"expected": {
+"base": "0x0059CC98"
+},
+"hot": false,
+"mangled": "_ZN3app20WeaponModuleAccessor14power_up_paramEiRKNS_19FighterPowerUpPointEPKN3lib14ParameterArrayIN19FighterParamPowerUp7PowerUpELb1EEEi",
+"module": "static",
+"name": "app::WeaponModuleAccessor::power_up_param(int, app::FighterPowerUpPoint const&, lib::ParameterArray<FighterParamPowerUp::PowerUp, true> const*, int)",
+"prio": 46,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2198"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickAreaModuleImpl14set_gimmick_idEj",
+"module": "static",
+"name": "app::GimmickAreaModuleImpl::set_gimmick_id(unsigned int)",
+"prio": 55,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B21AC"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickAreaModuleImpl16set_gimmick_dataEPNS_18stGimmickNomalDataEj",
+"module": "static",
+"name": "app::GimmickAreaModuleImpl::set_gimmick_data(app::stGimmickNomalData*, unsigned int)",
+"prio": 55,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2214"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickAreaModuleImpl17set_conveyor_dataEPNS_21stBeltConveyorTriInfoEj",
+"module": "static",
+"name": "app::GimmickAreaModuleImpl::set_conveyor_data(app::stBeltConveyorTriInfo*, unsigned int)",
+"prio": 55,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B22B4"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickAreaModuleImpl17set_conveyor_dataEPNS_25stGimmickBeltConveyorDataEj",
+"module": "static",
+"name": "app::GimmickAreaModuleImpl::set_conveyor_data(app::stGimmickBeltConveyorData*, unsigned int)",
+"prio": 55,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2364"
+},
+"hot": false,
+"mangled": "_ZN3app8GconArea17set_movement_dataEPNS_21stGimmickMovementDataEj",
+"module": "static",
+"name": "app::GconArea::set_movement_data(app::stGimmickMovementData*, unsigned int)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2398"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickAreaModuleImpl17set_movement_dataEPNS_21stGimmickMovementDataEj",
+"module": "static",
+"name": "app::GimmickAreaModuleImpl::set_movement_data(app::stGimmickMovementData*, unsigned int)",
+"prio": 55,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2400"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickAreaModuleImpl19reset_conveyor_dataEPNS_21stBeltConveyorTriInfoE",
+"module": "static",
+"name": "app::GimmickAreaModuleImpl::reset_conveyor_data(app::stBeltConveyorTriInfo*)",
+"prio": 55,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2440"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickAreaModuleImpl25set_gimmick_triangle_infoEPNS_21stBeltConveyorTriInfoEPNS_17stGimmickAreaInfoE",
+"module": "static",
+"name": "app::GimmickAreaModuleImpl::set_gimmick_triangle_info(app::stBeltConveyorTriInfo*, app::stGimmickAreaInfo*)",
+"prio": 55,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2760"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickAreaModuleImpl9area_initEv",
+"module": "static",
+"name": "app::GimmickAreaModuleImpl::area_init()",
+"prio": 55,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2BF4"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase10deactivateEv",
+"module": "static",
+"name": "app::GimmickControllerBase::deactivate()",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2C6C"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase11on_activateEv",
+"module": "static",
+"name": "app::GimmickControllerBase::on_activate()",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2CF0"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase12as_add_shapeERKNS_15StageShapeInfo3Ejjj",
+"module": "static",
+"name": "app::GimmickControllerBase::as_add_shape(app::StageShapeInfo3 const&, unsigned int, unsigned int, unsigned int)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2D2C"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase12as_add_shapeERKNS_20StageDamageShapeInfoEjj",
+"module": "static",
+"name": "app::GimmickControllerBase::as_add_shape(app::StageDamageShapeInfo const&, unsigned int, unsigned int)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2D5C"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase12ds_add_shapeEiRKNS_15StageShapeInfo3Ej",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_add_shape(int, app::StageShapeInfo3 const&, unsigned int)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2D90"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase12ds_add_shapeEiRKNS_20StageDamageShapeInfoE",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_add_shape(int, app::StageDamageShapeInfo const&)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2DBC"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase12ss_add_shapeERKNS_15StageShapeInfo3Ejj",
+"module": "static",
+"name": "app::GimmickControllerBase::ss_add_shape(app::StageShapeInfo3 const&, unsigned int, unsigned int)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2DF8"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickControllerBase13ds_get_damageEi",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_get_damage(int)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2E10"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickControllerBase13ds_get_vectorEi",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_get_vector(int)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2E74"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase13ds_set_statusENS_9HitStatusE",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_set_status(app::HitStatus)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2EDC"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase13on_deactivateEv",
+"module": "static",
+"name": "app::GimmickControllerBase::on_deactivate()",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2FC4"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase14as_set_enabledEiib",
+"module": "static",
+"name": "app::GimmickControllerBase::as_set_enabled(int, int, bool)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B2FDC"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase14ds_set_enabledEiib",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_set_enabled(int, int, bool)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B304C"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickControllerBase15as_get_log_listEv",
+"module": "static",
+"name": "app::GimmickControllerBase::as_get_log_list()",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B3064"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickControllerBase15ds_get_log_listEv",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_get_log_list()",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B307C"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickControllerBase15ss_get_log_listEv",
+"module": "static",
+"name": "app::GimmickControllerBase::ss_get_log_list()",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B3094"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase16as_replace_shapeEiiRKNS_15StageShapeInfo3E",
+"module": "static",
+"name": "app::GimmickControllerBase::as_replace_shape(int, int, app::StageShapeInfo3 const&)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B30AC"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase16on_start_captureERN3lib7Vector3E",
+"module": "static",
+"name": "app::GimmickControllerBase::on_start_capture(lib::Vector3&)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B30C8"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickControllerBase17as_get_num_shapesEv",
+"module": "static",
+"name": "app::GimmickControllerBase::as_get_num_shapes()",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B30E8"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase18as_set_all_enabledEb",
+"module": "static",
+"name": "app::GimmickControllerBase::as_set_all_enabled(bool)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B3100"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase18as_set_attack_dataEjRKNS_10AttackDataE",
+"module": "static",
+"name": "app::GimmickControllerBase::as_set_attack_data(unsigned int, app::AttackData const&)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B3120"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickControllerBase18as_transform_shapeERKN3lib8Matrix34ES4_b",
+"module": "static",
+"name": "app::GimmickControllerBase::as_transform_shape(lib::Matrix34 const&, lib::Matrix34 const&, bool)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B3138"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase18ds_set_all_enabledEb",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_set_all_enabled(bool)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B3150"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickControllerBase18ds_transform_shapeERKN3lib8Matrix34ES4_b",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_transform_shape(lib::Matrix34 const&, lib::Matrix34 const&, bool)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B3168"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickControllerBase18ds_transform_shapeEiiRKN3lib7Vector3Efb",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_transform_shape(int, int, lib::Vector3 const&, float, bool)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B31AC"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickControllerBase18ss_transform_shapeERKN3lib8Matrix34ES4_",
+"module": "static",
+"name": "app::GimmickControllerBase::ss_transform_shape(lib::Matrix34 const&, lib::Matrix34 const&)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B31C4"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase19on_notify_on_damageERKNS_13OnDamageEventE",
+"module": "static",
+"name": "app::GimmickControllerBase::on_notify_on_damage(app::OnDamageEvent const&)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B31D4"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase20ds_set_group_enabledEib",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_set_group_enabled(int, bool)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B31EC"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickControllerBase21as_set_shape_velocityERKN3lib7Vector3E",
+"module": "static",
+"name": "app::GimmickControllerBase::as_set_shape_velocity(lib::Vector3 const&)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B3204"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase21ds_set_reaction_frameEi",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_set_reaction_frame(int)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B321C"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase22activate_battle_objectEv",
+"module": "static",
+"name": "app::GimmickControllerBase::activate_battle_object()",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B329C"
+},
+"hot": true,
+"mangled": "_ZN3app21GimmickControllerBase22ds_get_owner_object_idEv",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_get_owner_object_id()",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B3384"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase23ds_set_target_mask_selfENS_15CollisionTargetEj",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_set_target_mask_self(app::CollisionTarget, unsigned int)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "chest",
+"expected": {
+"base": "0x005B33B8"
+},
+"hot": false,
+"mangled": "_ZN3app17GconEventTreasure17set_miniroom_exitEv",
+"module": "static",
+"name": "app::GconEventTreasure::set_miniroom_exit()",
+"prio": 43,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B33EC"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase24deactivate_battle_objectEv",
+"module": "static",
+"name": "app::GimmickControllerBase::deactivate_battle_object()",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B3578"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase8activateEv",
+"module": "static",
+"name": "app::GimmickControllerBase::activate()",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B35E0"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickControllerBase9ds_get_lrEi",
+"module": "static",
+"name": "app::GimmickControllerBase::ds_get_lr(int)",
+"prio": 53,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B3850"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickEventPresenter14dispatch_eventERNS_12GimmickEventE",
+"module": "static",
+"name": "app::GimmickEventPresenter::dispatch_event(app::GimmickEvent&)",
+"prio": 57,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B3928"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickEventPresenter17is_valid_instanceEv",
+"module": "static",
+"name": "app::GimmickEventPresenter::is_valid_instance()",
+"prio": 57,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x005B3940"
+},
+"hot": false,
+"mangled": "_ZN3app21GimmickEventPresenter8instanceEv",
+"module": "static",
+"name": "app::GimmickEventPresenter::instance()",
+"prio": 57,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "facing",
+"expected": {
+"base": "0x005E4D38",
+"update_readme": "0x00646274"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior21sync_lr_and_directionEv",
+"module": "static",
+"name": "app::Behavior::sync_lr_and_direction()",
+"prio": 16,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "kinetic",
+"expected": {
+"base": "0x005E4DB0",
+"update_readme": "0x006462EC"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior16set_kinetic_jumpEfffb",
+"module": "static",
+"name": "app::Behavior::set_kinetic_jump(float, float, float, bool)",
+"prio": 15,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "kinetic",
+"expected": {
+"base": "0x005E4E80",
+"update_readme": "0x006463BC"
+},
+"hot": false,
+"mangled": "_ZN3app22EnemyKineticModuleImpl14change_kineticEi",
+"module": "static",
+"name": "app::EnemyKineticModuleImpl::change_kinetic(int)",
+"prio": 14,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00608748"
+},
+"hot": false,
+"mangled": "_ZN3app23GconOneShotDeathFloorFsC1EPNS_9StageBaseEPNS_16StageSoundPlayerEjjPKNS0_18IParameterAccessorEbff",
+"module": "static",
+"name": "app::GconOneShotDeathFloorFs::GconOneShotDeathFloorFs(app::StageBase*, app::StageSoundPlayer*, unsigned int, unsigned int, app::GconOneShotDeathFloorFs::IParameterAccessor const*, bool, float, float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x0063B63C"
+},
+"hot": false,
+"mangled": "_ZN3app25GconModelRelatedMoveFloorC1EPKcPKNS_18StageDynamicObjectE",
+"module": "static",
+"name": "app::GconModelRelatedMoveFloor::GconModelRelatedMoveFloor(char const*, app::StageDynamicObject const*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x0063B6C8"
+},
+"hot": false,
+"mangled": "_ZN3app25GconModelRelatedMoveFloorC1EPKcPKNS_25StageGroundEdgeCollectionES2_",
+"module": "static",
+"name": "app::GconModelRelatedMoveFloor::GconModelRelatedMoveFloor(char const*, app::StageGroundEdgeCollection const*, char const*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "motion",
+"expected": {
+"base": "0x006653D0",
+"update_readme_candidates": [
+"0x006E469C",
+"0x007B3CB8"
+]
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior19change_script_stateEPKc",
+"module": "static",
+"name": "app::Behavior::change_script_state(char const*)",
+"prio": 13,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x0069F57C"
+},
+"hot": false,
+"mangled": "_ZN3app35GconModelRelatedMoveFloorWithIgnoreC1EPKcPKNS_18StageDynamicObjectE",
+"module": "static",
+"name": "app::GconModelRelatedMoveFloorWithIgnore::GconModelRelatedMoveFloorWithIgnore(char const*, app::StageDynamicObject const*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x0069F638"
+},
+"hot": false,
+"mangled": "_ZN3app35GconModelRelatedMoveFloorWithIgnoreC1EPNS_14StageDrawModelEPKNS_25StageGroundEdgeCollectionE",
+"module": "static",
+"name": "app::GconModelRelatedMoveFloorWithIgnore::GconModelRelatedMoveFloorWithIgnore(app::StageDrawModel*, app::StageGroundEdgeCollection const*)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "clock",
+"expected": {
+"base": "0x006A0744"
+},
+"hot": false,
+"mangled": "_ZN3app36GameOperatorRuleCheckObjFrameCounter20update_frame_counterEb",
+"module": "static",
+"name": "app::GameOperatorRuleCheckObjFrameCounter::update_frame_counter(bool)",
+"prio": 2,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x006BD0D8"
+},
+"hot": false,
+"mangled": "_ZN3app4Item15req_lost_effectEv",
+"module": "static",
+"name": "app::Item::req_lost_effect()",
+"prio": 30,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x0071E9B4",
+"update_readme": "0x007B01D8"
+},
+"hot": true,
+"mangled": "_ZN3app8Behavior10calc_angleEN3lib7Vector2E",
+"module": "static",
+"name": "app::Behavior::calc_angle(lib::Vector2)",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "facing",
+"expected": {
+"base": "0x0071EB2C",
+"update_readme": "0x007B034C"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior10reverse_lrEbb",
+"module": "static",
+"name": "app::Behavior::reverse_lr(bool, bool)",
+"prio": 16,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "damage",
+"expected": {
+"base": "0x0071EFEC",
+"update_readme": "0x007B0814"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior11damage_turnEv",
+"module": "static",
+"name": "app::Behavior::damage_turn()",
+"prio": 12,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "damage",
+"expected": {
+"base": "0x0071F048",
+"update_readme": "0x007B0864"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior11disable_hitEv",
+"module": "static",
+"name": "app::Behavior::disable_hit()",
+"prio": 12,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x0071F2D0",
+"update_readme_candidates": [
+"0x007B0AD8",
+"0x007B0B2C"
+]
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior12random_rangeEff",
+"module": "static",
+"name": "app::Behavior::random_range(float, float)",
+"prio": 7,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x0071F324",
+"update_readme_candidates": [
+"0x007B0AD8",
+"0x007B0B2C"
+]
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior12random_rangeEii",
+"module": "static",
+"name": "app::Behavior::random_range(int, int)",
+"prio": 7,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "kinetic",
+"expected": {
+"base": "0x0071F378",
+"update_readme": "0x007B0B80"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior13clear_speed_xEv",
+"module": "static",
+"name": "app::Behavior::clear_speed_x()",
+"prio": 15,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x0071F5D4",
+"update_readme_candidates": [
+"0x007B0DC4",
+"0x007B0E80"
+]
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior13random_choiceEffff",
+"module": "static",
+"name": "app::Behavior::random_choice(float, float, float, float)",
+"prio": 7,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x0071F690",
+"update_readme_candidates": [
+"0x007B0DC4",
+"0x007B0E80"
+]
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior13random_choiceEiiii",
+"module": "static",
+"name": "app::Behavior::random_choice(int, int, int, int)",
+"prio": 7,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x0071F700",
+"update_readme": "0x007B0EF0"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior13remove_effectEj",
+"module": "static",
+"name": "app::Behavior::remove_effect(unsigned int)",
+"prio": 28,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x0071F720",
+"update_readme": "0x007B0F0C"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior13request_quakeENS_15CameraQuakeKindE",
+"module": "static",
+"name": "app::Behavior::request_quake(app::CameraQuakeKind)",
+"prio": 28,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x0071FB04",
+"update_readme_candidates": [
+"0x007B12E0",
+"0x007B1338"
+]
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior14request_effectEiRKN3lib7Vector3ES4_f",
+"module": "static",
+"name": "app::Behavior::request_effect(int, lib::Vector3 const&, lib::Vector3 const&, float)",
+"prio": 28,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x0071FB60",
+"update_readme_candidates": [
+"0x007B12E0",
+"0x007B1338"
+]
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior14request_effectEiRKN3lib7Vector3Ef",
+"module": "static",
+"name": "app::Behavior::request_effect(int, lib::Vector3 const&, float)",
+"prio": 28,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x0071FBB0",
+"update_readme_candidates": [
+"0x007B12E0",
+"0x007B1338"
+]
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior14request_effectEijRKN3lib7Vector3ES4_f",
+"module": "static",
+"name": "app::Behavior::request_effect(int, unsigned int, lib::Vector3 const&, lib::Vector3 const&, float)",
+"prio": 28,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "kinetic",
+"expected": {
+"base": "0x0071FE48",
+"update_readme": "0x007B1628"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior15clear_speed_allEv",
+"module": "static",
+"name": "app::Behavior::clear_speed_all()",
+"prio": 15,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "attack",
+"expected": {
+"base": "0x0071FEB4",
+"update_readme": "0x007B1694"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior15set_attack_dataEi",
+"module": "static",
+"name": "app::Behavior::set_attack_data(int)",
+"prio": 25,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "damage",
+"expected": {
+"base": "0x00720058",
+"update_readme": "0x007B1828"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior15set_shield_dataEPKN12EnemyParamVL21InnerEnemyShieldParamE",
+"module": "static",
+"name": "app::Behavior::set_shield_data(EnemyParamVL::InnerEnemyShieldParam const*)",
+"prio": 12,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "damage",
+"expected": {
+"base": "0x00720120",
+"update_readme": "0x007B18F0"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior15set_weaken_typeEbNS0_20WeakenExpressionTypeE",
+"module": "static",
+"name": "app::Behavior::set_weaken_type(bool, app::Behavior::WeakenExpressionType)",
+"prio": 12,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "item",
+"expected": {
+"base": "0x007201BC",
+"update_readme": "0x007B1984"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior16create_dead_itemEffbi",
+"module": "static",
+"name": "app::Behavior::create_dead_item(float, float, bool, int)",
+"prio": 40,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "article",
+"expected": {
+"base": "0x007203F8",
+"update_readme": "0x007B1BBC"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior16generate_articleEib",
+"module": "static",
+"name": "app::Behavior::generate_article(int, bool)",
+"prio": 27,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "attack",
+"expected": {
+"base": "0x007208A4"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior16set_attack_powerEiib",
+"module": "static",
+"name": "app::Behavior::set_attack_power(int, int, bool)",
+"prio": 25,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "damage",
+"expected": {
+"base": "0x00720974",
+"update_readme": "0x007B2124"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior16set_shield_stateEiii",
+"module": "static",
+"name": "app::Behavior::set_shield_state(int, int, int)",
+"prio": 12,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "leave",
+"expected": {
+"base": "0x00720C00",
+"update_readme": "0x007B23B4"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior17init_common_leaveEPKN12EnemyParamVL20InnerEnemyLeaveParamE",
+"module": "static",
+"name": "app::Behavior::init_common_leave(EnemyParamVL::InnerEnemyLeaveParam const*)",
+"prio": 19,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "attack",
+"expected": {
+"base": "0x00721278",
+"update_readme_candidates": [
+"0x007B2A1C",
+"0x007B2B60"
+]
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior18create_attack_dataERKN12EnemyParamVL21InnerEnemyAttackParamE",
+"module": "static",
+"name": "app::Behavior::create_attack_data(EnemyParamVL::InnerEnemyAttackParam const&)",
+"prio": 25,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "attack",
+"expected": {
+"base": "0x007213BC",
+"update_readme_candidates": [
+"0x007B2A1C",
+"0x007B2B60"
+]
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior18create_attack_dataERKN12EnemyParamVL28InnerEnemyAttackParamOffset2E",
+"module": "static",
+"name": "app::Behavior::create_attack_data(EnemyParamVL::InnerEnemyAttackParamOffset2 const&)",
+"prio": 25,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "damage",
+"expected": {
+"base": "0x007218C4",
+"update_readme": "0x007B304C"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior6bulletEv",
+"module": "static",
+"name": "app::Behavior::bullet()",
+"prio": 12,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "damage",
+"expected": {
+"base": "0x00721F88",
+"update_readme": "0x007B36E4"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior16notify_on_removeEi",
+"module": "static",
+"name": "app::Behavior::notify_on_remove(int)",
+"prio": 12,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x0072246C",
+"update_readme": "0x007B3BC4"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior18success_by_percentEf",
+"module": "static",
+"name": "app::Behavior::success_by_percent(float)",
+"prio": 7,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "motion",
+"expected": {
+"base": "0x007224D4",
+"update_readme": "0x007B3C2C"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior19change_motion_stateEjffbf",
+"module": "static",
+"name": "app::Behavior::change_motion_state(unsigned int, float, float, bool, float)",
+"prio": 13,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "motion",
+"expected": {
+"base": "0x00722560",
+"update_readme_candidates": [
+"0x006E469C",
+"0x007B3CB8"
+]
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior19change_script_stateERKNS_25EnemyMotionAnimcmdHashsetE",
+"module": "static",
+"name": "app::Behavior::change_script_state(app::EnemyMotionAnimcmdHashset const&)",
+"prio": 13,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x0072294C",
+"update_readme": "0x007B408C"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior19success_by_fractionEii",
+"module": "static",
+"name": "app::Behavior::success_by_fraction(int, int)",
+"prio": 7,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "leave",
+"expected": {
+"base": "0x00722970",
+"update_readme": "0x007B40B0"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior19update_common_leaveEv",
+"module": "static",
+"name": "app::Behavior::update_common_leave()",
+"prio": 19,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "article",
+"expected": {
+"base": "0x00722A64",
+"update_readme": "0x007B41A4"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior20generate_article_posEiffb",
+"module": "static",
+"name": "app::Behavior::generate_article_pos(int, float, float, bool)",
+"prio": 27,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x00723378",
+"update_readme": "0x007B4AEC"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior21request_follow_effectEijRKN3lib7Vector3ES4_f",
+"module": "static",
+"name": "app::Behavior::request_follow_effect(int, unsigned int, lib::Vector3 const&, lib::Vector3 const&, float)",
+"prio": 28,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "motion",
+"expected": {
+"base": "0x007233D0",
+"update_readme": "0x007B4B44"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior21set_motion_no_restartEiffb",
+"module": "static",
+"name": "app::Behavior::set_motion_no_restart(int, float, float, bool)",
+"prio": 13,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "article",
+"expected": {
+"base": "0x0072348C",
+"update_readme": "0x007B4BF8"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior22generate_article_angleEifb",
+"module": "static",
+"name": "app::Behavior::generate_article_angle(int, float, bool)",
+"prio": 27,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "attack",
+"expected": {
+"base": "0x00723950",
+"update_readme": "0x007B50AC"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior24set_attack_absolute_dataEPKN12EnemyParamVL29InnerEnemyAttackAbsoluteParamE",
+"module": "static",
+"name": "app::Behavior::set_attack_absolute_data(EnemyParamVL::InnerEnemyAttackAbsoluteParam const*)",
+"prio": 25,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "article",
+"expected": {
+"base": "0x00723BA4"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior26generate_article_pos_angleEifffb",
+"module": "static",
+"name": "app::Behavior::generate_article_pos_angle(int, float, float, float, bool)",
+"prio": 27,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "facing",
+"expected": {
+"base": "0x00724034",
+"update_readme": "0x007B5778"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior6set_lrEfbb",
+"module": "static",
+"name": "app::Behavior::set_lr(float, bool, bool)",
+"prio": 16,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "sound",
+"expected": {
+"base": "0x0072425C",
+"update_readme": "0x007B59A8"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior7play_seEjb",
+"module": "static",
+"name": "app::Behavior::play_se(unsigned int, bool)",
+"prio": 32,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x0072447C",
+"update_readme_candidates": [
+"0x007B5A9C",
+"0x007B5B10"
+]
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior9ray_checkERKN3lib7Vector2EfRS2_S5_b",
+"module": "static",
+"name": "app::Behavior::ray_check(lib::Vector2 const&, float, lib::Vector2&, lib::Vector2&, bool)",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x007244F8",
+"update_readme_candidates": [
+"0x007B5A9C",
+"0x007B5B10"
+]
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior9ray_checkERKN3lib7Vector2Efb",
+"module": "static",
+"name": "app::Behavior::ray_check(lib::Vector2 const&, float, bool)",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x0072456C",
+"update_readme_candidates": [
+"0x007B5A9C",
+"0x007B5B10"
+]
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior9ray_checkERKN3lib7Vector3Efb",
+"module": "static",
+"name": "app::Behavior::ray_check(lib::Vector3 const&, float, bool)",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "damage",
+"expected": {
+"base": "0x007245EC",
+"update_readme": "0x007B5BF4"
+},
+"hot": false,
+"mangled": "_ZN3app8Behavior9update_hpEv",
+"module": "static",
+"name": "app::Behavior::update_hp()",
+"prio": 12,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x007249DC"
+},
+"hot": true,
+"mangled": "_ZN3app13GconEventWarp10pre_updateEf",
+"module": "static",
+"name": "app::GconEventWarp::pre_update(float)",
+"prio": 51,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x007249E0"
+},
+"hot": true,
+"mangled": "_ZN3app8GconArea10pre_updateEf",
+"module": "static",
+"name": "app::GconArea::pre_update(float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00724BC4"
+},
+"hot": false,
+"mangled": "_ZN3app8GconArea12replace_areaEPNS_8AreaDataEi",
+"module": "static",
+"name": "app::GconArea::replace_area(app::AreaData*, int)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00724C00"
+},
+"hot": false,
+"mangled": "_ZN3app8GconArea13get_log_countEv",
+"module": "static",
+"name": "app::GconArea::get_log_count()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00724C24"
+},
+"hot": false,
+"mangled": "_ZN3app8GconArea14is_figther_hitEf",
+"module": "static",
+"name": "app::GconArea::is_figther_hit(float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00724D2C"
+},
+"hot": false,
+"mangled": "_ZN3app8GconArea15is_hit_intervalEh",
+"module": "static",
+"name": "app::GconArea::is_hit_interval(unsigned char)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00724DB0"
+},
+"hot": false,
+"mangled": "_ZN3app8GconArea16get_hit_entry_idEh",
+"module": "static",
+"name": "app::GconArea::get_hit_entry_id(unsigned char)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x00724E44"
+},
+"hot": false,
+"mangled": "_ZN3app13GconEventWarp16set_gimmick_dataEPNS_18stGimmickNomalDataEj",
+"module": "static",
+"name": "app::GconEventWarp::set_gimmick_data(app::stGimmickNomalData*, unsigned int)",
+"prio": 51,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00724E4C"
+},
+"hot": false,
+"mangled": "_ZN3app8GconArea16set_gimmick_dataEPNS_18stGimmickNomalDataEj",
+"module": "static",
+"name": "app::GconArea::set_gimmick_data(app::stGimmickNomalData*, unsigned int)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00724E84"
+},
+"hot": false,
+"mangled": "_ZN3app8GconArea4testEh",
+"module": "static",
+"name": "app::GconArea::test(unsigned char)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x00724EC4"
+},
+"hot": false,
+"mangled": "_ZN3app13GconEventWarp5setupEv",
+"module": "static",
+"name": "app::GconEventWarp::setup()",
+"prio": 51,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00724EC8"
+},
+"hot": false,
+"mangled": "_ZN3app8GconArea5setupEv",
+"module": "static",
+"name": "app::GconArea::setup()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x00724F20"
+},
+"hot": false,
+"mangled": "_ZN3app13GconEventWarp8on_sleepEv",
+"module": "static",
+"name": "app::GconEventWarp::on_sleep()",
+"prio": 51,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00724F38"
+},
+"hot": false,
+"mangled": "_ZN3app8GconArea8on_sleepEv",
+"module": "static",
+"name": "app::GconArea::on_sleep()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "door",
+"expected": {
+"base": "0x00724F84"
+},
+"hot": false,
+"mangled": "_ZN3app13GconEventWarp9on_wakeupEv",
+"module": "static",
+"name": "app::GconEventWarp::on_wakeup()",
+"prio": 51,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00724F9C"
+},
+"hot": false,
+"mangled": "_ZN3app8GconArea9on_wakeupEv",
+"module": "static",
+"name": "app::GconArea::on_wakeup()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x00724FE0"
+},
+"hot": false,
+"mangled": "_ZN3app8GconAreaC1EPKcb",
+"module": "static",
+"name": "app::GconArea::GconArea(char const*, bool)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x007252FC"
+},
+"hot": false,
+"mangled": "_ZN3app8GconAreaD1Ev",
+"module": "static",
+"name": "app::GconArea::~GconArea()",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x007255F4"
+},
+"hot": true,
+"mangled": "_ZN3app8GconCell10pre_updateEf",
+"module": "static",
+"name": "app::GconCell::pre_update(float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x007255F8"
+},
+"hot": false,
+"mangled": "_ZN3app8GconCellC1EN3lib7Vector3Ef",
+"module": "static",
+"name": "app::GconCell::GconCell(lib::Vector3, float)",
+"prio": 54,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x007272C4"
+},
+"hot": true,
+"mangled": "_ZN3app8ItemUtil11sync_randomEi",
+"module": "static",
+"name": "app::ItemUtil::sync_random(int)",
+"prio": 6,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x00727474"
+},
+"hot": true,
+"mangled": "_ZN3app8ItemUtil12sync_randomfEf",
+"module": "static",
+"name": "app::ItemUtil::sync_randomf(float)",
+"prio": 6,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x00727A8C"
+},
+"hot": true,
+"mangled": "_ZN3app8ItemUtil17sync_random_rangeEii",
+"module": "static",
+"name": "app::ItemUtil::sync_random_range(int, int)",
+"prio": 6,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x00727CF4"
+},
+"hot": true,
+"mangled": "_ZN3app8ItemUtil18sync_random_rangefEff",
+"module": "static",
+"name": "app::ItemUtil::sync_random_rangef(float, float)",
+"prio": 6,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x0075C920",
+"update_readme": "0x007F9C9C"
+},
+"hot": false,
+"mangled": "_ZN3app16EffectModuleImpl11set_visibleEjb",
+"module": "static",
+"name": "app::EffectModuleImpl::set_visible(unsigned int, bool)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x0075CCA0"
+},
+"hot": false,
+"mangled": "_ZN3app16EffectModuleImpl18set_particle_scaleEjRKN3lib7Vector2E",
+"module": "static",
+"name": "app::EffectModuleImpl::set_particle_scale(unsigned int, lib::Vector2 const&)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x0075CE64",
+"update_readme": "0x007FA298"
+},
+"hot": false,
+"mangled": "_ZN3app16EffectModuleImpl9set_alphaEjf",
+"module": "static",
+"name": "app::EffectModuleImpl::set_alpha(unsigned int, float)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x0075CE80"
+},
+"hot": false,
+"mangled": "_ZN3app16EffectModuleImpl9set_colorEjRKN3lib7Color4fE",
+"module": "static",
+"name": "app::EffectModuleImpl::set_color(unsigned int, lib::Color4f const&)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "effect",
+"expected": {
+"base": "0x0075CEA4",
+"update_readme": "0x007FA2D8"
+},
+"hot": true,
+"mangled": "_ZN3app16EffectModuleImpl9set_frameEjf",
+"module": "static",
+"name": "app::EffectModuleImpl::set_frame(unsigned int, float)",
+"prio": 29,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "spawn",
+"expected": {
+"base": "0x00898648",
+"update_readme": "0x00948AA0"
+},
+"hot": false,
+"mangled": "_ZNK3app14EnemyGenerator15get_layout_dataEii",
+"module": "static",
+"name": "app::EnemyGenerator::get_layout_data(int, int) const",
+"prio": 22,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "rng",
+"expected": {
+"base": "0x008A4AF8"
+},
+"hot": false,
+"mangled": "_ZNK3app16UiFsItemDatabase15get_random_rateEhj",
+"module": "static",
+"name": "app::UiFsItemDatabase::get_random_rate(unsigned char, unsigned int) const",
+"prio": 8,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x008A5F48",
+"update_readme_candidates": [
+"0x0095782C",
+"0x009EA658"
+]
+},
+"hot": false,
+"mangled": "_ZNK3app8Behavior13search_targetENS_21EnemyTargetSearchTypeERKN3lib7Vector3Efffff",
+"module": "static",
+"name": "app::Behavior::search_target(app::EnemyTargetSearchType, lib::Vector3 const&, float, float, float, float, float) const",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x008A5F5C",
+"update_readme": "0x0095783C"
+},
+"hot": false,
+"mangled": "_ZNK3app17EnemyAiModuleImpl12check_targetENS_21EnemyTargetSearchTypeERKN3lib7Vector3Efffff",
+"module": "static",
+"name": "app::EnemyAiModuleImpl::check_target(app::EnemyTargetSearchType, lib::Vector3 const&, float, float, float, float, float) const",
+"prio": 18,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x008A6090",
+"update_readme": "0x00957970"
+},
+"hot": false,
+"mangled": "_ZNK3app17EnemyAiModuleImpl15get_fighter_posEiRN3lib7Vector3E",
+"module": "static",
+"name": "app::EnemyAiModuleImpl::get_fighter_pos(int, lib::Vector3&) const",
+"prio": 18,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "result",
+"expected": {
+"base": "0x008B149C"
+},
+"hot": false,
+"mangled": "_ZNK3app20RecFieldSmashDataAcc20field_smash_menu_accEv",
+"module": "static",
+"name": "app::RecFieldSmashDataAcc::field_smash_menu_acc() const",
+"prio": 60,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "result",
+"expected": {
+"base": "0x008B14BC"
+},
+"hot": false,
+"mangled": "_ZNK3app20RecFieldSmashDataAcc25field_smash_item_flag_accEv",
+"module": "static",
+"name": "app::RecFieldSmashDataAcc::field_smash_item_flag_acc() const",
+"prio": 60,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "result",
+"expected": {
+"base": "0x008B14C8"
+},
+"hot": true,
+"mangled": "_ZNK3app20RecFieldSmashDataAcc29get_phenomenon_count_when_gotEj",
+"module": "static",
+"name": "app::RecFieldSmashDataAcc::get_phenomenon_count_when_got(unsigned int) const",
+"prio": 60,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "result",
+"expected": {
+"base": "0x008B14DC"
+},
+"hot": true,
+"mangled": "_ZNK3app20RecFieldSmashFlagAcc16is_favorite_flagEhNS_19FieldSmashItemLevelE",
+"module": "static",
+"name": "app::RecFieldSmashFlagAcc::is_favorite_flag(unsigned char, app::FieldSmashItemLevel) const",
+"prio": 60,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "result",
+"expected": {
+"base": "0x008B1584"
+},
+"hot": true,
+"mangled": "_ZNK3app20RecFieldSmashMenuAcc27get_a_set_id_used_last_timeEv",
+"module": "static",
+"name": "app::RecFieldSmashMenuAcc::get_a_set_id_used_last_time() const",
+"prio": 60,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "result",
+"expected": {
+"base": "0x008B1590"
+},
+"hot": true,
+"mangled": "_ZNK3app20RecFieldSmashMenuAcc31has_watched_tutorial_how_to_setEv",
+"module": "static",
+"name": "app::RecFieldSmashMenuAcc::has_watched_tutorial_how_to_set() const",
+"prio": 60,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "result",
+"expected": {
+"base": "0x008B15A4"
+},
+"hot": true,
+"mangled": "_ZNK3app20RecFieldSmashMenuAcc32has_watched_tutorial_how_to_playEv",
+"module": "static",
+"name": "app::RecFieldSmashMenuAcc::has_watched_tutorial_how_to_play() const",
+"prio": 60,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "hazard",
+"expected": {
+"base": "0x008B3D4C"
+},
+"hot": true,
+"mangled": "_ZNK3app21GimmickAreaModuleImpl16get_gimmick_infoERNS_17stGimmickAreaInfoE",
+"module": "static",
+"name": "app::GimmickAreaModuleImpl::get_gimmick_info(app::stGimmickAreaInfo&) const",
+"prio": 55,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x0092F6D4",
+"update_readme": "0x009EA464"
+},
+"hot": true,
+"mangled": "_ZNK3app8Behavior10center_posEv",
+"module": "static",
+"name": "app::Behavior::center_pos() const",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x0092F728",
+"update_readme": "0x009EA4B8"
+},
+"hot": false,
+"mangled": "_ZNK3app8Behavior10check_wallEv",
+"module": "static",
+"name": "app::Behavior::check_wall() const",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x0092F7D0",
+"update_readme": "0x009EA55C"
+},
+"hot": false,
+"mangled": "_ZNK3app8Behavior11check_cliffEv",
+"module": "static",
+"name": "app::Behavior::check_cliff() const",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x0092F8CC",
+"update_readme_candidates": [
+"0x0095782C",
+"0x009EA658"
+]
+},
+"hot": false,
+"mangled": "_ZNK3app8Behavior13search_targetEi",
+"module": "static",
+"name": "app::Behavior::search_target(int) const",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x0092F928",
+"update_readme_candidates": [
+"0x0095782C",
+"0x009EA658"
+]
+},
+"hot": false,
+"mangled": "_ZNK3app8Behavior13search_targetEiRKN3lib7Vector3E",
+"module": "static",
+"name": "app::Behavior::search_target(int, lib::Vector3 const&) const",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x0092FA28",
+"update_readme": "0x009EA7AC"
+},
+"hot": true,
+"mangled": "_ZNK3app8Behavior14get_target_posEi",
+"module": "static",
+"name": "app::Behavior::get_target_pos(int) const",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x0092FA9C",
+"update_readme": "0x009EA818"
+},
+"hot": false,
+"mangled": "_ZNK3app8Behavior15search_intervalEi",
+"module": "static",
+"name": "app::Behavior::search_interval(int) const",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x0092FCE4",
+"update_readme": "0x009EAA5C"
+},
+"hot": false,
+"mangled": "_ZNK3app8Behavior18get_nearest_targetEv",
+"module": "static",
+"name": "app::Behavior::get_nearest_target() const",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x0092FEAC",
+"update_readme": "0x009EAC10"
+},
+"hot": false,
+"mangled": "_ZNK3app8Behavior20check_turn_to_targetEif",
+"module": "static",
+"name": "app::Behavior::check_turn_to_target(int, float) const",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x00930184",
+"update_readme": "0x009EAED4"
+},
+"hot": false,
+"mangled": "_ZNK3app8Behavior23check_cliff_distance_lrEff",
+"module": "static",
+"name": "app::Behavior::check_cliff_distance_lr(float, float) const",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "ai",
+"expected": {
+"base": "0x00930434",
+"update_readme": "0x009EB178"
+},
+"hot": false,
+"mangled": "_ZNK3app8Behavior24get_lr_to_nearest_targetEf",
+"module": "static",
+"name": "app::Behavior::get_lr_to_nearest_target(float) const",
+"prio": 17,
+"ret": true,
+"thumb": false
+},
+{
+"cat": "kinetic",
+"expected": {
+"base": "0x0093083C",
+"update_readme_candidates": [
+"0x009EB574",
+"0x009EB588"
+]
+},
+"hot": false,
+"mangled": "_ZNK3app8Behavior4moveEPNS_8AiModule7AiInputE",
+"module": "static",
+"name": "app::Behavior::move(app::AiModule::AiInput*) const",
+"prio": 15,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "kinetic",
+"expected": {
+"base": "0x00930850",
+"update_readme_candidates": [
+"0x009EB574",
+"0x009EB588"
+]
+},
+"hot": false,
+"mangled": "_ZNK3app8Behavior4moveEPNS_8AiModule7AiInputERKN3lib7Vector3E",
+"module": "static",
+"name": "app::Behavior::move(app::AiModule::AiInput*, lib::Vector3 const&) const",
+"prio": 15,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "kinetic",
+"expected": {
+"base": "0x00930864",
+"update_readme_candidates": [
+"0x009EB574",
+"0x009EB588"
+]
+},
+"hot": false,
+"mangled": "_ZNK3app8Behavior4moveEPNS_8AiModule7AiInputEff",
+"module": "static",
+"name": "app::Behavior::move(app::AiModule::AiInput*, float, float) const",
+"prio": 15,
+"ret": false,
+"thumb": false
+},
+{
+"cat": "stage",
+"expected": {
+"base": "cro+0x3E88"
+},
+"hot": false,
+"mangled": "_ZN3app15StageFieldSmashC1Ev",
+"module": "main_field",
+"name": "app::StageFieldSmash::StageFieldSmash()",
+"ret": false,
+"thumb": false
+},
+{
+"cat": "stage",
+"expected": {
+"base": "cro+0x46FC"
+},
+"hot": false,
+"mangled": "_ZN3app15StageFsMiniroomC1Ev",
+"module": "main_field",
+"name": "app::StageFsMiniroom::StageFsMiniroom()",
+"ret": false,
+"thumb": false
+},
+{
+"cat": "param",
+"expected": {
+"base": "cro+0xA474C"
+},
+"hot": false,
+"mangled": "_ZN3app36EnemyParamAccessorInstanceFieldSmashC1Ev",
+"module": "enemy_fs",
+"name": "app::EnemyParamAccessorInstanceFieldSmash::EnemyParamAccessorInstanceFieldSmash()",
+"ret": false,
+"thumb": false
+},
+{
+"cat": "result",
+"expected": {
+"base": "cro+0x474A4"
+},
+"hot": false,
+"mangled": "_ZN3app18FsViewResult1SceneC1Ev",
+"module": "menu",
+"name": "app::FsViewResult1Scene::FsViewResult1Scene()",
+"ret": false,
+"thumb": false
+},
+{
+"cat": "result",
+"expected": {
+"base": "cro+0x5C570"
+},
+"hot": false,
+"mangled": "_ZN3app20FsViewFinalInfoSceneC1Ev",
+"module": "menu",
+"name": "app::FsViewFinalInfoScene::FsViewFinalInfoScene()",
+"ret": false,
+"thumb": false
+},
+{
+"cat": "result",
+"expected": {
+"base": "cro+0x45F08"
+},
+"hot": false,
+"mangled": "_ZN3app18FsViewItemSetSceneC1Ev",
+"module": "menu",
+"name": "app::FsViewItemSetScene::FsViewItemSetScene()",
+"ret": false,
+"thumb": false
+}
+],
+"singletons": {
+"BattleObjectManager": {
+"expected": {
+"base": "0x00BA1368"
+},
+"mangled": "_ZN3lib9SingletonIN3app19BattleObjectManagerEE9instance_E"
+},
+"EnemyGenerator": {
+"expected": {
+"base": "0x00BA12D8"
+},
+"mangled": "_ZN3lib9SingletonIN3app14EnemyGeneratorEE9instance_E"
+},
+"EnemyManager": {
+"expected": {
+"base": "0x00BA1298"
+},
+"mangled": "_ZN3lib9SingletonIN3app12EnemyManagerEE9instance_E"
+},
+"EnemyParamAccessor": {
+"expected": {
+"base": "0x00BA1358"
+},
+"mangled": "_ZN3lib9SingletonIN3app18EnemyParamAccessorEE9instance_E"
+},
+"EquipmentManager": {
+"expected": {
+"base": "0x00BA1318"
+},
+"mangled": "_ZN3lib9SingletonIN3app16EquipmentManagerEE9instance_E"
+},
+"FieldSmashManager": {
+"expected": {
+"base": "0x00BA1334"
+},
+"mangled": "_ZN3lib9SingletonIN3app17FieldSmashManagerEE9instance_E"
+},
+"FighterManager": {
+"expected": {
+"base": "0x00BA12DC"
+},
+"mangled": "_ZN3lib9SingletonIN3app14FighterManagerEE9instance_E"
+},
+"FighterParamAccessor": {
+"expected": {
+"base": "0x00BA139C"
+},
+"mangled": "_ZN3lib9SingletonIN3app20FighterParamAccessorEE9instance_E"
+},
+"InstanceList<GimmickControllerBase>": {
+"expected": {
+"base": "0x00BA1268"
+},
+"mangled": "_ZN3app12InstanceListINS_21GimmickControllerBaseEE11s_instance_E"
+},
+"ItemManager": {
+"expected": {
+"base": "0x00BA1280"
+},
+"mangled": "_ZN3lib9SingletonIN3app11ItemManagerEE9instance_E"
+},
+"ItemParamAccessor": {
+"expected": {
+"base": "0x00BA133C"
+},
+"mangled": "_ZN3lib9SingletonIN3app17ItemParamAccessorEE9instance_E"
+},
+"ItemSwitch": {
+"expected": {
+"base": "0x00BA1274"
+},
+"mangled": "_ZN3lib9SingletonIN3app10ItemSwitchEE9instance_E"
+},
+"SoundSystem": {
+"expected": {
+"base": "0x00BA1288"
+},
+"mangled": "_ZN3lib9SingletonIN3app11SoundSystemEE9instance_E"
+},
+"StageManager": {
+"expected": {
+"base": "0x00BA12A4"
+},
+"mangled": "_ZN3lib9SingletonIN3app12StageManagerEE9instance_E"
+}
+},
+"source": {
+"label": "base",
+"static_crs_sha1": "f9ef4b3fec44c871557e8efda4f014d3058cb6f4"
+}
+}

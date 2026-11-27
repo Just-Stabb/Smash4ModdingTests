@@ -55,6 +55,74 @@ ground truth.
     it uses.
   - The script targets gdb-multiarch (ARM11, `set architecture arm`), connecting with `target remote :PORT`.
 
+## Azahar trace toolkit (tools/smashrun_trace/, 2026-11-27)
+
+The emulator ground truth goes through `tools/smashrun_trace/` (user guide: its README.md; package
+`smashrun_trace_v1.zip`). It replaces the gdb-multiarch script idea above: pure Python 3 (standard library only, for
+the user's Windows PC), speaking GDB's Remote Serial Protocol to Azahar's stub itself.
+
+- **Module bases** (`srtrace/cro.py`): every page's +0x80 is probed for "CRO0" (unmapped 1 MB blocks skipped, the code
+  region after code.bin first), then the RO service's chain (header +0x88 next / +0x8C previous, static.crs as the
+  head) gives the rest. The loaded header is rebased (absolute pointers), so the run-time segment table gives text /
+  rodata (in place: base + file offset) and the moved .data / .bss. The named export table keeps its segment tags
+  ({index | offset << 4}), so each export's FILE offset is known too: a map (`srtrace/maps/enemy_fs_<label>.json`) is
+  used only if every kind's `Behavior<Kind>::create` export is at the map's offset. Maps: `update` (from
+  reference/smashrun_enemy_specs, the update's enemy_fs.cro the hand reads use), `base` (derived from the base game's
+  enemy_fs.cro by `dev/build_data.py map-cro`).
+- **code.bin hooks by name** (`srtrace/catalog.json`, 358 functions + 14 singletons): mangled names from static.crs,
+  resolved at run time through the game's own loaded static.crs export table (so base and update both work);
+  arguments decoded from the demangled signatures (`srtrace/abi.py`: AAPCS + VFP, HFAs in s registers, references
+  dereferenced for the known structs), return values caught with a temporary breakpoint on LR matched by SP.
+- **Per enemy kind** (77 kinds): breakpoints on `create` (spawn + instance), each state's enter / exit (and update in
+  `--mode full`), and the vtable slots (tread, initialize, start, death_state, every_frame ...); each hit logs the
+  instance snapshot: state / kind / variation / AI stick (+0x8..+0x18), the fields the hand reads use (this.fNNN),
+  Posture position (+0x14) and lr (+0x60), and the movement energy's words; a raw dump of the instance and its
+  Posture / Damage / KineticEnergy modules on first sight and every N frames.
+  - The accessor's module slots differ between versions: update acc + 0x3040.. (README framework table), base 0x60
+    lower (the base Goomba notice-hop enter reads Posture at +0x303C, the energy at +0x3050, Kinetic +0x3008,
+    Ground +0x2FFC). The movement energy block is `[[[[acc + KineticEnergy] + 8] + 0] + 4]` (one more load than the
+    `[[[..]+8]+0]+4` notation of the specs suggests: ldr +8, ldr +0, ldr +4, then vstr +0x20).
+- **Categories**: clock, state, attack (create_attack_data with the 42-word InnerEnemyAttackParam decoded,
+  AttackModuleImpl set / clear), effect (Behavior::request_effect*, EffectModuleImpl::req / req_follow / colours /
+  alpha / scale ..., for every owner: an effect module is mapped to its enemy through the accessor), sound
+  (Behavior / SoundModuleImpl / SoundSystem play_se, StageSoundPlayer), rng (GameManager::randi / randf,
+  StageRandom, ItemUtil::sync_random*, Behavior::random_* / success_by_*), ai (search_target, check_target,
+  nearest target, wall / cliff checks), spawn (EnemyManager::create_request, EnemyGenerator::*, StageEnemyLayout,
+  StageBaseFs), leave (init / update_common_leave, remove_enemy_by_id, kill counts), item (ItemManager create / lot /
+  ejection, FsItemAutoSet, create_dead_item), chest (FieldSmashManager, GconEventTreasure / GconMultiTreasure), stat
+  (FighterInformation::set_power_up_point / power_up_level / set_power_up_temp, gold), door (GconEventDoor,
+  GconMultiDoor, GconEventWarp), hazard (GimmickControllerBase as_ / ds_ / ss_ shapes, activation, damage;
+  GconAttack, GconDamageBase, GconOneShotDeathFloorFs, GconMoveFloor ...), stage (StageFieldSmash /
+  StageFsMiniroom constructors: a dump follows), result (the results scenes, RecFieldSmash*).
+- **Dumps**: `dump params` (EnemyParamAccessor singleton +0x60 + 4 x kind -> each array's count / data, decoded with
+  the spec layouts), `dump objects` (objects reachable from InstanceList<GimmickControllerBase> etc., identified by
+  their armcc RTTI name: [obj] = vtable, [vtable - 4] = typeinfo, [typeinfo + 4] = "N3app13GconEventDoorE"),
+  singletons raw.
+- **Frame clock**: `StageManager::process_fix_position()` (exported, inferred to run once a frame in battle; not
+  verified). `calibrate-clock` counts the candidates' hits next to an enemy's per-frame update; without a clock the
+  first traced enemy's update counts frames.
+- **Still unknown** (not exported, need code.bin): the spawner's tables and timers inside EnemyGenerator /
+  FieldSmashManager (dumped raw, layouts unread), the off-screen / distance despawn test, the drop tables (the
+  item and chest calls and their RNG are logged, the tables are not located), the 3DS power-up formula (see
+  docs/smash-run-stats.md), inline param reads (the dumps cover the values), the enemies' HP offset (raw dumps).
+- **Tests** (no Azahar here): `tests/test_rsp.py` (mock stub: checksums, escapes, run-length, acks / nacks,
+  no-ack mode, chunked reads, Z0 and the BKPT fallback, step-over, interrupt), `tests/test_cro.py` (the base
+  enemy_fs.cro loaded and relocated at two bases by `tests/croload.py`, the RO loader's steps: exports, vtable
+  relocations, the moved state table, import veneers), `tests/test_fake_azahar.py` (a Citra-style stub over
+  Unicorn running the base enemy_fs.cro's own Goomba code: create, the notice-hop enter -> play_se 0x28D0002 through
+  its import veneer and the hop speed P0 f7 = -0.4 written to the energy, the walk update re-entering state 3 after
+  reverse_lr; framework calls with decoded arguments; both breakpoint methods; dump params against kuribo.json),
+  `tests/test_analyse.py`.
+- **Feeding hand_read.json**: `python3 tools/smashrun_trace/analyse.py LOGS... --out report.md` lists per kind the
+  transitions, frame counts, speeds, attacks (on / off frames, fields), effects, sounds, AI and RNG, and diffs them
+  against `<kind>.json` / hand_read.json (exact call sites when the trace ran on the update map).
+  `--apply-confirmations` writes each kind's `azahar_trace` {confirmed, mismatches, sessions} into hand_read.json;
+  fix the mismatches in the hand reads / ports, then mark the entry "confirmed by Azahar trace".
+- **Unconfirmed until it runs on Azahar**: that Azahar's stub takes Z0 (else the BKPT fallback, which relies on the
+  stub's M flushing the JIT cache), its `g` layout (Citra's assumed: r0-r15, cpsr, d0-d15, fpscr), breakpoints with
+  the CPU JIT on, where the RO service maps the CROs (the scan covers 0x00100000-0x10000000 and the linear heaps),
+  the clock, and that the user's update is the one the update map was read from.
+
 ## Where Smash Run's code is
 
 CROs (in the dump, with their symbol names):
