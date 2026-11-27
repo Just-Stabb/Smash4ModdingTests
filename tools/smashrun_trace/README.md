@@ -174,6 +174,9 @@ redead, killer). Not sure of a name? Leave out
 
 - **"connection refused"**: the stub isn't on, or another program is connected to it (only one at a time), or
   the port differs (`--port`).
+- **The game froze after `probe` / `dump` and stayed frozen (v1.0.0)**: Azahar pauses the game while the tracer is
+  connected and only resumes it when told to continue; v1.0.0 disconnected without saying so. Fixed in v1.0.1 (every
+  command now ends with a continue). If a game is stuck like that, run `python trace.py resume` instead of rebooting.
 - **Azahar is frozen right after the tracer connects**: wait a few seconds; with thousands of breakpoints the first
   seconds are slow. If it stays frozen, press Ctrl+C in the tracer window (the game resumes), then try
   `--kinds kuribo` to trace less.

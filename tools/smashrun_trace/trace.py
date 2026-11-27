@@ -5,6 +5,7 @@
   python trace.py run [options]              trace until Ctrl+C (or --duration seconds); writes a .jsonl log
   python trace.py dump {params,singletons,objects,all}   one-shot dump of what is in RAM now, then detach
   python trace.py calibrate-clock [--seconds 20]         count the frame-clock candidates' hits per second
+  python trace.py resume                     unfreeze a game left paused by the stub (connect, continue, detach)
 
 Common options: --host 127.0.0.1 --port 24689 --out FILE.jsonl
 Run options:
@@ -38,7 +39,7 @@ from srtrace import tracer, cro, VERSION   # noqa: E402
 
 def build(argv=None):
     ap = argparse.ArgumentParser(description='Smash Run trace (Azahar GDB stub) v' + VERSION)
-    ap.add_argument('command', nargs='?', default='run', choices=['run', 'probe', 'dump', 'calibrate-clock'])
+    ap.add_argument('command', nargs='?', default='run', choices=['run', 'probe', 'dump', 'calibrate-clock', 'resume'])
     ap.add_argument('what', nargs='?', default='all')
     ap.add_argument('--host', default='127.0.0.1')
     ap.add_argument('--port', type=int, default=24689)
@@ -107,8 +108,25 @@ def calibrate(tr, seconds):
     tr.log.write({'t': 'note', 'f': 0, 'msg': 'calibrate-clock', 'counts': counts, 'seconds': seconds})
 
 
+def resume(host, port):
+    """connect, remove nothing, send continue and detach: unfreezes a game a stub left halted (Azahar halts the game
+    while a client is connected; v1.0.0's probe detached without a continue and the game stayed frozen)"""
+    from srtrace import rsp
+    c = rsp.RSPClient(host, port)
+    t = rsp.Target(c, log=print)
+    try:
+        t.attach()
+        t.detach()
+        print('[trace] continue sent: the game should be running again')
+    finally:
+        c.close()
+
+
 def main(argv=None):
     a = build(argv)
+    if a.command == 'resume':
+        resume(a.host, a.port)
+        return
     cfg = {k: v for k, v in vars(a).items() if k not in ('command', 'what', 'seconds')}
     cfg['include'] = a.include
     cfg['exclude'] = a.exclude

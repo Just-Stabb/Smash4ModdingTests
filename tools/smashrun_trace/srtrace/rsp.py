@@ -491,7 +491,17 @@ class Target:
         return None
 
     def detach(s):
+        """leave the game running. Citra-style stubs (Azahar's) halt the game while a client is connected and only
+        a continue lets it run again; they may ignore 'D', so detaching with 'D' alone left the game frozen until a
+        reboot (v1.0.0, reported by the user after `probe`). So: continue first (no stop reply is awaited), then 'D'
+        for stubs that want it, then the caller closes the socket. Breakpoints must already be removed."""
+        if not s.running:
+            try:
+                s.c.send_packet('vCont;c' if s.has_vcont else 'c')
+                s.running = True
+            except (RSPError, OSError, socket.timeout):
+                pass
         try:
-            s.c.command('D', timeout=3)
+            s.c.command('D', timeout=1)
         except (RSPError, OSError, socket.timeout):
             pass

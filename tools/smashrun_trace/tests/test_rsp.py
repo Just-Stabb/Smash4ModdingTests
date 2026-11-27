@@ -10,9 +10,12 @@ import socket
 import struct
 import sys
 import threading
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from srtrace import rsp     # noqa: E402
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 FAILS = []
 N = [0]
@@ -44,7 +47,7 @@ def rle(s):
 
 
 class Mock:
-    def __init__(s, noack=False, z0=True, nack_first=True, bad_checksum_once=True, packet_size=0x40):
+    def __init__(s, noack=False, z0=True, nack_first=True, bad_checksum_once=True, packet_size=0x40, citra_d=False):
         s.mem = {}
         s.regs = [0x100 + i for i in range(16)]
         s.bps = set()
@@ -54,6 +57,7 @@ class Mock:
         s.nack_first = nack_first
         s.bad_once = bad_checksum_once
         s.packet_size = packet_size
+        s.citra_d = citra_d       # Azahar-like: 'D' unsupported (empty reply), the game halted until a continue
         s.ls = socket.socket()
         s.ls.bind(('127.0.0.1', 0))
         s.ls.listen(1)
@@ -117,7 +121,7 @@ class Mock:
                 c.sendall(s.frame(r))
                 if body == 'QStartNoAckMode':
                     s.noack = True
-                if body == 'D':
+                if body == 'D' and not s.citra_d:
                     c.close()
                     return
 
@@ -164,7 +168,7 @@ class Mock:
             s.regs[15] += 4
             return 'T050f:%s;' % struct.pack('<I', s.regs[15]).hex()
         if p == 'D':
-            return 'OK'
+            return '' if s.citra_d else 'OK'
         if p == 'qEscape':
             return 'x}*#$'           # a reply that needs escaping
         return ''
@@ -239,6 +243,32 @@ def main():
     check(bytes(m.mem[0x3000 + k] for k in range(6)) == b'\x1e\xff\x2f\xe1\x70\x47', 'original bytes restored')
     t.detach()
     c.close()
+
+    # v1.0.1: an Azahar-like stub halts the game while a client is connected and ignores 'D'. The user's probe left
+    # the game frozen until a reboot because v1.0.0 detached with 'D' alone. Every detach must continue first.
+    for vcont in (True, False):
+        m = Mock(nack_first=False, bad_checksum_once=False, citra_d=True)
+        c = rsp.RSPClient('127.0.0.1', m.port, timeout=5)
+        t = rsp.Target(c, log=lambda *a: None)
+        t.attach()
+        t.has_vcont = vcont
+        t.read_regs()
+        t.detach()
+        c.close()
+        time.sleep(0.2)
+        cont = 'vCont;c' if vcont else 'c'
+        check(cont in m.log and 'D' in m.log and m.log.index(cont) < m.log.index('D'),
+              '[vCont=%s] detach continues the halted game before D (Azahar ignores D): %s' % (vcont, m.log[-3:]))
+    # trace.py resume: the same on its own (unfreezes a game a stub left halted)
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('trace_cli', os.path.join(HERE, '..', 'trace.py'))
+    cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cli)
+    m = Mock(nack_first=False, bad_checksum_once=False, citra_d=True)
+    cli.resume('127.0.0.1', m.port)
+    time.sleep(0.2)
+    check('vCont;c' in m.log and not any(x.startswith(('Z', 'z', 'M')) for x in m.log),
+          'trace.py resume: continue sent, nothing written: %s' % m.log)
     print('rsp: %d checks, %d failed' % (N[0], len(FAILS)))
     return 1 if FAILS else 0
 
