@@ -25,7 +25,7 @@ import time
 import socket
 
 from . import VERSION, TITLE_ID
-from . import rsp, cro, abi
+from . import rsp, cro, abi, locate
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -56,6 +56,8 @@ DEFAULTS = {
     'include': [], 'exclude': [],   # extra hook name substrings to force on / off
     'rsp_log': None,
     'dry': False,                   # probe: resolve everything, plant nothing
+    'eager_kinds': False,           # all kinds' state hooks at once (default: a kind's when its first one spawns)
+    'samples': 20,                  # CPU samples looking for a CRO before the page scan
 }
 
 
@@ -173,25 +175,42 @@ class Tracer:
                                                                    ', '.join(sorted(str(k) for k in feats))))
         if stop.exited:
             raise rsp.RSPError('the stub reports no running game (%s)' % stop.raw)
-        if s.t.running:
-            s.t.halt()
+        cache = os.path.join(os.path.dirname(os.path.abspath(s.cfg['out'])), locate.CACHE_NAME)
+        s.loc = locate.Locator(s.t, s.say, cache, s.catalog, s.maps, s.cfg['regions'])
+        s.loc.measure(stop_state_running=False)
+        s.loc.steps.start('read size')
+        n = s.t.find_max_read()
+        s.loc.steps.end('up to 0x%X bytes a packet' % n)
+        s.log.write({'t': 'note', 'f': 0, 'msg': 'latency', 'latency': s.loc.latency, 'max_read': n})
         return feats
 
     def find_modules(s):
-        hint = [m.base for m in s.mods.values()]
-        cache = os.path.join(os.path.dirname(os.path.abspath(s.cfg['out'])), 'smashrun_trace_modules.json')
-        if not hint and os.path.exists(cache):
-            try:
-                hint = json.load(open(cache))
-            except ValueError:
-                hint = []
-        mods = cro.scan(s.t, s.cfg['regions'], log=s.say, hint=hint)
-        s.mods = cro.by_name(mods)
-        try:
-            json.dump([m.base for m in mods], open(cache, 'w'))
-        except OSError:
-            pass
+        s.mods = s.loc.find(s.cfg['samples'])
+        s.loc.remember(s.mods)
         return s.mods
+
+    def module_addrs(s, m, hooks):
+        """{mangled: run-time address} of the wanted exports of module m: the catalogue's own offsets when m is the
+        file the catalogue was built from (same hash block), else the export table (cached per hash)"""
+        src = s.catalog.get('source', {})
+        label = src.get('label', 'base')
+        names = [h['mangled'] for h in hooks]
+        same = (getattr(m, 'hash80', None) and (m.hash80 == src.get('static_crs_hash80') if m.name == '|static|'
+                                                else m.hash80 == (src.get('module_hash80') or {}).get(m.name)))
+        out = {}
+        if same:
+            s.loc.how[m.name] = 'catalogue (same %s)' % ('static.crs' if m.name == '|static|' else m.name)
+            for h in hooks:
+                e = h.get('expected', {}).get(label)
+                if not e:
+                    continue
+                out[h['mangled']] = int(e, 16) if e.startswith('0x') else m.base + int(e.split('+')[1], 16)
+            return out
+        tags = s.loc.export_tags(m, names, 'static' if m.name == '|static|' else 'cro')
+        for n, tg in tags.items():
+            if tg and tg[0] < len(m.segments):
+                out[n] = m.segments[tg[0]][0] + tg[1]
+        return out
 
     def static_module(s):
         for n, m in s.mods.items():
@@ -203,7 +222,14 @@ class Tracer:
         ef = s.mods.get('enemy_fs')
         if not ef:
             return None
-        ex = cro.read_exports(s.t, ef)
+        for label, mp in s.maps.items():
+            if mp.get('hash80') and mp['hash80'] == getattr(ef, 'hash80', None) and s.cfg['map'] in ('auto', label):
+                s.say('[trace] map %s: the loaded enemy_fs.cro is the file the map was read from' % label)
+                s.map = mp
+                s.map_kinds_by_index = {v['index']: k for k, v in mp['kinds'].items()}
+                return mp
+        names = sorted(set(v['create_mangled'] for mp in s.maps.values() for v in mp['kinds'].values()))
+        ex = s.loc.export_tags(ef, names, 'cro')
         best, score = None, -1
         for label, mp in s.maps.items():
             if s.cfg['map'] not in ('auto', label):
@@ -244,9 +270,9 @@ class Tracer:
         st = s.static_module()
         s.static_syms = {}
         if st:
-            cro.read_exports(s.t, st)
-            for name, _tag in st.exports.items():
-                s.static_syms[name] = cro.export_addr(st, name)
+            want = [h for h in s.catalog['hooks'] if h['module'] == 'static'] + \
+                list(s.catalog.get('singletons', {}).values())
+            s.static_syms = s.module_addrs(st, want)
         for nm, sg in s.catalog.get('singletons', {}).items():
             a = s.static_syms.get(sg['mangled'])
             if a:
@@ -290,7 +316,7 @@ class Tracer:
                 a = s.static_syms.get(h['mangled'])
             else:
                 m = s.mods.get(h['module'])
-                a = cro.export_addr(m, h['mangled']) if m and cro.read_exports(s.t, m) is not None else None
+                a = s.cro_addrs(m).get(h['mangled']) if m else None
             if h['cat'] == 'clock':
                 if a:
                     clock_cands.append((h, a))
@@ -337,6 +363,8 @@ class Tracer:
             return
         segs = s.map.get('file_segments') or None
         to_rt = (lambda off: ef.to_runtime(off, segs)) if segs else (lambda off: ef.base + off)
+        s.to_rt = to_rt
+        s.kinds_hooked = set()
         n = 0
         for kind, v in s.map['kinds'].items():
             if s.kinds and kind not in s.kinds:
@@ -345,8 +373,23 @@ class Tracer:
             if s.add(Hook('create', a, {'kind': kind}, 'create:' + kind, 'spawn', want_ret=True,
                           plan=abi.plan('create(app::EnemyModuleAccessor&, int, int)'))):
                 n += 1
+            if s.cfg['eager_kinds'] or s.kinds:
+                n += s.install_kind(kind)
+        s.note('[trace] %d enemy breakpoints in enemy_fs.cro (map %s, base 0x%08X)%s' % (
+            n, s.map['label'], ef.base, '' if (s.cfg['eager_kinds'] or s.kinds) else
+            '; a kind\'s state hooks go in when its first one spawns'))
+
+    def install_kind(s, kind):
+        """the state / slot breakpoints of one kind"""
+        if kind in s.kinds_hooked or not s.map or kind not in s.map['kinds']:
+            return 0
+        s.kinds_hooked.add(kind)
+        v = s.map['kinds'][kind]
+        to_rt = s.to_rt
+        n = 0
+        if True:
             if 'state' not in s.cats:
-                continue
+                return 0
             for sid, fns in v['states'].items():
                 for role in ('enter', 'exit', 'update'):
                     off = fns.get(role)
@@ -362,7 +405,7 @@ class Tracer:
                     continue
                 if s.add(Hook('slot', to_rt(off), {'kind': kind, 'slot': slot}, '%s:slot:%s' % (kind, slot), 'state')):
                     n += 1
-        s.note('[trace] %d enemy breakpoints in enemy_fs.cro (map %s, base 0x%08X)' % (n, s.map['label'], ef.base))
+        return n
 
     def uninstall_module(s, m):
         lo, hi = m.range()
@@ -613,6 +656,9 @@ class Tracer:
         except rsp.RSPError:
             pass
         if hk.kind == 'create' and r0:
+            if hk.data['kind'] not in getattr(s, 'kinds_hooked', ()):
+                s.log.write({'t': 'hook', 'f': s.frame, 'name': hk.data['kind'], 'status': 'state hooks on (%d)' %
+                             s.install_kind(hk.data['kind'])})
             info = s.instance(r0, hk.data['kind'])
             if info:
                 ev['spawn'] = {'inst': '0x%08X' % r0, 'kind': info['kind'], 'var': info['var']}
@@ -755,10 +801,9 @@ class Tracer:
                 s.uninstall_module(m)
                 del s.mods[n]
         st = s.static_module()
-        if st:
-            for m in cro.walk(s.t, st):
-                if m.name and m.name not in s.mods:
-                    s.mods[m.name] = m
+        if st and not all(n in s.mods for n in ('enemy_fs', 'main_field')):
+            s.loc.chain(st, s.mods)
+            s.loc.remember(s.mods)
         new = [n for n in s.mods if n not in old or s.mods[n].base != old.get(n)]
         for n in new:
             s.log.write({'t': 'module', 'f': s.frame, 'name': n, 'base': '0x%08X' % s.mods[n].base, 'status': 'loaded'})
@@ -769,12 +814,19 @@ class Tracer:
         if 'main_field' in new and s.cfg['dump_on_stage']:
             s.dump_at = s.frame + s.cfg['dump_delay']
 
+    def cro_addrs(s, m):
+        if not hasattr(s, '_cro_addr_cache'):
+            s._cro_addr_cache = {}
+        key = (m.name, m.base)
+        if key not in s._cro_addr_cache:
+            s._cro_addr_cache[key] = s.module_addrs(m, [h for h in s.catalog['hooks'] if h['module'] == m.name])
+        return s._cro_addr_cache[key]
+
     def reinstall_cro_hooks(s, names):
         for h in s.catalog['hooks']:
             if h['module'] in names and s.want_hook(h):
                 m = s.mods[h['module']]
-                cro.read_exports(s.t, m)
-                a = cro.export_addr(m, h['mangled'])
+                a = s.cro_addrs(m).get(h['mangled'])
                 if a:
                     s.add(Hook('cro', a, h, h['name'], h['cat'], abi.plan(h['name']), False))
         if 'enemy_fs' in names:
@@ -809,7 +861,7 @@ class Tracer:
             s.client.close()
             s.say('[trace] breakpoints removed, detached')
 
-    def run(s, one_shot=None):
+    def run(s, one_shot=None, partial=None):
         s.open()
         t_end = time.time() + s.cfg['duration'] if s.cfg['duration'] else None
         try:
@@ -839,16 +891,26 @@ class Tracer:
                     s.note('[trace] reconnecting')
         except KeyboardInterrupt:
             s.note('[trace] Ctrl+C: stopping')
+            if partial:
+                try:
+                    partial(s)
+                except Exception as e:          # the summary of what is known must not hide the teardown
+                    s.say('[trace] (partial summary failed: %s)' % e)
         finally:
+            if getattr(s, 'loc', None):
+                s.log.write({'t': 'note', 'f': s.frame, 'msg': 'packet accounting', 'steps': s.loc.steps.rows,
+                             'packets': s.client.n_packets, 'latency': s.loc.latency, 'how': s.loc.how})
             s.teardown()
             if s.log:
                 s.log.close()
                 s.say('[trace] log: %s (%d events)' % (s.cfg['out'], s.log.count))
 
     def loop(s, t_end=None):
-        regs = s.t.read_regs()
-        pc = regs.get('r15')
-        st = s.t.cont(pc)
+        if s.t.running:
+            st = None
+        else:
+            regs = s.t.read_regs()
+            st = s.t.cont(regs.get('r15'))
         idle = time.time()
         while not s.stop_flag:
             if s.log.capped:

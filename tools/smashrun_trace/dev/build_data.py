@@ -214,11 +214,13 @@ def cmd_catalog(a):
         if m:
             singles['InstanceList<GimmickControllerBase>'] = {'mangled': mang, 'expected': {a.label: '0x%08X' % addr}}
     cro_hooks = []
+    mod_hash = {}
     for mod, rx, cat in CRO_RULES:
         p = os.path.join(a.cro_dir, mod + '.cro')
         if not os.path.exists(p):
             continue
         _x, ex = mangled_exports(p)
+        mod_hash[mod] = _x[:0x80].hex()
         for off, mang, dem in ex:
             if re.search(rx, dem):
                 cro_hooks.append({'name': dem, 'mangled': mang, 'module': mod, 'cat': cat, 'hot': False, 'ret': False,
@@ -228,7 +230,10 @@ def cmd_catalog(a):
         counts[h['cat']] = counts.get(h['cat'], 0) + 1
     out = {'about': 'Framework hooks by mangled name (tools/smashrun_trace/dev/build_data.py catalog). Resolved at run '
                     'time through the loaded static.crs / CRO export tables.',
-           'source': {'static_crs_sha1': hashlib.sha1(crs).hexdigest(), 'label': a.label},
+           'source': {'static_crs_sha1': hashlib.sha1(crs).hexdigest(), 'label': a.label,
+                      # the 0x80-byte hash block at the start of the file (kept in RAM at the module's base): when the
+                      # loaded static.crs / CRO has the same block, the `expected` addresses are used without reads
+                      'static_crs_hash80': crs[:0x80].hex(), 'module_hash80': mod_hash},
            'counts': counts, 'hooks': hooks + cro_hooks, 'singletons': singles}
     json.dump(out, open(os.path.join(OUT, 'catalog.json'), 'w'), indent=0, sort_keys=True)
     print('catalog: %d hooks (%s), %d singletons' % (len(hooks) + len(cro_hooks), counts, len(singles)))
@@ -362,7 +367,7 @@ def cmd_map_cro(a):
                 v['fields'] = u[k]['fields']
                 v['params'] = u[k]['params']
     out = {'module': 'enemy_fs', 'label': a.label, 'source': os.path.basename(a.cro) + ' sha1 ' +
-           hashlib.sha1(c.x).hexdigest(), 'file_segments': [list(s) for s in c.segs], 'kinds': kinds,
+           hashlib.sha1(c.x).hexdigest(), 'hash80': c.x[:0x80].hex(), 'file_segments': [list(s) for s in c.segs], 'kinds': kinds,
            'accessor': {k: v - a.accessor_shift for k, v in ACCESSOR.items()},
            'accessor_source': 'update - 0x%X: the base enemy_fs.cro reads Posture at +0x303C, the movement energy at '
                               '+0x3050, Kinetic at +0x3008 and Ground at +0x2FFC where the update reads +0x309C / '

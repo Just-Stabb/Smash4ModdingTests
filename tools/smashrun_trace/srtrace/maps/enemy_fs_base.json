@@ -40,6 +40,7 @@
 0
 ]
 ],
+"hash80": "9d8ab7aaed0c07ddea444f82bf2bd2e66af6a55d2a9201929d9bd9ecec6888af55d2741b6eec91f0e221655ed6cbca33b4420598e7c66942e6e9fc3f75d21bd5e7e5909f0ad626d4a493c52c4616a0aacff556563a6f8db6e512eeafeac6eed192fd998afddaca9ca43027aa0c7f7c21ff3142f764f31a0a7e13496859e4c9b1",
 "kinds": {
 "bacula": {
 "class": "BehaviorBacula",

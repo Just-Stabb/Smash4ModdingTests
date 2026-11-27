@@ -70,15 +70,31 @@ def build(argv=None):
 
 def probe(tr):
     t = tr.t
-    print('modules:')
+    loc = getattr(tr, 'loc', None)
+    print('')
+    print('==== probe summary (toolkit v%s) ====' % VERSION)
+    if loc and loc.latency:
+        la = loc.latency
+        print('stub latency: %s ms a packet as connected, %s ms halted -> bulk reads done %s' % (
+            la.get('as_connected_ms'), la.get('halted_ms'), la.get('mode')))
+    print('read size: up to 0x%X bytes a packet' % (t.max_read or 0))
+    print('modules (%s):' % (loc.how.get('modules') if loc else '?'))
     for n, m in sorted(tr.mods.items(), key=lambda x: x[1].base):
-        print('  %-16s 0x%08X  %s' % (n, m.base, ' '.join('%d:0x%08X+0x%X' % (ty, a, sz) for a, sz, ty in m.segments)))
-    print('map: %s' % (tr.map['label'] if tr.map else 'none (enemy_fs.cro not loaded, or no map matches it)'))
-    print('static symbols: %d, singletons: %s' % (len(tr.static_syms), ', '.join(sorted(tr.singletons))))
+        print('  %-16s 0x%08X  %s' % (n, m.base, ' '.join('%d:0x%08X+0x%X' % (ty, a, sz) for a, sz, ty in m.segments)
+                                       if not getattr(m, 'partial', False) else '(segments not read)'))
+    print('map: %s' % (tr.map['label'] if tr.map else 'none (enemy_fs.cro not loaded: run the probe inside Smash Run, '
+                                                          'or no map matches it)'))
+    print('static symbols: %d resolved (%s), singletons: %s' % (
+        len(tr.static_syms), (loc.how.get('|static|') if loc else '?'), ', '.join(sorted(tr.singletons))))
     on = sum(len(v) for v in tr.bp.values())
-    print('breakpoints that would be set: %d (at %d addresses)' % (on, len(tr.bp)))
+    print('breakpoints a run would set now: %d (at %d addresses)' % (on, len(tr.bp)))
     print('clock: %s' % (tr.clock_hook.name if tr.clock_hook else 'none'))
-    print('breakpoint method: %s' % ('Z0' if t.z0_ok else 'BKPT words' if t.z0_ok is False else 'untested'))
+    if loc:
+        print('cost per step:')
+        for r in loc.steps.rows:
+            print('  %-40s %6d packets %7.1f s  %s' % (r['step'], r['packets'], r['seconds'], r['note']))
+    print('total: %d packets' % tr.client.n_packets)
+    print('====')
 
 
 def calibrate(tr, seconds):
@@ -141,7 +157,7 @@ def main(argv=None):
     if a.command == 'run':
         tr.run()
     elif a.command == 'probe':
-        tr.run(one_shot=probe)
+        tr.run(one_shot=probe, partial=probe)
     elif a.command == 'dump':
         fn = {'params': lambda t: t.dump_params(), 'singletons': lambda t: t.dump_singletons(),
               'objects': lambda t: t.dump_objects(), 'all': lambda t: t.dump_all('requested')}[a.what]

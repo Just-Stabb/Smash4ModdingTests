@@ -112,6 +112,7 @@ class RSPClient:
         s.trace = trace            # callable(direction, bytes) for --rsp-log
         s.async_stop = None
         s.ack_nudge = True
+        s.n_packets = 0            # packets sent (the probe's cost accounting)
 
     # ---------------------------------------------------------------- transport
     def connect(s):
@@ -182,6 +183,7 @@ class RSPClient:
             s._recv_more(left)
 
     def send_packet(s, payload, tries=5):
+        s.n_packets += 1
         f = frame(payload)
         for _ in range(tries):
             s._send_raw(f)
@@ -261,6 +263,7 @@ class Target:
         s.running = False
         s.has_vcont = False
         s.mem_errors = 0
+        s.max_read = None
 
     # ---------------------------------------------------------------- setup
     def attach(s):
@@ -349,9 +352,31 @@ class Target:
         return out[:count]
 
     # ---------------------------------------------------------------- memory
+    def find_max_read(s, addr=0x00100000):
+        """the largest `m` length the stub answers in full (some take more than PacketSize implies): <= 3 packets"""
+        base = max(0x10, (s.c.packet_size - 8) // 2)
+        for n in (0x4000, 0x2000):
+            if n <= base:
+                break
+            try:
+                r = s.c.command('m%x,%x' % (addr, n))
+            except (RSPError, socket.timeout):
+                continue
+            if r and not (r[0] == 'E' and len(r) == 3) and len(r) == 2 * n:
+                s.max_read = n
+                return n
+        s.max_read = base
+        return base
+
+    def resume_nowait(s):
+        """continue without waiting for a stop (the probe's 'running' mode, the detach)"""
+        if not s.running:
+            s.c.send_packet('vCont;c' if s.has_vcont else 'c')
+            s.running = True
+
     def read(s, addr, size):
         out = bytearray()
-        step = max(0x10, (s.c.packet_size - 8) // 2)
+        step = s.max_read or max(0x10, (s.c.packet_size - 8) // 2)
         while size > 0:
             n = min(size, step)
             r = s.c.command('m%x,%x' % (addr, n))
