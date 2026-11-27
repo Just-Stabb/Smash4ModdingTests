@@ -35,6 +35,21 @@ RomFS only (no ExeFS):
 - `sound/bgm/*.nus3bank`, `sound/smashappeal/`, `movie/howtoplay.moflex` (left out of the scratch copy to save
   space; refetch for Smash Run's music).
 
+## The user can emulate Smash 3DS (noted 2026-11-27)
+
+The user can run Smash for 3DS in an emulator. Before this, every 3DS behaviour came from static reading of
+enemy_fs.cro / code.bin plus Unicorn runs of single functions. When Smash Run work resumes, use the emulator as
+ground truth.
+- **Reference clips:** ask for clips of each enemy's behaviours in Smash Run (walk / search / turn / attacks /
+  stomp / death), to compare the port's speeds, timings and attack windows side by side.
+- **Per-frame traces:** if the user's emulator has a GDB stub (Citra and its forks Lime3DS / Azahar do), write a
+  gdb Python script for the user to run.
+  - Breakpoints on the hand-read state enter / update / exit functions log the state id, position, speed and
+    timers per frame, so each entry in `reference/smashrun_enemy_specs/hand_read.json` can be confirmed.
+  - enemy_fs.cro is relocated at load, so the script must find its base first.
+- **RAM dumps:** a RAM dump at a chosen moment lets the enemy structs and params be read with their real values.
+- Mark what the emulator confirmed in hand_read.json, as Unicorn checks are marked now.
+
 ## Where Smash Run's code is
 
 CROs (in the dump, with their symbol names):
