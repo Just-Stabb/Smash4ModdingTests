@@ -131,6 +131,22 @@ namespace Sm4shCommand.Sound
             Index();
         }
 
+        /// <summary>v1.7.34 (Merge sound mods): any row given a bank id and labels (in use or empty; the labels appended to
+        /// the pool, the old words stay), as SetLabels / UseRow; rows past the table's end are added empty first.</summary>
+        public void SetRow(int row, uint bankId, IList<int> tones)
+        {
+            EnsureRows(row + 1);
+            uint zero = Rows[row].Zero;
+            Rows[row] = new Row { BankId = bankId, Count = (uint)tones.Count, Offset = AppendLabels(tones), Zero = zero };
+            Index();
+        }
+
+        /// <summary>v1.7.34: grows the row table to n rows (new rows empty: bank id -1, no labels).</summary>
+        public void EnsureRows(int n)
+        {
+            while (Rows.Count < n) Rows.Add(new Row { BankId = EmptyBank, Count = 0, Offset = 0, Zero = 0 });
+        }
+
         uint AppendLabels(IList<int> tones)
         {
             int pad = (4 - Pool.Length % 4) % 4;

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Sm4shCommand v1.7.32's Sound Effect Viewer and v1.7.33's Sound Adder, tested headlessly (Mono): sound_viewer_test.cs
+"""Sm4shCommand v1.7.32's Sound Effect Viewer, v1.7.33's Sound Adder and v1.7.34's keyboard / Merge sound mods, tested
+headlessly (Mono): sound_viewer_test.cs
 (SvTest.exe) on real banks, then its decoded PCM checked here against this file's own DSP-ADPCM decoder (written from the
 format, not from the C#) and, for Greninja's IceBoom, against the user's creeper_explosion.mp3 it was made from
 (tools/gekkouga_sound.py --ice: trimmed / padded, -0.5 dBFS peak), by cross-correlation.
@@ -14,6 +15,10 @@ user's snd_se_Gekkouga and his soundlabeltable row, one to Master's se and its c
 encoder's frames against tools/dspadpcm's (dspenc, compiled here) byte for byte, its resampling against ffmpeg's, and
 the written banks / table read with the repo's own tools (fighter_own_bank.py's Table / binf, minecraft_sound.py's TONE
 reader, fighter_sound.py's tone count) and this file's decoder, the new tones against their source clips.
+v1.7.34: --gui also sends real key presses (XTest) to the lists (Space / arrows / Enter / F2, the player stubbed); --adder
+also builds sound mods with the Sound Adder and merges them (sound_viewer_test.cs MergeTests / MergeGui); here the merged
+ids are followed through fighter_own_bank.Table and decoded against the mods' own, and the command line
+(SM4SHCommand.exe --merge-sounds) is run and compared with the engine's output.
 """
 import os
 import shutil
@@ -238,6 +243,51 @@ def adder_checks(check, out, adder_in):
         os.remove(exe)
 
 
+def merge_checks(check, run, out):
+    """v1.7.34's Merge sound mods, read here with the repo's own tools: the remapped ids through the merged table
+    (fighter_own_bank.Table) to the merged bank's tone (this file's decoder) = the mod's own id through its own table and
+    bank; the command-line mode (SM4SHCommand.exe --merge-sounds) giving the dialog's / engine's files"""
+    sys.path.insert(0, TOOLS)
+    import fighter_own_bank as FB
+    import minecraft_sound as ms
+    rows = [l.rstrip('\n').split('\t') for l in open(os.path.join(out, 'adder', 'merge', 'manifest.txt'))]
+
+    def reach(table, bank, sid):
+        t = FB.Table(open(table, 'rb').read())
+        row, label = sid >> 16, sid & 0xFFFF
+        tone = t.tones(row)[label]
+        _s, tones = ms.tones_of(open(bank, 'rb').read())
+        _h, name, _r = ms.parse_entry(tones[tone])
+        return tone, name, dsp_decode(tone_audio(bank, tone))[0]
+
+    for r in [r for r in rows if r[0] == 'reach']:
+        table, bank, sid, mtable, mbank = r[1], r[2], int(r[3]), r[4], r[5]
+        old = int(r[6]) if len(r) > 6 else sid
+        t1, n1, p1 = reach(table, bank, sid)
+        t2, n2, p2 = reach(mtable, mbank, old)
+        check('merge: 0x%08X in the merged table -> tone %d %s = the mod\'s 0x%08X -> its tone %d (decoded here, sample for sample)' % (sid, t1, n1, old, t2),
+              n1 == n2 and p1.shape == p2.shape and np.array_equal(p1, p2))
+    cli = [r for r in rows if r[0] == 'cli'][0]
+    mod_a, mod_c, base, engine_out, cli_out, cli_dry = cli[1:7]
+    exe = os.path.join(run, 'SM4SHCommand.exe')
+    p = subprocess.run(['mono', exe, '--merge-sounds', cli_out, mod_a, mod_c, '--base', base], cwd=run, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    text = p.stdout.decode('utf-8', 'replace')
+    check('merge CLI: exit code 0 (%d)' % p.returncode, p.returncode == 0, p.stderr.decode('utf-8', 'replace')[-400:])
+    check('merge CLI: the report printed (the remap)', '0x07680062 -> 0x07680065' in text)
+    for rel in ['sound/config/soundlabeltable.bin', 'fighter/gekkouga/sound/snd_se_Gekkouga.nus3bank',
+                'fighter/gekkouga/script/animcmd/body/sound.bin', 'fighter/gekkouga/script/animcmd/weapon/shuriken/sound.bin',
+                'Aliases/sounds/gekkouga.txt']:
+        a, b = os.path.join(cli_out, rel), os.path.join(engine_out, rel)
+        check('merge CLI: %s = the engine\'s (the test\'s A+C merge)' % rel, os.path.exists(a) and open(a, 'rb').read() == open(b, 'rb').read())
+    check('merge CLI: MERGE_REPORT.txt', os.path.exists(os.path.join(cli_out, 'MERGE_REPORT.txt')))
+    p = subprocess.run(['mono', exe, '--merge-sounds', mod_a, mod_c, '--base', base, '--dry-run'], cwd=run, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    check('merge CLI --dry-run: exit 0, the report, nothing written', p.returncode == 0 and b'[check only: nothing written]' in p.stdout and not os.path.exists(cli_dry))
+    p = subprocess.run(['mono', exe, '--merge-sounds', cli_out, mod_a], cwd=run, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    check('merge CLI: one mod: exit 2 (usage)', p.returncode == 2 and b'--merge-sounds OUT_DIR' in p.stderr)
+    p = subprocess.run(['mono', exe, '--merge-sounds', cli_out, mod_a, mod_c, '--base', base], cwd=run, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    check('merge CLI: a folder that isn\'t empty: exit 1, refused', p.returncode == 1 and b"isn't empty" in p.stdout)
+
+
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--')]
     if len(a) < 5:
@@ -251,7 +301,8 @@ def main():
         make_inputs(mp3, adder_in)
     exe = os.path.join(run, 'SvTest.exe')
     refs = ['-r:' + os.path.join(run, x) for x in ('SALT.dll', 'SM4SHCommand.exe', 'FastColoredTextBox.dll')] + \
-           ['-r:%s/%s' % (MONO, x) for x in ('mscorlib.dll', 'System.dll', 'System.Core.dll', 'System.Windows.Forms.dll', 'System.Drawing.dll')]
+           ['-r:%s/%s' % (MONO, x) for x in ('mscorlib.dll', 'System.dll', 'System.Core.dll', 'System.Windows.Forms.dll', 'System.Drawing.dll',
+                                            'System.IO.Compression.dll', 'System.IO.Compression.FileSystem.dll')]
     subprocess.run(['dotnet', CSC, '-nologo', '-nowarn:1701,1702', '-out:' + exe, '-nostdlib'] + refs +
                    [os.path.join(HERE, 'sound_viewer_test.cs')], check=True)
     cmd = ['mono', exe, os.path.join(run, 'Events.cfg'), root, game, port, out] + (['--gui'] if gui else []) + \
@@ -304,6 +355,7 @@ def main():
         check('IceBoom: the padding in front (gekkouga_sound.py ice_cut: 0.149 s)', abs(lag / 48000 - 0.149) < 0.005, '%.4f s' % (lag / 48000))
     if adder_in:
         adder_checks(check, out, adder_in)
+        merge_checks(check, run, out)
         shutil.rmtree(os.path.join(out, 'adder'), ignore_errors=True)      # the staged / written copies (rebuildable)
         shutil.rmtree(adder_in, ignore_errors=True)
     print('%d python checks; %d failures in all (the C# test\'s count included)' % (oks, fails))

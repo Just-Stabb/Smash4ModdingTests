@@ -7,7 +7,9 @@
 // -r:<mono 4.5>/System.Windows.Forms.dll -r:<mono 4.5>/System.Drawing.dll -nostdlib sound_viewer_test.cs
 // Run: mono SvTest.exe Events.cfg FIGHTER_ROOT GAME_DATA PORT_ROOT OUT_DIR [--gui] [--adder IN_DIR]
 //   --adder IN_DIR  v1.7.33's Sound Adder (AdderTests, AdderGui): IN_DIR's audio files (sound_viewer_test.py makes them
-//                   with ffmpeg: 44.1 kHz WAVs mono / stereo / 24-bit / float, a padded one, an mp3, a flac)
+//                   with ffmpeg: 44.1 kHz WAVs mono / stereo / 24-bit / float, a padded one, an mp3, a flac); v1.7.34's
+//                   Merge sound mods (MergeTests, MergeGui) on mods built from them with the Sound Adder
+//   --gui         also v1.7.34's keyboard (KeysGui): real key events (XTest) sent to the lists under Xvfb, the player stubbed
 //   FIGHTER_ROOT  .../fighter/gekkouga (sound/: the user's snd_se_Gekkouga with the skeleton / ice tones, vanilla vc)
 //                 with .../sound/config/soundlabeltable.bin above it (the package's)
 //   GAME_DATA     a folder with sound/se/snd_se_joucyu.nus3bank and sound/config/soundlabeltable.bin (vanilla)
@@ -23,6 +25,7 @@ using System.Windows.Forms;
 using SALT.Moveset;
 using SALT.Moveset.AnimCMD;
 using Sm4shCommand.Sound;
+using System.Runtime.InteropServices;
 
 class SvTest
 {
@@ -315,8 +318,11 @@ class SvTest
         int ai = Array.IndexOf(args, "--adder");
         string adderIn = ai >= 0 && ai + 1 < args.Length ? args[ai + 1] : null;
         if (adderIn != null) AdderTests(root, game, port, outDir, adderIn);
+        if (adderIn != null) MergeTests(root, game, port, outDir, adderIn);
         if (gui) Gui(root, game, outDir, ini);
+        if (gui) KeysGui(root, game, outDir, ini);
         if (gui && adderIn != null) AdderGui(root, game, outDir, adderIn, ini);
+        if (gui && adderIn != null) MergeGui(root, game, outDir, ini);
         Console.WriteLine(string.Format(IC, "{0} checks, {1} failures", oks + fails, fails));
         return fails;
     }
@@ -942,6 +948,599 @@ class SvTest
             form.FighterGrid.FirstDisplayedScrollingRowIndex = Math.Max(0, lastSaved.Index - 15);
             form.FighterGrid.CurrentCell = lastSaved.Cells["Name"];
             Shot(form, Path.Combine(outDir, "adder_saved.png"));
+            form.Close();
+        }
+        finally { File.Delete(ini); }
+    }
+
+    // ======================================================================== v1.7.34: the keyboard
+
+    [DllImport("libX11.so.6")] static extern IntPtr XOpenDisplay(string name);
+    [DllImport("libX11.so.6")] static extern byte XKeysymToKeycode(IntPtr d, UIntPtr keysym);
+    [DllImport("libX11.so.6")] static extern int XFlush(IntPtr d);
+    [DllImport("libXtst.so.6")] static extern int XTestFakeKeyEvent(IntPtr d, uint keycode, bool press, UIntPtr delay);
+    [DllImport("libXtst.so.6")] static extern int XTestFakeMotionEvent(IntPtr d, int screen, int x, int y, UIntPtr delay);
+    [DllImport("libXtst.so.6")] static extern int XTestFakeButtonEvent(IntPtr d, uint button, bool press, UIntPtr delay);
+    static IntPtr xd;
+    const uint XK_space = 0x20, XK_Up = 0xFF52, XK_Down = 0xFF54, XK_Return = 0xFF0D, XK_F2 = 0xFFBF, XK_a = 0x61, XK_b = 0x62;
+
+    static void Pump(int n = 12) { for (int i = 0; i < n; i++) { Application.DoEvents(); System.Threading.Thread.Sleep(15); } }
+
+    /// <summary>A real key press and release sent to the X server (XTest): the window under the pointer gets it, as a user's.</summary>
+    static void XKey(uint sym)
+    {
+        uint kc = XKeysymToKeycode(xd, (UIntPtr)sym);
+        XTestFakeKeyEvent(xd, kc, true, UIntPtr.Zero);
+        XTestFakeKeyEvent(xd, kc, false, UIntPtr.Zero);
+        XFlush(xd);
+        Pump();
+    }
+
+    static void XPoint(Control c, Point p)
+    {
+        var at = c.PointToScreen(p);
+        XTestFakeMotionEvent(xd, -1, at.X, at.Y, UIntPtr.Zero);
+        XFlush(xd);
+        Pump();
+    }
+
+    static void XClick(int times)
+    {
+        for (int i = 0; i < times; i++) { XTestFakeButtonEvent(xd, 1, true, UIntPtr.Zero); XTestFakeButtonEvent(xd, 1, false, UIntPtr.Zero); }
+        XFlush(xd);
+        Pump();
+    }
+
+    /// <summary>The player, stubbed: what the viewer asked it to do.</summary>
+    class StubOut : Sm4shCommand.GUI.ISoundOut, Sm4shCommand.GUI.ISoundOutState
+    {
+        public readonly List<string> Log = new List<string>();
+        public bool Playing { get; set; }
+        public void Play(byte[] wav) { Log.Add("play"); Playing = true; }
+        public void Stop() { if (Playing) Log.Add("stop"); Playing = false; }
+        public string Text { get { return string.Join(",", Log); } }
+    }
+
+    static void KeysGui(string root, string game, string outDir, string ini)
+    {
+        Console.WriteLine("---- v1.7.34: the keyboard (XTest key events under Xvfb; the player stubbed)");
+        File.WriteAllText(ini, "SoundDataFolder = " + game + "\n");     // (no SoundPlayOnSelect line: a first run)
+        xd = XOpenDisplay(null);
+        True("keys: the X display opened (XTest)", xd != IntPtr.Zero);
+        if (xd == IntPtr.Zero) return;
+        try
+        {
+            var stub = new StubOut();
+            var form = new Sm4shCommand.GUI.SoundViewer(root, () => null) { Output = stub };
+            form.StartPosition = FormStartPosition.Manual;
+            form.Location = new Point(0, 0);
+            form.Show();
+            Pump();
+            Check("keys: \"Play on select while playing\" is off on a first run", form.PlayOnSelect.Checked, false);
+            form.Filter.Text = "_Sk";
+            Pump();
+            var g = form.FighterGrid;
+            Func<int, string> id = i => (string)g.Rows[i].Cells["Id"].Value;
+            Func<string> cur = () => form.Selected != null ? form.Selected.IdText : "-";
+            Func<string> playing = () => form.PlayingEntry != null ? form.PlayingEntry.IdText : "-";
+            True("keys: rows to move through (" + g.Rows.Count + ")", g.Rows.Count >= 5);
+            g.CurrentCell = g.Rows[0].Cells["Name"];
+            form.Activate();
+            g.Focus();
+            XPoint(g, new Point(g.Width / 2, g.Height - 8));        // (no window manager: the window under the pointer gets the keys)
+            True("keys: the list has the focus", g.Focused);
+            XKey(XK_space);
+            Check("Space: plays the selected row", playing() + " " + stub.Text, id(0) + " play");
+            XKey(XK_Down);
+            Check("Down: the selection moves down", cur(), id(1));
+            Check("Down, play on select off: the sound plays on, nothing new played", playing() + " " + stub.Text, id(0) + " play");
+            XKey(XK_space);
+            Check("Space while playing: stops it", playing() + " " + stub.Text, "- play,stop");
+            XKey(XK_space);
+            Check("Space while stopped: plays the selected row", playing() + " " + stub.Text, id(1) + " play,stop,play");
+            Check("Space: no edit started", g.IsCurrentCellInEditMode, false);
+            form.PlayOnSelect.Checked = true;
+            Pump();
+            True("keys: the option is remembered (Sm4shCommand.ini SoundPlayOnSelect = true)", File.ReadAllText(ini).Contains("SoundPlayOnSelect = true"));
+            stub.Log.Clear();
+            XKey(XK_Down);
+            Check("Down, play on select on, while playing: the old one stops at once, the new row plays", cur() + " " + playing() + " " + stub.Text, id(2) + " " + id(2) + " stop,play");
+            XKey(XK_Up);
+            Check("Up, the same: back to the row above, playing", cur() + " " + playing() + " " + stub.Text, id(1) + " " + id(1) + " stop,play,stop,play");
+            XKey(XK_space);
+            Check("Space: stops it", playing(), "-");
+            stub.Log.Clear();
+            XKey(XK_Down);
+            Check("Down while nothing plays (play on select on): moves, plays nothing", cur() + " " + playing() + " [" + stub.Text + "]", id(2) + " - []");
+            XKey(XK_Return);
+            Check("Enter: plays the selected row (and stays on it)", cur() + " " + playing() + " " + stub.Text, id(2) + " " + id(2) + " play");
+            // the alias cell: Space (not editing) plays / stops, no edit; while editing it types a space
+            g.CurrentCell = g.Rows[2].Cells["Alias"];
+            Pump();
+            var entry = (SoundEntry)g.Rows[2].Tag;
+            string aliasWas = entry.Alias;
+            stub.Log.Clear();
+            XKey(XK_space);
+            Check("Space on the Alias cell: stops the sound, no edit started", playing() + " " + stub.Text + " " + g.IsCurrentCellInEditMode, "- stop False");
+            XKey(XK_F2);
+            Check("F2: edits the alias", g.IsCurrentCellInEditMode, true);
+            XKey(XK_a); XKey(XK_space); XKey(XK_b);
+            Check("typing while editing: Space types a space, plays nothing", playing() + " [" + stub.Text + "] " + Convert.ToString(g.EditingControl != null ? g.EditingControl.Text : "", IC), "- [stop] " + aliasWas + "a b");
+            XKey(XK_Return);
+            Check("Enter: the alias saved (with its space)", SoundAliases.Get("gekkouga", entry.Id.Value), aliasWas + "a b");
+            Check("... nothing played", playing() + " [" + stub.Text + "]", "- [stop]");
+            SoundAliases.Set("gekkouga", entry.Id.Value, aliasWas);
+            // a double-click on a row plays it
+            form.Fill();
+            Pump();
+            stub.Log.Clear();
+            var rect = g.GetCellDisplayRectangle(g.Columns["Name"].Index, 3, false);
+            XPoint(g, new Point(rect.X + rect.Width / 2, rect.Y + rect.Height / 2));
+            XClick(2);
+            Check("double-click: plays the row", cur() + " " + playing() + " " + stub.Text, id(3) + " " + id(3) + " play");
+            // the common list: the same keys
+            form.Tabs.SelectedIndex = 1;
+            form.Filter.Text = "common_";
+            Pump();
+            var cg = form.CommonGrid;
+            Func<int, string> cid = i => (string)cg.Rows[i].Cells["Id"].Value;
+            cg.CurrentCell = cg.Rows[0].Cells["Name"];
+            cg.Focus();
+            XPoint(cg, new Point(cg.Width / 2, cg.Height - 8));
+            stub.Log.Clear();
+            XKey(XK_space);
+            Check("common list: Space stops the fighter sound playing", playing() + " " + stub.Text, "- stop");
+            XKey(XK_space);
+            Check("common list: Space plays its row", playing(), cid(0));
+            XKey(XK_Down);
+            Check("common list: Down with play on select: the next row plays", cur() + " " + playing(), cid(1) + " " + cid(1));
+            form.PlayOnSelect.Checked = false;
+            Pump();
+            True("keys: off remembered (SoundPlayOnSelect = false)", File.ReadAllText(ini).Contains("SoundPlayOnSelect = false"));
+            XKey(XK_Down);
+            Check("common list: Down with it off: the sound plays on", cur() + " " + playing(), cid(2) + " " + cid(1));
+            XKey(XK_space);
+            Check("common list: Space stops it", playing(), "-");
+            form.Close();
+        }
+        finally { File.Delete(ini); }
+    }
+
+    // ======================================================================== v1.7.34: Merge sound mods
+
+    static byte[] BE32(uint v) { return new[] { (byte)(v >> 24), (byte)(v >> 16), (byte)(v >> 8), (byte)v }; }
+
+    /// <summary>An ACMD file (big-endian, as the Wii U's) from scripts' text, compiled by Sm4shCommand's compiler.</summary>
+    static byte[] AcmdFile(params KeyValuePair<uint, string>[] scripts)
+    {
+        var body = new List<byte>();
+        var table = new List<byte>();
+        int total = 0;
+        foreach (var kv in scripts.OrderBy(x => x.Key))
+        {
+            var sc = new ACMDScript(kv.Key);
+            sc.Serialize(kv.Value);
+            table.AddRange(BE32(kv.Key));
+            table.AddRange(BE32((uint)(0x10 + 8 * scripts.Length + body.Count)));
+            body.AddRange(Bytes(sc));
+            total += sc.Count;
+        }
+        var o = new List<byte>(System.Text.Encoding.ASCII.GetBytes("ACMD"));
+        o.AddRange(BE32(2)); o.AddRange(BE32((uint)scripts.Length)); o.AddRange(BE32((uint)total));
+        o.AddRange(table); o.AddRange(body);
+        return o.ToArray();
+    }
+
+    static ACMDFile ReadAcmd(string path)
+    {
+        string copy = Path.GetTempFileName();
+        File.Copy(path, copy, true);
+        return new ACMDFile(copy);
+    }
+
+    static string MakeMod(string ad, string name, string fighter, string[] banks, string table, IDictionary<uint, uint> aliases, string game, Action<SoundAdder> fill, string outRoot)
+    {
+        string src = Path.Combine(ad, name + "_src");
+        var fs = FighterSounds.Load(Stage(src, fighter, banks, table), game, aliases);
+        var adder = new SoundAdder(fs);
+        fill(adder);
+        var saved = adder.Save(outRoot);
+        Directory.Delete(src, true);
+        return saved.FighterRoot;
+    }
+
+    static void WriteText(string path, string text) { Directory.CreateDirectory(Path.GetDirectoryName(path)); File.WriteAllText(path, text); }
+
+    /// <summary>The tone an id reaches through a table and a bank: its name and decoded PCM ("" when none).</summary>
+    static string Reach(string tablePath, string bankPath, uint id, out short[] pcm)
+    {
+        pcm = null;
+        uint bank;
+        int t = SoundLabelTable.Load(tablePath).ToneOf(id, out bank);
+        var b = Nus3Bank.Load(bankPath);
+        if (t < 0 || t >= b.Tones.Count) return "";
+        var tone = b.Tones[t];
+        if (tone.HasAudio) pcm = Idsp.Decode(b.ReadAudio(tone)).Pcm;
+        return tone.Name;
+    }
+
+    static string J(params string[] p) { return p.Aggregate(Path.Combine); }
+
+    static void MergeTests(string root, string game, string port, string outDir, string inDir)
+    {
+        Console.WriteLine("---- v1.7.34: Merge sound mods");
+        AudioImport.UseMediaFoundation = false;
+        string ad = J(outDir, "adder", "merge");
+        if (Directory.Exists(ad)) Directory.Delete(ad, true);
+        Directory.CreateDirectory(ad);
+        var manifest = new List<string>();
+        Func<string, string> input = f => Path.Combine(inDir, f);
+        var aliases = FighterSounds.LoadBankAliases(J(Application.StartupPath, "Viewer", "SoundBanks.txt"));
+        string sePath = J(root, "sound", "snd_se_Gekkouga.nus3bank");
+        string stbPath = FighterSounds.FindData(root, J("sound", "config", "soundlabeltable.bin"), null, out bool fp);
+        string mstb = FighterSounds.FindData(port, J("sound", "config", "soundlabeltable.bin"), null, out fp);
+        string mse = J(port, "sound", "snd_se_Master.nus3bank"), mc01 = J(port, "sound", "snd_se_Master_c01.nus3bank");
+        // the base: the game's table (the package's, every mod below made from it) and Greninja's se bank (the base folder
+        // has it: which mod changed an existing tone's volume can be told)
+        string mbase = J(ad, "base");
+        CopyTo(stbPath, J(mbase, "sound", "config", "soundlabeltable.bin"));
+        CopyTo(sePath, J(mbase, "fighter", "gekkouga", "sound", "snd_se_Gekkouga.nus3bank"));
+        string baseTable = J(mbase, "sound", "config", "soundlabeltable.bin");
+        var se0 = Nus3Bank.Load(sePath);
+        var audible = se0.Tones.Where(t => t.HasAudio && t.Index > 0 && t.Index < 100).Select(t => t.Index).ToList();
+        int v1 = audible[0], v2 = audible[1];
+
+        // ---- mod A: 3 tones to Greninja (row 0x768), volume edits (tone 0 -> -3 dB, tone v2 -> -2 dB), a script, aliases
+        string modA = J(ad, "modA");
+        string aRoot = MakeMod(ad, "modA", "gekkouga", new[] { sePath }, stbPath, aliases, game, a =>
+        {
+            a.Pending.Add(new PendingSound { Source = input("mono44.wav"), ToneName = "snd_se_Gekkouga_A1" });
+            a.Pending.Add(new PendingSound { Source = input("stereo44.wav"), ToneName = "snd_se_Gekkouga_A2" });
+            a.Pending.Add(new PendingSound { Source = input("ding.mp3"), ToneName = "snd_se_Gekkouga_A3", Loop = true });
+            a.SetVolume(a.Target.Tones[0], -3f);
+            a.SetVolume(a.Target.Tones[v2], -2f);
+        }, J(modA, "INSTALL_TO_data"));
+        Directory.CreateDirectory(J(aRoot, "script", "animcmd", "body"));
+        // (sound.bin: the base folder has one; A adds a script and changes 0x33333333, C below changes 0x55555555)
+        var baseSoundScripts = new[] { new KeyValuePair<uint, string>(0x33333333, "Sound_Effect(SFX=0x7680001)"), new KeyValuePair<uint, string>(0x55555555, "Sound_Effect(SFX=0x7680005)") };
+        File.WriteAllBytes(MkDirs(J(mbase, "fighter", "gekkouga", "script", "animcmd", "body", "sound.bin")), AcmdFile(baseSoundScripts));
+        File.WriteAllBytes(J(aRoot, "script", "animcmd", "body", "sound.bin"), AcmdFile(new KeyValuePair<uint, string>(0x1A2B3C4D, "Sound_Effect(SFX=0x7680062)\nTransient_Sound_Effect(SFX=0x7680064)"),
+            new KeyValuePair<uint, string>(0x33333333, "Sound_Effect(SFX=0x7680002)"), baseSoundScripts[1]));
+        WriteText(J(modA, "Aliases", "sounds", "gekkouga.txt"), "0x07680062 = A mono\n0x07680063 = A stereo\n0x07680064 = A loop\n0x07680061 = Ice boom (A)\n");
+        string aTable = J(modA, "INSTALL_TO_data", "sound", "config", "soundlabeltable.bin"), aBank = J(aRoot, "sound", "snd_se_Gekkouga.nus3bank");
+        Check("mod A: its ids (the Sound Adder's)", string.Join(",", Enumerable.Range(0, 3).Select(k => Reach(aTable, aBank, (uint)(0x07680062 + k), out short[] _))), "snd_se_Gekkouga_A1,snd_se_Gekkouga_A2,snd_se_Gekkouga_A3");
+
+        // ---- mod C: 2 tones to Greninja too (its ids 0x07680062 / 63, the same as A's), label 3 re-pointed at IceBoom,
+        // volume edits (tone 0 -> -1 dB: A changed it too; tone v1 -> +2 dB), scripts (body, a weapon), an MSC with an id
+        string modC = J(ad, "modC");
+        string cRoot = MakeMod(ad, "modC", "gekkouga", new[] { sePath }, stbPath, aliases, game, a =>
+        {
+            a.Pending.Add(new PendingSound { Source = input("mono22.wav"), ToneName = "snd_se_Gekkouga_C1" });
+            a.Pending.Add(new PendingSound { Source = input("padded.wav"), ToneName = "snd_se_Gekkouga_C2" });
+            a.SetVolume(a.Target.Tones[0], -1f);
+            a.SetVolume(a.Target.Tones[v1], 2f);
+        }, J(modC, "data"));
+        string cTable = J(modC, "data", "sound", "config", "soundlabeltable.bin"), cBank = J(cRoot, "sound", "snd_se_Gekkouga.nus3bank");
+        {
+            var ct = SoundLabelTable.Load(cTable);
+            var l = ct.Labels(0x768).ToList();
+            l[3] = 110;                                     // an existing (vanilla) label re-pointed: the row grew AND changed
+            ct.SetLabels(0x768, l);
+            File.WriteAllBytes(cTable, ct.Build());
+        }
+        string cSound = J(cRoot, "script", "animcmd", "body", "sound.bin");
+        Directory.CreateDirectory(Path.GetDirectoryName(cSound));
+        File.WriteAllBytes(cSound, AcmdFile(
+            new KeyValuePair<uint, string>(0x11111111, "Sound_Effect(SFX=0x7680062)\nFRAME(Frames=4)\nPLAY_SE_REMAIN(Se=0x7680063)\nRemove_Hitbox(ID=0x7680062)\nSound_Effect(SFX=0x46)\nSound_Effect(SFX=0x7680000)\nStop_Sound_Effect(SFX=0x7680063)"),
+            new KeyValuePair<uint, string>(0x22222222, "Transient_Sound_Effect(SFX=0x7680063)\nPLAY_STEP_FLIPPABLE(SoundID=0x7680062, SoundIDFlip=0x7680003)"),
+            baseSoundScripts[0], new KeyValuePair<uint, string>(0x55555555, "Sound_Effect(SFX=0x7680006)")));
+        string cGame = J(cRoot, "script", "animcmd", "body", "game.bin");
+        File.WriteAllBytes(cGame, AcmdFile(new KeyValuePair<uint, string>(0x11111111, "FRAME(Frames=2)\nSound_Effect(SFX=0x7680062)")));
+        string cWeapon = J(cRoot, "script", "animcmd", "weapon", "shuriken", "sound.bin");
+        Directory.CreateDirectory(Path.GetDirectoryName(cWeapon));
+        File.WriteAllBytes(cWeapon, AcmdFile(new KeyValuePair<uint, string>(0x44444444, "Sound_Effect(SFX=0x7680063)")));
+        string cMsc = J(cRoot, "script", "msc", "gekkouga.mscsb");
+        Directory.CreateDirectory(Path.GetDirectoryName(cMsc));
+        File.WriteAllBytes(cMsc, new byte[] { 0x0A, 0x62, 0x00, 0x68, 0x07, 0x00, 0x00, 0x00 });
+        WriteText(J(modC, "Aliases", "sounds", "gekkouga.txt"), "0x07680062 = C one\n0x07680063 = C two\n0x07680061 = Ice boom (C)\n");
+
+        // ---- mod B: 6 tones to Master (a port: banks on their own ids 46192 / 46201, row 2028's through SoundBanks.txt;
+        // its costume bank too), given to the merge as a .zip
+        string modB = J(ad, "modB");
+        string bRoot = MakeMod(ad, "modB", "master", new[] { mse, mc01 }, stbPath, aliases, game, a =>
+        {
+            foreach (var f in new[] { "mono44.wav", "stereo44.wav", "mono22.wav", "padded.wav", "ding.mp3", "mono44_s24.wav" })
+                a.Pending.Add(new PendingSound { Source = input(f), ToneName = "snd_se_Master_B" + (a.Pending.Count + 1) });
+        }, modB);
+        string bTable = J(modB, "sound", "config", "soundlabeltable.bin");
+        string modBZip = J(ad, "modB.zip");
+        System.IO.Compression.ZipFile.CreateFromDirectory(modB, modBZip);
+        int mrow = SoundLabelTable.Load(baseTable).RowOf(2028);
+        int bCount = SoundLabelTable.Load(baseTable).Labels(mrow).Length;
+        // ---- mod E: 2 tones to Master as well (the costume bank's fallback); mod D: 1 tone to Master, made from another
+        // base (Master's own table, which differs from the base in 4 rows)
+        string modE = J(ad, "modE");
+        MakeMod(ad, "modE", "master", new[] { mse, mc01 }, stbPath, aliases, game, a =>
+        {
+            a.Pending.Add(new PendingSound { Source = input("mono22.wav"), ToneName = "snd_se_Master_E1" });
+            a.Pending.Add(new PendingSound { Source = input("mono44.wav"), ToneName = "snd_se_Master_E2" });
+        }, modE);
+        string modD = J(ad, "modD");
+        MakeMod(ad, "modD", "master", new[] { mse }, mstb, aliases, game, a => a.Pending.Add(new PendingSound { Source = input("mono22.wav"), ToneName = "snd_se_Master_D1" }), modD);
+
+        Func<string[], MergeOptions, string, MergeResult> merge = (mods, opt, o) =>
+        {
+            var r = new SoundMerger(baseTable, mods, opt ?? new MergeOptions(), aliases) { Version = "test" }.Run(o);
+            if (!r.Ok) Console.WriteLine("     merge errors: " + string.Join(" | ", r.Errors));
+            return r;
+        };
+        var bt = File.ReadAllBytes(baseTable);
+        var bTab = SoundLabelTable.Parse(bt);
+        Func<byte[], IEnumerable<int>, int> sameRows = (nt, except) =>
+        {
+            var ex = new HashSet<int>(except);
+            int n = 0;
+            for (int r = 0; r < bTab.Rows.Count; r++) if (!ex.Contains(r) && Same(bt, 16 + 16 * r, nt, 16 + 16 * r, 16)) n++;
+            return n;
+        };
+        Func<byte[], bool> poolKept = nt => Same(bt, 16 + 16 * bTab.Rows.Count, nt, 16 + 16 * bTab.Rows.Count, bt.Length - 16 - 16 * bTab.Rows.Count);
+
+        // ==== A + B: different fighters (the user's example): both rows taken, nothing else changes
+        string oAB = J(ad, "out_AB");
+        var rAB = merge(new[] { modA, modBZip }, null, oAB);
+        Check("A+B: merged with no error", string.Join("; ", rAB.Errors), "");
+        Check("A+B: rows from the mods (0x768 A, 2028's B)", string.Join(",", rAB.RowsFrom.Select(kv => "0x" + kv.Key.ToString("X") + "=" + string.Join("+", kv.Value))), "0x" + Math.Min(mrow, 0x768).ToString("X") + "=" + (mrow < 0x768 ? "modB" : "modA") + ",0x" + Math.Max(mrow, 0x768).ToString("X") + "=" + (mrow < 0x768 ? "modA" : "modB"));
+        Check("A+B: no conflicts, no remaps, no warnings", rAB.Conflicts.Count + " " + rAB.Remaps.Count + " " + string.Join("; ", rAB.Warnings), "0 0 ");
+        Check("A+B: the zip read (modB.zip unzipped)", rAB.Mods[1].Unzipped && rAB.Mods[1].Banks.Count == 2, true);
+        var abT = File.ReadAllBytes(J(oAB, "sound", "config", "soundlabeltable.bin"));
+        Check("A+B: every other row byte for byte the base's (" + (bTab.Rows.Count - 2) + ")", sameRows(abT, new[] { 0x768, mrow }), bTab.Rows.Count - 2);
+        True("A+B: the base's label words in place", poolKept(abT));
+        var abTab = SoundLabelTable.Parse(abT);
+        Check("A+B: row 0x768 = A's", string.Join(",", abTab.Labels(0x768)), string.Join(",", SoundLabelTable.Load(aTable).Labels(0x768)));
+        Check("A+B: Master's row = B's (" + bCount + " + 6 labels)", string.Join(",", abTab.Labels(mrow)), string.Join(",", SoundLabelTable.Load(bTable).Labels(mrow)));
+        True("A+B: Greninja's bank copied unchanged (A's)", File.ReadAllBytes(J(oAB, "fighter", "gekkouga", "sound", "snd_se_Gekkouga.nus3bank")).SequenceEqual(File.ReadAllBytes(aBank)));
+        foreach (var f in new[] { "snd_se_Master.nus3bank", "snd_se_Master_c01.nus3bank" })
+            True("A+B: " + f + " copied unchanged (B's)", File.ReadAllBytes(J(oAB, "fighter", "master", "sound", f)).SequenceEqual(File.ReadAllBytes(J(bRoot, "sound", f))));
+        string abTable = J(oAB, "sound", "config", "soundlabeltable.bin");
+        foreach (var k in Enumerable.Range(0, 3))
+        {
+            uint i = (uint)(0x07680062 + k);
+            short[] p1, p2;
+            string n1 = Reach(abTable, J(oAB, "fighter", "gekkouga", "sound", "snd_se_Gekkouga.nus3bank"), i, out p1), n2 = Reach(aTable, aBank, i, out p2);
+            True(string.Format(IC, "A+B: A's 0x{0:X8} reaches {1} (decoded, the same as in mod A)", i, n1), n1 == n2 && n1.Length > 0 && p1.SequenceEqual(p2));
+        }
+        foreach (var bank in new[] { "snd_se_Master.nus3bank", "snd_se_Master_c01.nus3bank" })
+            for (int k = 0; k < 6; k++)
+            {
+                uint i = SoundLabelTable.SoundId(mrow, bCount + k);
+                short[] p1, p2;
+                string n1 = Reach(abTable, J(oAB, "fighter", "master", "sound", bank), i, out p1), n2 = Reach(bTable, J(bRoot, "sound", bank), i, out p2);
+                True(string.Format(IC, "A+B: B's 0x{0:X8} in {1} reaches {2} (decoded, as in mod B)", i, bank, n1), n1 == "snd_se_Master_B" + (k + 1) && n1 == n2 && p1.SequenceEqual(p2));
+                if (k == 5 && bank == "snd_se_Master.nus3bank") manifest.Add(string.Join("\t", new[] { "reach", abTable, J(oAB, "fighter", "master", "sound", bank), i.ToString(IC), bTable, J(bRoot, "sound", bank) }));
+            }
+        True("A+B: MERGE_REPORT.txt written", File.Exists(J(oAB, "MERGE_REPORT.txt")) && File.ReadAllText(J(oAB, "MERGE_REPORT.txt")).Contains("taken from modB"));
+        Check("A+B: no script rewritten (no id changed)", Directory.Exists(J(oAB, "fighter", "gekkouga", "script")), false);
+        Check("A+B: the aliases copied", SoundAliases.ReadFile(J(oAB, "Aliases", "sounds", "gekkouga.txt")).Count, 4);
+        Check("A+B: the check line", rAB.CheckLines.Any(l => l.Contains("each reaches its own tone")), true);
+
+        // ==== A + C: the same fighter (the fallback): one Greninja bank with A's 3 and C's 2 new tones, C's ids remapped,
+        // its scripts rewritten
+        string oAC = J(ad, "out_AC");
+        var rAC = merge(new[] { modA, modC }, null, oAC);
+        Check("A+C: merged with no error", string.Join("; ", rAC.Errors), "");
+        Check("A+C: the row from A + C", string.Join(",", rAC.RowsFrom.Select(kv => "0x" + kv.Key.ToString("X") + "=" + string.Join("+", kv.Value))), "0x768=modA+modC");
+        Check("A+C: C's ids remapped after A's", string.Join(",", rAC.Remaps.Select(x => x.Mod + " " + x)), "modC 0x07680062 -> 0x07680065,modC 0x07680063 -> 0x07680066");
+        string acBank = J(oAC, "fighter", "gekkouga", "sound", "snd_se_Gekkouga.nus3bank"), acTable = J(oAC, "sound", "config", "soundlabeltable.bin");
+        var acB = Nus3Bank.Load(acBank);
+        var aB = Nus3Bank.Load(aBank);
+        Check("A+C: one Greninja bank with 5 new tones (111 + 3 + 2)", acB.Tones.Count, 116);
+        Check("A+C: the new tones", string.Join(",", acB.Tones.Skip(111).Select(t => t.Name.Replace("snd_se_Gekkouga_", ""))), "A1,A2,A3,C1,C2");
+        Check("A+C: BankCheck", string.Join("; ", BankCheck.Validate(File.ReadAllBytes(acBank), 114)), "");
+        int sameEntries = 0;
+        for (int i = 0; i < 114; i++) if (acB.Tones[i].Entry.SequenceEqual(aB.Tones[i].Entry) || i == v1) sameEntries++;
+        Check("A+C: A's 114 tones' entries kept (but C's volume edit)", sameEntries, 114);
+        True("A+C: A's PACK kept at PACK's start", Same(File.ReadAllBytes(aBank), (int)aB.PackOffset, File.ReadAllBytes(acBank), (int)acB.PackOffset, (int)aB.PackSize));
+        Check("A+C: volumes: tone 0 A's (both changed it: the first's), tone v1 C's (only C), tone v2 A's (only A)",
+              acB.Tones[0].VolumeDb + " " + acB.Tones[v1].VolumeDb + " " + acB.Tones[v2].VolumeDb, "-3 2 -2");
+        Check("A+C: one conflict, tone 0's volume (" + string.Join(" | ", rAC.Conflicts) + ")", rAC.Conflicts.Count == 1 && rAC.Conflicts[0].Contains("tone 0 (") && rAC.Conflicts[0].Contains("modA has -3.0 dB, modC has -1.0 dB") && rAC.Conflicts[0].Contains("took modA's"), true);
+        var acTab = SoundLabelTable.Load(acTable);
+        Check("A+C: row 0x768 = 98 + A's 3 + C's 2 labels", acTab.Labels(0x768).Length, 103);
+        Check("A+C: C's re-pointed label 3 taken (-> IceBoom, tone 110)", acTab.Labels(0x768)[3], 110);
+        Check("A+C: every other row byte for byte the base's", sameRows(File.ReadAllBytes(acTable), new[] { 0x768 }), bTab.Rows.Count - 1);
+        foreach (var t in new[] { new { Id = 0x07680062u, Mod = "A", Old = 0x07680062u }, new { Id = 0x07680063u, Mod = "A", Old = 0x07680063u }, new { Id = 0x07680064u, Mod = "A", Old = 0x07680064u },
+                                  new { Id = 0x07680065u, Mod = "C", Old = 0x07680062u }, new { Id = 0x07680066u, Mod = "C", Old = 0x07680063u }, new { Id = 0x07680003u, Mod = "C", Old = 0x07680003u } })
+        {
+            short[] p1, p2;
+            string n1 = Reach(acTable, acBank, t.Id, out p1), n2 = t.Mod == "A" ? Reach(aTable, aBank, t.Old, out p2) : Reach(cTable, cBank, t.Old, out p2);
+            True(string.Format(IC, "A+C: 0x{0:X8} reaches {1} ({2}'s 0x{3:X8}: the same tone, decoded)", t.Id, n1, t.Mod, t.Old), n1 == n2 && n1.Length > 0 && p1 != null && p1.SequenceEqual(p2));
+            if (t.Mod == "C" && t.Id != t.Old) manifest.Add(string.Join("\t", new[] { "reach", acTable, acBank, t.Id.ToString(IC), cTable, cBank, t.Old.ToString(IC) }));
+        }
+        // the scripts
+        Check("A+C: C's scripts rewritten (body sound / game, the weapon's)", string.Join(",", rAC.RewrittenScripts),
+              "fighter/gekkouga/script/animcmd/body/game.bin,fighter/gekkouga/script/animcmd/body/sound.bin,fighter/gekkouga/script/animcmd/weapon/shuriken/sound.bin");
+        string outSound = J(oAC, "fighter", "gekkouga", "script", "animcmd", "body", "sound.bin");
+        var sf = ReadAcmd(outSound);
+        var cf = ReadAcmd(cSound);
+        int words = 0, cmds = 0;
+        foreach (var crc in new uint[] { 0x11111111, 0x22222222 })
+        {
+            var ob = Bytes((ACMDScript)cf.Scripts[crc]);
+            var nb = Bytes((ACMDScript)sf.Scripts[crc]);
+            cmds += ob.Length == nb.Length ? 1 : 0;
+            for (int i = 0; i + 4 <= Math.Min(ob.Length, nb.Length); i += 4) if (!Same(ob, i, nb, i, 4)) words++;
+        }
+        Check("A+C: C's scripts in sound.bin: their sizes kept, only the 5 sound id words differ", cmds + " " + words, "2 5");
+        Check("A+C: sound.bin (both mods ship it) merged script by script against the base's copy: A's new script, A's change, C's change, C's rewritten scripts",
+              string.Join(",", sf.Scripts.Keys.Select(k => k.ToString("X8"))), "11111111,1A2B3C4D,22222222,33333333,55555555");
+        True("A+C: the report says so", rAC.ScriptLines.Any(l => l.StartsWith("fighter/gekkouga/script/animcmd/body/sound.bin: shipped by modA, modC (rewritten): merged script by script") && l.Contains("against the base's copy")));
+        Func<uint, string> text = crc => AcmdText((ACMDScript)sf.Scripts[crc]);
+        Check("A+C: sound.bin script 1: Sound_Effect / PLAY_SE_REMAIN / Stop_Sound_Effect remapped; Remove_Hitbox's ID, a common id and a vanilla id kept",
+              text(0x11111111), "Sound_Effect(SFX=0x7680065) | FRAME(Frames=4) | PLAY_SE_REMAIN(Se=0x7680066) | Remove_Hitbox(ID=0x7680062) | Sound_Effect(SFX=0x46) | Sound_Effect(SFX=0x7680000) | Stop_Sound_Effect(SFX=0x7680066)");
+        Check("A+C: sound.bin script 2 (Transient_Sound_Effect, PLAY_STEP_FLIPPABLE's two ids)", text(0x22222222), "Transient_Sound_Effect(SFX=0x7680066) | PLAY_STEP_FLIPPABLE(SoundID=0x7680065, SoundIDFlip=0x7680003)");
+        Check("A+C: sound.bin 0x33333333: A's (only A changed it from the base's)", text(0x33333333), "Sound_Effect(SFX=0x7680002)");
+        Check("A+C: sound.bin 0x55555555: C's (only C changed it)", text(0x55555555), "Sound_Effect(SFX=0x7680006)");
+        Check("A+C: sound.bin A's own script kept", text(0x1A2B3C4D), "Sound_Effect(SFX=0x7680062) | Transient_Sound_Effect(SFX=0x7680064)");
+        foreach (var crc in sf.Scripts.Keys)
+        {
+            var s1 = (ACMDScript)sf.Scripts[crc];
+            var s2 = new ACMDScript(crc);
+            s2.Serialize(s1.Deserialize());
+            True(string.Format(IC, "A+C: rewritten sound.bin script 0x{0:X8} round-trips (text -> the same bytes)", crc), Bytes(s2).SequenceEqual(Bytes(s1)));
+        }
+        Check("A+C: game.bin rewritten", AcmdText((ACMDScript)ReadAcmd(J(oAC, "fighter", "gekkouga", "script", "animcmd", "body", "game.bin")).Scripts[0x11111111]),
+              "FRAME(Frames=2) | Sound_Effect(SFX=0x7680065)");
+        Check("A+C: the weapon's sound.bin rewritten", AcmdText((ACMDScript)ReadAcmd(J(oAC, "fighter", "gekkouga", "script", "animcmd", "weapon", "shuriken", "sound.bin")).Scripts[0x44444444]),
+              "Sound_Effect(SFX=0x7680066)");
+        // without the base's copy of sound.bin, the scripts both changed can't be told apart: conflicts
+        string mbase2 = J(ad, "base2");
+        CopyTo(baseTable, J(mbase2, "sound", "config", "soundlabeltable.bin"));
+        var rNb = new SoundMerger(J(mbase2, "sound", "config", "soundlabeltable.bin"), new[] { modA, modC }, new MergeOptions(), aliases).Run(null);
+        True("A+C, no base copies: the differing scripts reported as conflicts, the first's taken", rNb.Conflicts.Any(c => c.Contains("script 0x33333333") && c.Contains("no copy of the file") && c.Contains("took modA's")) &&
+             rNb.Conflicts.Any(c => c.Contains("script 0x55555555")));
+        True("A+C, no base copies: volume differences reported as conflicts (no bank to tell)", rNb.Conflicts.Any(c => c.Contains("tone " + v1 + " (") && c.Contains("no copy of the bank")));
+        True("A+C: the MSC holding a remapped id reported (not rewritten)", rAC.Warnings.Any(w => w.Contains("gekkouga.mscsb") && w.Contains("0x07680062")));
+        var al = SoundAliases.ReadFile(J(oAC, "Aliases", "sounds", "gekkouga.txt"));
+        Check("A+C: the aliases merged, C's on its new ids, A's kept (the first's on a clash)", string.Join(",", al.OrderBy(x => x.Key).Select(x => x.Key.ToString("X8") + "=" + x.Value)),
+              "07680061=Ice boom (A),07680062=A mono,07680063=A stereo,07680064=A loop,07680065=C one,07680066=C two");
+        string report = File.ReadAllText(J(oAC, "MERGE_REPORT.txt"));
+        foreach (var part in new[] { "== Rows", "row 0x768", "taken from modA", "modC merged in", "== Banks", "merged (modA + modC)", "== Sound id remaps", "0x07680062 -> 0x07680065", "== Scripts rewritten", "body/sound.bin (modC): 5 sound id(s)", "== Conflicts", "== Warnings", "== Checks" })
+            True("A+C: MERGE_REPORT.txt has \"" + part + "\"", report.Contains(part));
+        manifest.Add(string.Join("\t", new[] { "cli", modA, modC, mbase, oAC, J(ad, "out_cli"), J(ad, "out_cli_dry") }));
+        // the same merge, the later mod winning conflicts
+        var rL = merge(new[] { modA, modC }, new MergeOptions { LaterWins = true }, J(ad, "out_AC_later"));
+        Check("A+C, later wins: tone 0's volume C's", Nus3Bank.Load(J(ad, "out_AC_later", "fighter", "gekkouga", "sound", "snd_se_Gekkouga.nus3bank")).Tones[0].VolumeDb + " " + rL.Conflicts[0].Contains("took modC's"), "-1 True");
+        // C first: A's ids move instead
+        var rCA = merge(new[] { modC, modA }, null, null);
+        Check("C+A (dry run): A's ids remapped after C's", string.Join(",", rCA.Remaps.Select(x => x.Mod + " " + x)), "modA 0x07680062 -> 0x07680064,modA 0x07680063 -> 0x07680065,modA 0x07680064 -> 0x07680066");
+        Check("C+A (dry run): A's sound.bin would be rewritten; nothing written", string.Join(",", rCA.RewrittenScripts) + " " + rCA.Written.Count, "fighter/gekkouga/script/animcmd/body/sound.bin 0");
+        True("C+A (dry run): the report lists A's remaps", rCA.Report.Contains("modA:") && rCA.Report.Contains("0x07680062 -> 0x07680064") && rCA.Report.Contains("[check only: nothing written]"));
+        // scripts off: a warning
+        var rNo = merge(new[] { modA, modC }, new MergeOptions { RewriteScripts = false }, null);
+        True("A+C, scripts off: warned that C's scripts keep the old ids", rNo.RewrittenScripts.Count == 0 && rNo.Warnings.Any(w => w.Contains("weren't rewritten")));
+
+        // ==== B + E: Master twice (a port's banks on their own ids, its costume bank): both banks merged, at the same indexes
+        string oBE = J(ad, "out_BE");
+        var rBE = merge(new[] { modB, modE }, null, oBE);
+        Check("B+E: merged with no error", string.Join("; ", rBE.Errors), "");
+        Check("B+E: both Master banks merged", string.Join(",", rBE.MergedBanks), "fighter/master/sound/snd_se_Master.nus3bank,fighter/master/sound/snd_se_Master_c01.nus3bank");
+        Check("B+E: E's 2 ids remapped after B's 6", string.Join(",", rBE.Remaps.Select(x => x.ToString())),
+              Hex(SoundLabelTable.SoundId(mrow, bCount)) + " -> " + Hex(SoundLabelTable.SoundId(mrow, bCount + 6)) + "," + Hex(SoundLabelTable.SoundId(mrow, bCount + 1)) + " -> " + Hex(SoundLabelTable.SoundId(mrow, bCount + 7)));
+        string beTable = J(oBE, "sound", "config", "soundlabeltable.bin");
+        foreach (var bank in new[] { "snd_se_Master.nus3bank", "snd_se_Master_c01.nus3bank" })
+            for (int k = 0; k < 8; k++)
+            {
+                short[] p1;
+                string n1 = Reach(beTable, J(oBE, "fighter", "master", "sound", bank), SoundLabelTable.SoundId(mrow, bCount + k), out p1);
+                Check("B+E: " + bank + ": label " + (bCount + k), n1, k < 6 ? "snd_se_Master_B" + (k + 1) : "snd_se_Master_E" + (k - 5));
+            }
+        var be0 = Nus3Bank.Load(J(oBE, "fighter", "master", "sound", "snd_se_Master.nus3bank"));
+        var be1 = Nus3Bank.Load(J(oBE, "fighter", "master", "sound", "snd_se_Master_c01.nus3bank"));
+        int e1 = be0.Tones.FindIndex(t => t.Name == "snd_se_Master_E1");
+        True("B+E: E1 at the same tone index in se and se c01 (" + e1 + "), the same audio", e1 > 0 && be1.Tones[e1].Name == "snd_se_Master_E1" && be0.ReadAudio(be0.Tones[e1]).SequenceEqual(be1.ReadAudio(be1.Tones[e1])));
+        Check("B+E: the bank ids kept", be0.Id + " " + be1.Id, "46192 46201");
+
+        // ==== A + D: D made from another base: warned, the base's rows kept but the one D's bank plays from
+        var rAD = merge(new[] { modA, modD }, null, J(ad, "out_AD"));
+        Check("A+D: merged", string.Join("; ", rAD.Errors), "");
+        True("A+D: a different-base warning for D (" + string.Join(" | ", rAD.Warnings) + ")", rAD.Warnings.Any(w => w.StartsWith("modD:") && w.Contains("made from another soundlabeltable.bin")));
+        Check("A+D: rows from the mods: Greninja's A's only, Master's D's", string.Join(",", rAD.RowsFrom.Select(kv => "0x" + kv.Key.ToString("X") + "=" + string.Join("+", kv.Value))),
+              "0x" + Math.Min(mrow, 0x768).ToString("X") + "=" + (mrow < 0x768 ? "modD" : "modA") + ",0x" + Math.Max(mrow, 0x768).ToString("X") + "=" + (mrow < 0x768 ? "modA" : "modD"));
+        Check("A+D: every other row the base's", sameRows(File.ReadAllBytes(J(ad, "out_AD", "sound", "config", "soundlabeltable.bin")), new[] { 0x768, mrow }), bTab.Rows.Count - 2);
+        var rAD2 = merge(new[] { modA, modD }, new MergeOptions { TakeUnbankedRows = true }, null);
+        True("A+D, take rows without banks: D's other rows taken (" + rAD2.RowsFrom.Count + " rows)", rAD2.RowsFrom.Count > 2);
+
+        // ==== F + G: two new fighters' banks (their own bank ids 47000 / 47001) given the same empty row: G's moved to
+        // another empty row, every id of it remapped
+        int empty = bTab.Rows.FindLastIndex(x => x.Empty);
+        var newIds = new Dictionary<string, uint> { { "modF", 47000 }, { "modG", 47001 } };
+        foreach (var kv in newIds)
+        {
+            string name = kv.Key == "modF" ? "newf" : "newg";
+            var nb2 = Nus3Bank.Load(sePath);
+            nb2.Id = kv.Value;
+            string bp = J(ad, kv.Key, "fighter", name, "sound", "snd_se_" + name + ".nus3bank");
+            Directory.CreateDirectory(Path.GetDirectoryName(bp));
+            File.WriteAllBytes(bp, nb2.Build());
+            var tt = SoundLabelTable.Parse(bt);
+            tt.UseRow(empty, kv.Value, new[] { 0, 1, 2, 110 });
+            File.WriteAllBytes(MkDirs(J(ad, kv.Key, "sound", "config", "soundlabeltable.bin")), tt.Build());
+        }
+        string oFG = J(ad, "out_FG");
+        var rFG = merge(new[] { J(ad, "modF"), J(ad, "modG") }, null, oFG);
+        Check("F+G: merged", string.Join("; ", rFG.Errors), "");
+        var fgTab = SoundLabelTable.Load(J(oFG, "sound", "config", "soundlabeltable.bin"));
+        int moved = fgTab.RowOf(47001);
+        True(string.Format(IC, "F+G: F keeps row 0x{0:X}, G moved to another empty row (0x{1:X})", fgTab.RowOf(47000), moved), fgTab.RowOf(47000) == empty && moved > 0 && moved != empty && bTab.Rows[moved].Empty);
+        Check("F+G: G's 4 ids remapped to its new row", string.Join(",", rFG.Remaps.Select(x => x.ToString())),
+              string.Join(",", Enumerable.Range(0, 4).Select(l => Hex(SoundLabelTable.SoundId(empty, l)) + " -> " + Hex(SoundLabelTable.SoundId(moved, l)))));
+        True("F+G: warned", rFG.Warnings.Any(w => w.Contains("both give row") && w.Contains("moved to the empty row")));
+        Check("F+G: G's label 3 on its new row reaches IceBoom in G's bank", Reach(J(oFG, "sound", "config", "soundlabeltable.bin"), J(oFG, "fighter", "newg", "sound", "snd_se_newg.nus3bank"), SoundLabelTable.SoundId(moved, 3), out short[] _), "snd_se_Gekkouga_IceBoom");
+
+        // ==== refusals: nothing written
+        var rBad = merge(new[] { modA, modC }, null, oAC);
+        True("refused: an output folder that isn't empty", !rBad.Ok && rBad.Errors[0].Contains("isn't empty"));
+        var rIn = merge(new[] { modA, modC }, null, J(modA, "merged"));
+        True("refused: an output folder inside a mod", !rIn.Ok && rIn.Errors.Any(e => e.Contains("inside a mod")) && !Directory.Exists(J(modA, "merged")));
+        var rOne = merge(new[] { modA }, null, null);
+        True("refused: one mod", !rOne.Ok && rOne.Errors[0].Contains("two or more"));
+        // a zip with a name escaping the folder
+        string evil = J(ad, "evil.zip");
+        using (var z = System.IO.Compression.ZipFile.Open(evil, System.IO.Compression.ZipArchiveMode.Create)) using (var w = new StreamWriter(z.CreateEntry("../escape.txt").Open())) w.Write("x");
+        string zmsg = "";
+        try { MiniZip.Extract(evil, J(ad, "evil_out")); } catch (Exception e) { zmsg = e.Message; }
+        True("zip: a name outside the folder refused (" + zmsg + ")", zmsg.Contains("outside the folder") && !File.Exists(J(ad, "escape.txt")));
+        File.WriteAllLines(J(ad, "manifest.txt"), manifest.ToArray());
+    }
+
+    static string Hex(uint v) { return "0x" + v.ToString("X8", IC); }
+    static string AcmdText(ACMDScript s) { return string.Join(" | ", s.Deserialize().Replace("\r", "").Split('\n').Select(x => x.Trim()).Where(x => x.Length > 0 && x != "Script_End()").ToArray()); }
+    static void CopyDir(string from, string to)
+    {
+        foreach (var f in Directory.GetFiles(from, "*", SearchOption.AllDirectories)) CopyTo(f, Path.Combine(to, f.Substring(from.Length + 1)));
+    }
+
+    static string MkDirs(string file) { Directory.CreateDirectory(Path.GetDirectoryName(file)); return file; }
+
+    static void MergeGui(string root, string game, string outDir, string ini)
+    {
+        Console.WriteLine("---- v1.7.34: the Merge sound mods dialog");
+        File.WriteAllText(ini, "SoundDataFolder = " + game + "\n");
+        string ad = J(outDir, "adder", "merge");
+        try
+        {
+            var form = new Sm4shCommand.GUI.SoundViewer(root, () => null) { Output = new StubOut() };
+            form.StartPosition = FormStartPosition.Manual;
+            form.Location = new Point(0, 0);
+            form.Show();
+            Pump();
+            Sm4shCommand.GUI.SoundMergeDialog seen = null;
+            form.MergeDialogHook = dlg =>
+            {
+                seen = dlg;
+                dlg.StartPosition = FormStartPosition.Manual;
+                dlg.Location = new Point(0, 0);
+                Pump();
+                Check("merge dialog: the base from the Game data folder (the setting as the viewer read it)", dlg.BaseBox.Text, J(game, "sound", "config", "soundlabeltable.bin"));
+                dlg.BaseBox.Text = J(ad, "base", "sound", "config", "soundlabeltable.bin");
+                // (the mods under the names two users would give them; the second as a .zip)
+                string u1 = J(ad, "samples", "User1_Greninja_sounds"), u2 = J(ad, "samples", "User2_Greninja_sounds.zip");
+                CopyDir(J(ad, "modA"), u1);
+                System.IO.Compression.ZipFile.CreateFromDirectory(J(ad, "modC"), u2);
+                dlg.AddMod(u1);
+                dlg.AddMod(u2);
+                Check("merge dialog: an output folder suggested next to the mods", dlg.OutBox.Text, J(ad, "samples", "merged_sound_mods"));
+                var r = dlg.RunMerge(true);
+                True("merge dialog: Check (dry run): the remaps in the report, nothing written", r != null && r.Ok && dlg.ReportBox.Text.Contains("0x07680062 -> 0x07680065") && !Directory.Exists(dlg.OutBox.Text));
+                var r2 = dlg.RunMerge(false);
+                True("merge dialog: Merge: written", r2 != null && r2.Ok && File.Exists(J(dlg.OutBox.Text, "MERGE_REPORT.txt")));
+                File.Copy(J(dlg.OutBox.Text, "MERGE_REPORT.txt"), J(outDir, "merge_report_sample.txt"), true);
+                True("merge dialog: the same table as the engine's own A+C merge", File.ReadAllBytes(J(dlg.OutBox.Text, "sound", "config", "soundlabeltable.bin")).SequenceEqual(File.ReadAllBytes(J(ad, "out_AC", "sound", "config", "soundlabeltable.bin"))));
+                dlg.ReportBox.SelectionStart = dlg.ReportBox.Text.IndexOf("== Rows", StringComparison.Ordinal);
+                dlg.ReportBox.ScrollToCaret();
+                Shot(dlg, J(outDir, "merge_dialog.png"));
+            };
+            form.ShowMerge();
+            Check("merge dialog: shown from the viewer", seen != null, true);
             form.Close();
         }
         finally { File.Delete(ini); }

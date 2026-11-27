@@ -39,8 +39,16 @@ namespace Sm4shCommand.Sound
         {
             Dictionary<uint, string> d;
             if (cache.TryGetValue(set ?? "", out d)) return d;
-            d = new Dictionary<uint, string>();
-            string path = FileFor(set);
+            d = ReadFile(FileFor(set));
+            cache[set ?? ""] = d;
+            return d;
+        }
+
+        /// <summary>v1.7.34: an aliases file read ("0x07680061 = name" lines; # and // comments): id -> name; empty
+        /// when missing or unreadable.</summary>
+        public static Dictionary<uint, string> ReadFile(string path)
+        {
+            var d = new Dictionary<uint, string>();
             try
             {
                 if (File.Exists(path))
@@ -58,8 +66,22 @@ namespace Sm4shCommand.Sound
                     }
             }
             catch (Exception) { }   // unreadable: no aliases
-            cache[set ?? ""] = d;
             return d;
+        }
+
+        /// <summary>v1.7.34: writes an aliases file in the viewer's format (its header, one line per id, in id order).</summary>
+        public static void WriteFile(string path, string set, IDictionary<uint, string> d)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            var lines = new List<string>
+            {
+                "# Sound aliases for " + set + ": Sm4shCommand's Sound Effect Viewer (Tools > Sound Effect Viewer) writes this file",
+                "# from its Alias column; you can edit it too. One per line: sound id = your name for it. Labels only: scripts keep",
+                "# the number, the editor's tooltip on the id shows the name.",
+            };
+            foreach (var kv in d.OrderBy(x => x.Key))
+                lines.Add(string.Format(CultureInfo.InvariantCulture, "0x{0:X8} = {1}", kv.Key, kv.Value));
+            File.WriteAllLines(path, lines.ToArray());
         }
 
         public static bool TryParseId(string s, out uint id)
@@ -107,16 +129,7 @@ namespace Sm4shCommand.Sound
             alias = (alias ?? "").Replace("\r", " ").Replace("\n", " ").Trim();
             var d = Of(set);
             if (alias.Length == 0) d.Remove(id); else d[id] = alias;
-            Directory.CreateDirectory(Folder);
-            var lines = new List<string>
-            {
-                "# Sound aliases for " + set + ": Sm4shCommand's Sound Effect Viewer (Tools > Sound Effect Viewer) writes this file",
-                "# from its Alias column; you can edit it too. One per line: sound id = your name for it. Labels only: scripts keep",
-                "# the number, the editor's tooltip on the id shows the name.",
-            };
-            foreach (var kv in d.OrderBy(x => x.Key))
-                lines.Add(string.Format(CultureInfo.InvariantCulture, "0x{0:X8} = {1}", kv.Key, kv.Value));
-            File.WriteAllLines(FileFor(set), lines.ToArray());
+            WriteFile(FileFor(set), set, d);
         }
 
         public static void Reload() { cache.Clear(); }

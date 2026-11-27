@@ -130,10 +130,14 @@
     <Compile Include="Classes\Sound\DspAdpcm.cs" />
     <Compile Include="Classes\Sound\AudioImport.cs" />
     <Compile Include="Classes\Sound\SoundAdder.cs" />
+    <Compile Include="Classes\Sound\SoundMerge.cs" />
     <Compile Include="GUI\SoundViewer.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="GUI\SoundAdderDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="GUI\SoundMergeDialog.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Classes\ScriptComments.cs" />

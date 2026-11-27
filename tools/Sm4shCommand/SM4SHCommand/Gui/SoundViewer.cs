@@ -11,6 +11,157 @@ using Sm4shCommand.Sound;
 
 namespace Sm4shCommand.GUI
 {
+    /// <summary>v1.7.34: where the viewer's previews play (an in-memory WAV).</summary>
+    public interface ISoundOut
+    {
+        void Play(byte[] wav);
+        void Stop();
+    }
+
+    /// <summary>v1.7.34: an output that knows whether it is still playing (the tests' stub); else the viewer counts the
+    /// WAV's length from when it started.</summary>
+    public interface ISoundOutState
+    {
+        bool Playing { get; }
+    }
+
+    /// <summary>Windows' SoundPlayer (.NET Framework): asynchronous, one sound at a time.</summary>
+    public class SoundPlayerOut : ISoundOut
+    {
+        SoundPlayer player;
+        MemoryStream stream;
+
+        public void Play(byte[] wav)
+        {
+            Stop();
+            stream = new MemoryStream(wav);
+            player = new SoundPlayer(stream);
+            player.Play();
+        }
+
+        public void Stop()
+        {
+            try { if (player != null) player.Stop(); } catch (Exception) { }
+            if (player != null) player.Dispose();
+            player = null;
+            if (stream != null) stream.Dispose();
+            stream = null;
+        }
+    }
+
+    /// <summary>
+    /// v1.7.34: the viewer's lists. Space (not while a cell is being edited: then it types a space) plays / stops the
+    /// selected sound instead of starting an edit; Enter plays it (rather than moving down a row); the arrows and
+    /// double-click work as before.
+    /// </summary>
+    public class SoundGrid : DataGridView
+    {
+        public event Action SpacePressed, EnterPressed;
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.Space && !IsCurrentCellInEditMode && SpacePressed != null)
+            {
+                SpacePressed();
+                return true;
+            }
+            if (keyData == Keys.Enter && !IsCurrentCellInEditMode && EnterPressed != null)
+            {
+                EnterPressed();         // (plays the row; doesn't move down a row as a grid's Enter does)
+                return true;
+            }
+            if (keyData == Keys.Enter && IsCurrentCellInEditMode && EndEdit())
+                return true;            // (an alias / volume typed: Enter keeps it, on the same row)
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        public SoundGrid()
+        {
+            // Enter in the cell being edited keeps the text (Mono hands it to the editing box, not to the grid)
+            EditingControlShowing += (o, e) =>
+            {
+                e.Control.KeyDown -= EditKeyDown;
+                e.Control.KeyDown += EditKeyDown;
+            };
+        }
+
+        void EditKeyDown(object sender, KeyEventArgs e)
+        {
+            if ((e.KeyCode == Keys.Enter || e.KeyCode == Keys.Return) && e.Modifiers == Keys.None && IsCurrentCellInEditMode)
+            {
+                e.Handled = e.SuppressKeyPress = true;
+                BeginInvoke((Action)(() => { if (IsCurrentCellInEditMode) EndEdit(); }));
+            }
+        }
+
+        // (where ProcessCmdKey doesn't see the list's keys, as under Mono: the same from ProcessDialogKey / OnKeyDown, and
+        // the Space's character kept from starting an edit)
+        bool swallowSpace;
+
+        protected override bool ProcessKeyEventArgs(ref Message m)
+        {
+            const int WM_KEYDOWN = 0x100, WM_KEYUP = 0x101, WM_CHAR = 0x102;
+            if (!IsCurrentCellInEditMode && Control.ModifierKeys == Keys.None)
+            {
+                if (m.Msg == WM_KEYDOWN && (Keys)(m.WParam.ToInt64() & 0xFFFF) == Keys.Space && SpacePressed != null)
+                {
+                    SpacePressed();
+                    swallowSpace = true;
+                    return true;
+                }
+            }
+            if (swallowSpace && (m.Msg == WM_CHAR || m.Msg == WM_KEYUP) && (m.WParam.ToInt64() & 0xFFFF) == (m.Msg == WM_CHAR ? ' ' : (long)Keys.Space))
+            {
+                if (m.Msg == WM_KEYUP) swallowSpace = false;        // (the Space's character and its release: no edit)
+                return true;
+            }
+            return base.ProcessKeyEventArgs(ref m);
+        }
+
+        protected override bool ProcessDialogKey(Keys keyData)
+        {
+            if (keyData == Keys.Enter && !IsCurrentCellInEditMode && EnterPressed != null)
+            {
+                EnterPressed();
+                return true;
+            }
+            if (keyData == Keys.Enter && IsCurrentCellInEditMode && EndEdit())
+                return true;
+            return base.ProcessDialogKey(keyData);
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            if (!IsCurrentCellInEditMode && e.Modifiers == Keys.None)
+            {
+                if (e.KeyCode == Keys.Space && SpacePressed != null)
+                {
+                    SpacePressed();
+                    swallowSpace = true;
+                    e.Handled = e.SuppressKeyPress = true;
+                    return;
+                }
+                if ((e.KeyCode == Keys.Enter || e.KeyCode == Keys.Return) && EnterPressed != null)
+                {
+                    EnterPressed();
+                    e.Handled = e.SuppressKeyPress = true;
+                    return;
+                }
+            }
+            base.OnKeyDown(e);
+        }
+
+        protected override void OnKeyPress(KeyPressEventArgs e)
+        {
+            if (e.KeyChar == ' ' && swallowSpace && !IsCurrentCellInEditMode)
+            {
+                e.Handled = true;
+                return;
+            }
+            base.OnKeyPress(e);
+        }
+    }
+
     /// <summary>
     /// Tools > Sound Effect Viewer (v1.7.32, Ctrl+Shift+E): the open fighter's sounds (fighter/NAME/sound: se, its costume
     /// banks, vc, cheer, Kirby copy) and the common ones (sound/se/snd_se_joucyu, row 0), each with the sound id ACMD
@@ -22,6 +173,9 @@ namespace Sm4shCommand.GUI
     /// any other) and the Volume column of the fighter's list can be edited (the TONE volume, dB); Save writes the banks
     /// and soundlabeltable.bin in place (backups first), Save to.. under a folder laid out as the game's data, ready to
     /// install (Sound.SoundAdder).
+    /// v1.7.34: Space in either list plays / stops the selected sound (the arrows move the selection; with "Play on select
+    /// while playing", off by default, a sound playing when the selection moves stops and the new row plays); Merge sound
+    /// mods.. (SoundMergeDialog, Sound.SoundMerger) merges several mods' soundlabeltable.bin and banks into a new folder.
     /// </summary>
     public class SoundViewer : Form
     {
@@ -32,15 +186,17 @@ namespace Sm4shCommand.GUI
         readonly Button pickFighter = new Button { Text = "Fighter..", AutoSize = true };
         readonly Button pickData = new Button { Text = "Game data..", AutoSize = true };
         readonly Button reload = new Button { Text = "Reload", AutoSize = true };
-        readonly TextBox filter = new TextBox { Width = 180 };
+        readonly TextBox filter = new TextBox { Width = 160 };
         readonly ComboBox bankFilter = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 120 };
         readonly TabControl tabs = new TabControl { Dock = DockStyle.Fill };
         readonly TabPage fighterTab = new TabPage("Fighter sounds"), commonTab = new TabPage("Common sounds"), banksTab = new TabPage("Banks");
-        readonly DataGridView fighterGrid = Grid(true), commonGrid = Grid(false);
+        readonly SoundGrid fighterGrid = Grid(true), commonGrid = Grid(false);
         readonly Button addSounds = new Button { Text = "Add sounds..", AutoSize = true };
         readonly Button save = new Button { Text = "Save", AutoSize = true, Enabled = false };
         readonly Button saveTo = new Button { Text = "Save to..", AutoSize = true, Enabled = false };
         readonly Button discard = new Button { Text = "Discard", AutoSize = true, Enabled = false };
+        readonly Button merge = new Button { Text = "Merge sound mods..", AutoSize = true };
+        readonly CheckBox playOnSelect = new CheckBox { Text = "Play on select while playing", AutoSize = true, Checked = false };
         SoundAdder adder;
         readonly ComboBox commonBank = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly Label commonNote = new Label { AutoSize = true, Padding = new Padding(6, 6, 0, 0), ForeColor = Color.DimGray };
@@ -50,16 +206,19 @@ namespace Sm4shCommand.GUI
         readonly CheckBox loop = new CheckBox { Text = "Loop (looping tones)", AutoSize = true, Checked = true };
         readonly CheckBox bankVolume = new CheckBox { Text = "Bank volume", AutoSize = true, Checked = true };
         readonly NumericUpDown gain = new NumericUpDown { Minimum = -40, Maximum = 20, Value = 0, DecimalPlaces = 1, Increment = 1, Width = 60 };
-        readonly ComboBox command = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 300 };
+        readonly ComboBox command = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
         readonly Button addToScript = new Button { Text = "Add to Script", AutoSize = true };
         readonly Button copyId = new Button { Text = "Copy ID", AutoSize = true };
         readonly Button copyLine = new Button { Text = "Copy Line", AutoSize = true };
         readonly Label info = new Label { Dock = DockStyle.Fill, AutoEllipsis = true, Padding = new Padding(4, 2, 4, 2) };
         readonly Label status = new Label { Dock = DockStyle.Bottom, Height = 18, ForeColor = Color.DimGray, AutoEllipsis = true };
         readonly ToolTip tips = new ToolTip();
-        SoundPlayer player;
-        MemoryStream playing;
-        bool filling;
+        bool filling, refilling;
+        DateTime playingUntil = DateTime.MinValue;
+        SoundEntry playingEntry;
+
+        /// <summary>v1.7.34: where previews go (Windows' SoundPlayer; the tests put a stub here).</summary>
+        public ISoundOut Output = new SoundPlayerOut();
 
         /// <summary>The sound commands Add to Script offers: (command, what it does). The game's own scripts use each
         /// (vanilla Dr. Mario's and Kirby's sound.bin: Sound_Effect 222 times with common ids, row 0, besides their own).</summary>
@@ -75,9 +234,9 @@ namespace Sm4shCommand.GUI
             new[] { "Sound_Effect2", "PLAY_STEP: a step sound" },
         };
 
-        static DataGridView Grid(bool volumeEditable)
+        static SoundGrid Grid(bool volumeEditable)
         {
-            var g = new DataGridView
+            var g = new SoundGrid
             {
                 Dock = DockStyle.Fill, AllowUserToAddRows = false, AllowUserToDeleteRows = false, RowHeadersVisible = false,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, AllowUserToResizeRows = false,
@@ -108,7 +267,7 @@ namespace Sm4shCommand.GUI
         {
             this.activeEditor = activeEditor;
             Text = "Sound Effect Viewer";
-            Size = new Size(1180, 680);
+            Size = new Size(1320, 700);      // (v1.7.34: wider, for the Merge button and the new checkbox; the bars wrap when narrower)
             StartPosition = FormStartPosition.CenterParent;
             Build();
             LoadFighter(fighterRoot);
@@ -121,6 +280,10 @@ namespace Sm4shCommand.GUI
         public TabControl Tabs { get { return tabs; } }
         public ComboBox CommandBox { get { return command; } }
         public TextBox Filter { get { return filter; } }
+        /// <summary>v1.7.34: "Play on select while playing" (the tests).</summary>
+        public CheckBox PlayOnSelect { get { return playOnSelect; } }
+        /// <summary>v1.7.34: the Merge sound mods.. dialog the tests fill instead of showing it modally (null: shown).</summary>
+        public Action<SoundMergeDialog> MergeDialogHook;
         /// <summary>v1.7.33: the pending additions / volume changes (the tests).</summary>
         public SoundAdder Adder { get { return adder; } }
         /// <summary>v1.7.33: the Add sounds.. dialog the tests fill instead of showing it modally (null: shown).</summary>
@@ -130,7 +293,7 @@ namespace Sm4shCommand.GUI
 
         void Build()
         {
-            var top = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 32, WrapContents = false, Padding = new Padding(4, 3, 4, 0) };
+            var top = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = true, Padding = new Padding(4, 3, 4, 0) };
             top.Controls.Add(fighterLabel);
             top.Controls.Add(pickFighter);
             top.Controls.Add(pickData);
@@ -144,6 +307,7 @@ namespace Sm4shCommand.GUI
             top.Controls.Add(save);
             top.Controls.Add(saveTo);
             top.Controls.Add(discard);
+            top.Controls.Add(merge);
 
             fighterTab.Controls.Add(fighterGrid);
             var commonTop = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 30, WrapContents = false, Padding = new Padding(2, 2, 2, 0) };
@@ -161,6 +325,7 @@ namespace Sm4shCommand.GUI
             var row1 = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 32, WrapContents = false, Padding = new Padding(4, 3, 4, 0) };
             row1.Controls.Add(play);
             row1.Controls.Add(stop);
+            row1.Controls.Add(playOnSelect);
             row1.Controls.Add(loop);
             row1.Controls.Add(bankVolume);
             row1.Controls.Add(new Label { Text = "Gain (dB):", AutoSize = true, Padding = new Padding(6, 6, 0, 0) });
@@ -201,6 +366,15 @@ namespace Sm4shCommand.GUI
             tips.SetToolTip(saveTo, "Writes them under a folder of your choice laid out as the game's data, ready to install:\n" +
                                     "fighter\\NAME\\sound\\<bank>.nus3bank and sound\\config\\soundlabeltable.bin.");
             tips.SetToolTip(discard, "Drops the new sounds and volume changes not saved yet.");
+            tips.SetToolTip(merge, "Merges several sound mods (each with its own sound\\config\\soundlabeltable.bin and fighter banks) into a new install folder,\n" +
+                                   "so each mod's added sounds keep working: rows by fighter, the same fighter's banks merged, ids remapped, scripts rewritten.");
+            tips.SetToolTip(play, "Plays the selected sound. In the list: Space plays / stops it, the arrow keys move; Enter or a double-click plays.");
+            tips.SetToolTip(stop, "Stops the sound (Space in the list too).");
+            tips.SetToolTip(playOnSelect, "On: while a sound is playing, moving the selection (arrow keys, a click) stops it and plays the new row,\n" +
+                                          "to audition sounds as you scroll. Off: the sound plays on; Space stops it or plays the selected row.");
+            try { playOnSelect.Checked = Runtime.GetSetting("SoundPlayOnSelect", false); } catch (Exception) { }
+            playOnSelect.CheckedChanged += (o, e) => { try { Runtime.SetSetting("SoundPlayOnSelect", playOnSelect.Checked); } catch (Exception) { } };
+            merge.Click += (o, e) => ShowMerge();
             addSounds.Click += (o, e) => ShowAdder();
             save.Click += (o, e) => SaveChanges(null);
             saveTo.Click += (o, e) => SaveTo();
@@ -227,10 +401,11 @@ namespace Sm4shCommand.GUI
             foreach (var g in new[] { fighterGrid, commonGrid })
             {
                 var grid = g;
-                grid.SelectionChanged += (o, e) => ShowInfo();
+                grid.SelectionChanged += (o, e) => { ShowInfo(); if (grid == CurrentGrid) SelectionMoved(); };
+                grid.SpacePressed += () => { if (grid == CurrentGrid) TogglePlay(); };
+                grid.EnterPressed += () => { if (grid == CurrentGrid) Play(); };
                 grid.CellDoubleClick += (o, e) => { if (e.RowIndex >= 0 && grid.Columns[e.ColumnIndex].ReadOnly) Play(); };
                 grid.CellEndEdit += (o, e) => { AliasEdited(grid, e.RowIndex, e.ColumnIndex); VolumeEdited(grid, e.RowIndex, e.ColumnIndex); };
-                grid.KeyDown += (o, e) => { if (e.KeyCode == Keys.Enter && !grid.IsCurrentCellInEditMode) { Play(); e.Handled = true; } };
                 grid.SortCompare += (o, e) =>
                 {
                     // numbers as numbers (length, volume, tone #, rate)
@@ -350,6 +525,9 @@ namespace Sm4shCommand.GUI
             // the picked sound stays picked when it is still in the list (filtering as you type)
             var keepF = RowEntry(fighterGrid);
             var keepC = RowEntry(commonGrid);
+            refilling = true;
+            try
+            {
             var fighterEntries = new List<SoundEntry>();
             if (sounds != null)
             {
@@ -365,6 +543,8 @@ namespace Sm4shCommand.GUI
             FillGrid(commonGrid, sounds != null && sounds.Common != null ? sounds.Common.Entries.Where(e => Matches(e, f)) : Enumerable.Empty<SoundEntry>());
             Reselect(fighterGrid, keepF);
             Reselect(commonGrid, keepC);
+            }
+            finally { refilling = false; }
             int allF = sounds != null ? sounds.Fighter.Entries.Count + (adder != null ? adder.Pending.Count : 0) : 0, allC = sounds != null && sounds.Common != null ? sounds.Common.Entries.Count : 0;
             fighterTab.Text = "Fighter sounds (" + (fighterGrid.Rows.Count == allF ? allF.ToString(CultureInfo.InvariantCulture) : fighterGrid.Rows.Count + " of " + allF) + ")";
             commonTab.Text = "Common sounds (" + (commonGrid.Rows.Count == allC ? allC.ToString(CultureInfo.InvariantCulture) : commonGrid.Rows.Count + " of " + allC) + ")";
@@ -618,9 +798,8 @@ namespace Sm4shCommand.GUI
             try
             {
                 StopPlaying();
-                playing = new MemoryStream(wav);
-                player = new SoundPlayer(playing);
-                player.Play();
+                Output.Play(wav);
+                playingUntil = DateTime.Now + TimeSpan.FromSeconds(WavSeconds(wav));
                 status.Text = "Playing " + name;
                 return true;
             }
@@ -699,9 +878,9 @@ namespace Sm4shCommand.GUI
             {
                 var wav = PreviewWav(e);
                 StopPlaying();
-                playing = new MemoryStream(wav);
-                player = new SoundPlayer(playing);
-                player.Play();          // (asynchronous: returns at once)
+                Output.Play(wav);       // (asynchronous: returns at once)
+                playingEntry = e;
+                playingUntil = DateTime.Now + TimeSpan.FromSeconds(WavSeconds(wav));
                 status.Text = "Playing " + e.IdText + " " + e.Name + string.Format(CultureInfo.InvariantCulture, " ({0:0.00} s)", e.Tone.Seconds);
             }
             catch (Exception ex) { status.Text = "Couldn't play " + e.Name + ": " + ex.Message; }
@@ -709,11 +888,66 @@ namespace Sm4shCommand.GUI
 
         void StopPlaying()
         {
-            try { if (player != null) player.Stop(); } catch (Exception) { }
-            if (player != null) player.Dispose();
-            player = null;
-            if (playing != null) playing.Dispose();
-            playing = null;
+            try { Output.Stop(); } catch (Exception) { }
+            playingEntry = null;
+            playingUntil = DateTime.MinValue;
+        }
+
+        /// <summary>v1.7.34: a preview is playing (the WAV's length since it started; Stop ends it).</summary>
+        public bool IsPlaying
+        {
+            get
+            {
+                var st = Output as ISoundOutState;
+                return st != null ? playingUntil != DateTime.MinValue && st.Playing : DateTime.Now < playingUntil;
+            }
+        }
+
+        /// <summary>v1.7.34: the sound playing (null when none, or the adder's preview).</summary>
+        public SoundEntry PlayingEntry { get { return IsPlaying ? playingEntry : null; } }
+
+        static double WavSeconds(byte[] wav)
+        {
+            if (wav == null || wav.Length < 44) return 0;
+            int ch = BitConverter.ToInt16(wav, 22), rate = BitConverter.ToInt32(wav, 24), size = BitConverter.ToInt32(wav, 40);
+            return ch > 0 && rate > 0 ? size / (2.0 * ch * rate) : 0;
+        }
+
+        /// <summary>v1.7.34: Space in the list: stops the sound playing, else plays the selected row.</summary>
+        public void TogglePlay()
+        {
+            if (IsPlaying)
+            {
+                StopPlaying();
+                status.Text = "Stopped.";
+            }
+            else Play();
+        }
+
+        /// <summary>v1.7.34: the selection moved (arrows, a click): with Play on select while playing, a sound playing
+        /// stops and the new row plays (audition as you browse); off, the sound plays on.</summary>
+        void SelectionMoved()
+        {
+            if (refilling || filling || !playOnSelect.Checked || !IsPlaying) return;
+            var e = Selected;
+            if (e == null || e == playingEntry) return;
+            StopPlaying();
+            if (e.Playable) Play();
+        }
+
+        /// <summary>v1.7.34: Merge sound mods.. (the dialog; MergeDialogHook fills it in the tests).</summary>
+        public void ShowMerge()
+        {
+            StopPlaying();
+            string picked = "";
+            try { picked = Runtime.GetSettingText("SoundDataFolder", ""); } catch (Exception) { }
+            bool p;
+            string table = FighterSounds.FindData(null, Path.Combine(Path.Combine("sound", "config"), "soundlabeltable.bin"), picked, out p);
+            using (var dlg = new SoundMergeDialog(table, sounds != null ? Path.GetDirectoryName(SoundAdder.DataRootOf(sounds.Root)) : null))
+            {
+                if (MergeDialogHook != null) { dlg.Show(this); MergeDialogHook(dlg); dlg.Close(); }
+                else dlg.ShowDialog(this);
+            }
         }
 
         /// <summary>v1.7.33: true when there is nothing unsaved, or the user drops it.</summary>

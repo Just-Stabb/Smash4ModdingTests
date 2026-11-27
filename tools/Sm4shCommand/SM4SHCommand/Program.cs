@@ -12,7 +12,7 @@ namespace Sm4shCommand
 {
     static class Program
     {
-        public static readonly string Version = "v1.7.33";
+        public static readonly string Version = "v1.7.34";
         public static readonly string Title;
         public static readonly string Description;
         public static readonly string Copyright;
@@ -20,7 +20,7 @@ namespace Sm4shCommand
 
         static Program()
         {
-            Application.EnableVisualStyles();
+            // (Application.EnableVisualStyles is in Main, after the command-line modes: they run with no window)
             // Missing assembly attributes must not stop the program from starting.
             Title = Attr<AssemblyTitleAttribute>(a => a.Title) ?? "SM4SHCommand";
             Description = Attr<AssemblyDescriptionAttribute>(a => a.Description) ?? "";
@@ -54,6 +54,13 @@ namespace Sm4shCommand
             // already routes UI-thread exceptions to ThreadException.)
             Application.ThreadException += (o, e) => ReportError(e.Exception, true);
             Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
+            if (args.Length > 0 && args[0].Equals("--merge-sounds", StringComparison.OrdinalIgnoreCase))
+            {
+                // v1.7.34: Merge sound mods from the command line (no window)
+                Environment.ExitCode = MergeSoundsCommandLine(args);
+                return;
+            }
+            Application.EnableVisualStyles();
             AcmdMain main;
             try
             {
@@ -67,6 +74,72 @@ namespace Sm4shCommand
             if (args.Length > 0) // a file or fighter folder given on the command line / dropped on the exe
                 main.Shown += (o, e) => main.OpenPath(args[0]);
             Application.Run(main);
+        }
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        static extern bool AttachConsole(int pid);
+
+        const string MergeUsage =
+            "SM4SHCommand.exe --merge-sounds OUT_DIR MOD1 MOD2 [MOD3 ...] [options]\n" +
+            "  Merges sound mods (folders or .zips, each with its sound/config/soundlabeltable.bin and fighter banks) into the\n" +
+            "  new folder OUT_DIR (the Sound Effect Viewer's Merge sound mods..). Writes OUT_DIR/MERGE_REPORT.txt; prints it.\n" +
+            "  --base PATH            the base soundlabeltable.bin, or the game data folder holding sound/config/soundlabeltable.bin\n" +
+            "                         (default: the viewer's Game data folder, SoundDataFolder in Sm4shCommand.ini)\n" +
+            "  --later-wins           a conflict takes the later mod's (default: the first mod's)\n" +
+            "  --no-scripts           don't rewrite the mods' ACMD scripts to their remapped ids\n" +
+            "  --take-unbanked-rows   take rows a mod changed without shipping their banks (default: the base's kept)\n" +
+            "  --copy-all             copy the mods' other files too (a complete install folder)\n" +
+            "  --dry-run              write nothing: print the report (OUT_DIR is then left out: every name is a mod)\n" +
+            "Exit code 0: merged (or checked) with no error; 1: errors (nothing written); 2: bad arguments.";
+
+        static int MergeSoundsCommandLine(string[] args)
+        {
+            try { if (Environment.OSVersion.Platform == PlatformID.Win32NT) AttachConsole(-1); } catch { }
+            var names = new List<string>();
+            string basePath = null;
+            var opt = new Sm4shCommand.Sound.MergeOptions();
+            bool dry = false;
+            for (int i = 1; i < args.Length; i++)
+            {
+                string a = args[i];
+                if (a == "--base" && i + 1 < args.Length) basePath = args[++i];
+                else if (a == "--later-wins") opt.LaterWins = true;
+                else if (a == "--no-scripts") opt.RewriteScripts = false;
+                else if (a == "--take-unbanked-rows") opt.TakeUnbankedRows = true;
+                else if (a == "--copy-all") opt.CopyOtherFiles = true;
+                else if (a == "--dry-run") dry = true;
+                else if (a.StartsWith("--")) { Console.Error.WriteLine("Unknown option " + a + "\n\n" + MergeUsage); return 2; }
+                else names.Add(a);
+            }
+            if (names.Count < (dry ? 2 : 3)) { Console.Error.WriteLine(MergeUsage); return 2; }
+            string outDir = dry ? null : names[0];
+            var mods = dry ? names : names.Skip(1).ToList();
+            try { SALT.Moveset.AnimCMD.ACMD_INFO.OverrideInfo(System.IO.Path.Combine(Application.StartupPath, "Events.cfg"), new List<string>()); } catch { }
+            if (basePath == null)
+            {
+                try
+                {
+                    var ini = System.IO.Path.Combine(Application.StartupPath, "Sm4shCommand.ini");
+                    if (System.IO.File.Exists(ini))
+                        foreach (var line in System.IO.File.ReadAllLines(ini))
+                        {
+                            int eq = line.IndexOf('=');
+                            if (eq > 0 && line.Substring(0, eq).Trim() == "SoundDataFolder") basePath = line.Substring(eq + 1).Trim();
+                        }
+                }
+                catch { }
+            }
+            string table = basePath;
+            if (basePath != null && !System.IO.File.Exists(basePath))
+            {
+                bool p;
+                table = Sm4shCommand.Sound.FighterSounds.FindData(null, System.IO.Path.Combine(System.IO.Path.Combine("sound", "config"), "soundlabeltable.bin"), basePath, out p);
+            }
+            if (table == null) { Console.Error.WriteLine("No base soundlabeltable.bin: give --base (a soundlabeltable.bin or the game's data folder).\n\n" + MergeUsage); return 2; }
+            var merger = new Sm4shCommand.Sound.SoundMerger(table, mods, opt, Sm4shCommand.Sound.FighterSounds.LoadBankAliases(Sm4shCommand.Sound.FighterSounds.BankAliasesPath)) { Version = Version };
+            var r = merger.Run(outDir);
+            Console.WriteLine(r.Report);
+            return r.Ok ? 0 : 1;
         }
 
         static void ReportError(Exception e, bool canContinue)

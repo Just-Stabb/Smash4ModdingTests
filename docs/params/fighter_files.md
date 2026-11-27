@@ -436,6 +436,13 @@ read off the hitboxes, e.g. with Sm4shCommand's hitbox viewer).
   holds none). A costume bank (`_cNN`) is loaded instead of the main one for that costume and plays the same row, so a
   new label's tone index must be the new tone in it too (the adder gives the costume banks on the row the same tones at
   the same indexes).
+- **Two sound mods, one table** (Sm4shCommand v1.7.34's Merge sound mods, `tools/Sm4shCommand/README.md` "Merging sound
+  mods"; `SM4SHCommand.exe --merge-sounds`): `soundlabeltable.bin` is one file for the whole game, so mods that each
+  ship their own copy (each with its fighter's row grown) overwrite each other's rows. The merge takes each row from the
+  mod that changed it (the others byte for byte the base's); the same row grown by two mods gets the later mod's new
+  tones appended to the earlier mod's bank (and the costume banks on the row), its new labels after the earlier's, its
+  ids remapped and its ACMD scripts' sound command ids rewritten. Banks only merge with the same file of another mod:
+  rows and banks stay per fighter.
 - **`soundseq_<Name>.sqb`**: header {u16 4, u16 **set id**, u32 count, u32 count x 4}, offsets
   (-1 = none), sequences of weighted choices (sound ID or -1 = silence, weight %). ACMD plays
   sequence n as `0x8000 | set id << 16 | n` (Marth's set 0x28: `Low_Voice_Clip(0x80280000)`,
