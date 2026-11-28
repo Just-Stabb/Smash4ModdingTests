@@ -953,5 +953,10 @@ viewer plays it even without the names file.
   finds a built Sm4shCommand in `$SM4SHCOMMAND_RUN` or `WORK/../../sm/run`; without one that part is reported skipped.
 - `gui_test.py`: the import tab (a fighter's effect bank listed, the imported items shown).
 
+Run for 2.0 (on the game's v288 executable, after merging 1.5.1 / 1.5.2): run_all 143 checks, 0 failed (import_test's
+checks, import_exe_test 72 / 0, weapon_expand_test on build 4 142 ok with only its fireball-specific check failing,
+sm4shcommand_test on 4 fighters 24 + 22 + 7 + 2 / 0, rollback_test 27 / 0, outputs_test 11 / 0, patchset_test 30 / 0,
+kind_expand_test 171 / 0, extras_test 38 / 0); gui_test (python3.12) 8 ok; package_clean_test 0 hits.
+
 Not covered: the game itself (nothing here ran in Cemu or on a console), a cross-fighter article's native behaviour for
 its new owner, the effect memory of a match with imported effects, imported sounds through the game's sound engine.
