@@ -232,6 +232,9 @@ class App:
         self.x_kirby = tk.BooleanVar(value=True)
         ttk.Checkbutton(k, text='Kirby copies the clone (its base\'s copy ability)', variable=self.x_kirby).pack(anchor='w')
         radio(k, 'kirby_hat', [('own', 'Own hat + copy motions (copies of the base\'s)'), ('share', 'The base\'s')], 'own')
+        self.x_kirby_scripts = tk.BooleanVar(value=True)
+        ttk.Checkbutton(k, text='Own copy scripts (his copy plays the clone\'s effects / sounds; names for Sm4shCommand)',
+                        variable=self.x_kirby_scripts).pack(anchor='w')
         hf = ttk.Frame(k)
         hf.pack(fill='x')
         self.x['kirby_hat_dir'] = tk.StringVar()
@@ -398,7 +401,7 @@ class App:
 
     def extras_opts(self):
         o = {'call': self.x['call'].get(), 'music': self.x['music'].get(), 'kirby': self.x_kirby.get(),
-             'kirby_hat_mode': self.x['kirby_hat'].get()}
+             'kirby_hat_mode': self.x['kirby_hat'].get(), 'kirby_scripts': self.x_kirby_scripts.get()}
         for k in ('call', 'music'):
             if o[k] == 'wav':
                 if self.x[k + '_wav'].get():

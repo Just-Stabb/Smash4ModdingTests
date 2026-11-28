@@ -140,7 +140,7 @@ def record(spec, reg):
             'plate_lines': spec.get('plate_lines'), 'fonts': dict(spec.get('fonts') or {}),
             'call': spec.get('call') or ('wav' if spec.get('call_wav') else 'own'), 'call_wav': spec.get('call_wav'),
             'kirby': bool(spec.get('kirby', True)), 'kirby_hat_mode': spec.get('kirby_hat_mode') or 'own',
-            'kirby_hat_dir': spec.get('kirby_hat_dir'),
+            'kirby_hat_dir': spec.get('kirby_hat_dir'), 'kirby_scripts': bool(spec.get('kirby_scripts', True)),
             'titles': dict(spec.get('titles') or {}),
             'music': spec.get('music') or ('wav' if spec.get('music_wav') else 'own'), 'music_wav': spec.get('music_wav'),
             'voices': dict(spec.get('voices') or {})}
@@ -217,11 +217,13 @@ def build(rec, data_dir, ui_dir, out_data, reg, portraits=None, log=print, renum
         from . import music
         music.own_fanfare(rec, data_dir, out_data, read, rec.get('music', 'own'), rec.get('music_wav'), logs.append)
     logs += result_panel(rec, data_dir, out_data)
+    rows = {}
     if rec.get('own_sound'):
         from . import sound
-        sound.own_banks(rec, out_data, data_dir, logs.append)
+        rows = sound.own_banks(rec, out_data, data_dir, logs.append)
     else:
         rec['sound_alias'] = []
+        rec['kirby_copy_bank'] = None
     if rec.get('voices'):
         from . import voices as V
         ls = V.lines(rec, out_data)
@@ -237,7 +239,7 @@ def build(rec, data_dir, ui_dir, out_data, reg, portraits=None, log=print, renum
     src_rec = next((f for f in reg['fighters'] if f['name'] == rec['source']), None)
     narration.own_call(rec, data_dir, out_data, read, rec.get('call', 'own'), rec.get('call_wav'), logs.append, src_rec)
     if read is not None:
-        logs += kirby_files(rec, data_dir, out_data, read, src_rec)
+        logs += kirby_files(rec, data_dir, out_data, read, src_rec, rows)
     from . import languages
     logs += languages.names(rec, data_dir, out_data)
     for line in logs:
@@ -278,12 +280,13 @@ def win_cameras(rec, data_dir, out_data):
 KIRBY_BODY, KIRBY_HAT = 0x1041A6D0, 0x1041A7B8     # Kirby's copy tables: motion folder name, hat name (per kind)
 
 
-def kirby_files(rec, data_dir, out_data, read, src_rec=None):
+def kirby_files(rec, data_dir, out_data, read, src_rec=None, rows=None):
     """Kirby's copy of the clone: its own hat (fighter/kirby/model/<name>cap/, a copy of the base's hat) and copy
     motions (fighter/kirby/motion/<name>body/), when the base has them in the data folder; the executable then loads
     them for a Kirby who copies the clone (clone_extras.py). rec["kirby"] False: Kirby gets no ability (vanilla)."""
     rec['kirby_body'] = rec['kirby_hat'] = None
     rec['kirby_voice'] = False
+    rec['kirby_slots'] = []
     if not rec.get('kirby', True):
         return ['Kirby: does not copy the clone (option off: no ability, as the game does for new kinds)']
     if rec.get('kirby_hat_mode', 'own') == 'share':
@@ -318,7 +321,15 @@ def kirby_files(rec, data_dir, out_data, read, src_rec=None):
     if os.path.exists(v) or os.path.exists(os.path.join(data_dir, 'fighter', rec['name'], 'sound',
                                                         os.path.basename(v))):
         rec['kirby_voice'] = True
-        logs.append('Kirby: his copy voices of the clone load from its own %s' % os.path.basename(v))
+        logs.append('Kirby: his copy voices of the clone load from its own %s%s' % (
+            os.path.basename(v), ' (its own bank id %d, answering for the base\'s %d)' % tuple(rec['kirby_copy_bank'])
+            if rec.get('kirby_copy_bank') else ''))
+    if body:
+        from . import kirby_copy as KC
+        KC.own_scripts(rec, R.KINDS.index, data_dir, out_data, read, rows or {},
+                       (src_rec or {}).get('kirby_base_body') or body, logs.append)
+        if rec.get('kirby_slots'):
+            rec['kirby_base_body'] = (src_rec or {}).get('kirby_base_body') or body
     return logs
 
 

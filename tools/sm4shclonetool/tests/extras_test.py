@@ -167,8 +167,15 @@ def main():
     check('a vanilla kind (0x19): no alias written', [m.w(mod + o) for o in (0x5C0, 0x5C4, 0x5C8)], [0, 0, 0])
 
     # ---------------------------------------------------------------- Kirby
-    def grant(k):
-        m.run(CE.GRANT, CE.GRANT + 4, {6: k, 28: 0xDEAD})
+    # a Kirby: fighter +0x726C -> WorkModule, [WM+8] -> groups, [group 0 + 0xC] -> his int array (int 0xA4 at +0x290)
+    FTR, WM, GRP, INTS = OBJ + 0x8000, OBJ + 0x9000, OBJ + 0x9100, OBJ + 0xA000
+    m.mu.mem_write(FTR + 0x726C, struct.pack('>I', WM))
+    m.mu.mem_write(WM + 8, struct.pack('>I', GRP))
+    m.mu.mem_write(GRP, struct.pack('>I', GRP + 0x40))
+    m.mu.mem_write(GRP + 0x40 + 0xC, struct.pack('>I', INTS))
+
+    def grant(k, ftr=FTR):
+        m.run(CE.GRANT, CE.GRANT + 4, {6: k, 28: 0xDEAD, 4: ftr})
         return m.r(28)
     want = {f['kind']: kind_of(f['base']) for f in fs if f.get('kirby', True)}
     got = {k: grant(k) for k in range(0x100)}
@@ -214,8 +221,115 @@ def main():
             bad.append(hex(k))
     check('the Kirby-copy voice bank bound: kinds 0-0x39 and the %d clones with their own copy voices pass, the rest '
           'not' % len(vk), bad[:6], [])
+    kirby_scripts(m, v, fs, kind_of, grant, FTR, WM, INTS)
     print('\n%d failed' % len(FAILS))
     return 1 if FAILS else 0
+
+
+def kirby_scripts(m, v, fs, kind_of, grant, FTR, WM, INTS):
+    """(1.4) Kirby's own copy scripts (KMAP, GRANT's KTAB) and the clone's own Kirby-copy bank id (COPYID)"""
+    labels = m_labels(m, v)
+    ks = [f for f in fs if f.get('kirby', True) and f.get('kirby_slots')]
+    print('     Kirby\'s own copy scripts: %d clone(s) with copy runs in the marker' % len(ks))
+    if ks:
+        ktab = labels['ktab']
+        f = ks[0]
+        bk = kind_of(f['base'])
+        grant(f['kind'])
+        check('%s: copy_grant keeps {Kirby\'s int array, the clone\'s kind} (KTAB)' % f['name'],
+              (m.w(ktab), m.w(ktab + 4)), (INTS, f['kind']))
+        # the per-kind script lookup: a manager with Kirby's entry (kind 8 -> his motion.mtable)
+        MGR, MT, MOD, ACC = OBJ + 0xC000, OBJ + 0x10000, OBJ + 0xB000, OBJ + 0xB800
+        n = max(nb + hi - lo for lo, hi, nb in f['kirby_slots']) + 1
+        m.mu.mem_write(MGR, b'\0' * 0x400)
+        m.mu.mem_write(MGR, struct.pack('>IIII', 8, 0, 1, MT))
+        m.mu.mem_write(MT, b''.join(struct.pack('>I', 0x5000000 + i) for i in range(n)))
+        m.mu.mem_write(MOD + 4, struct.pack('>I', ACC))
+        m.mu.mem_write(ACC + 0x28, struct.pack('>I', WM))
+        runs = f['kirby_slots']
+        probe = sorted({x for lo, hi, _nb in runs for x in (lo, hi, (lo + hi) // 2, lo - 1, hi + 1)} | {0, 0x211, 0x300})
+
+        def look(motion, kind=8, site=CE.KMAP_CALLERS[0][0], reg=27, copy=bk):
+            m.mu.mem_write(INTS + 0x290, struct.pack('>I', copy))
+            m.run(CE.KMAP, site + 4, {3: MGR, 4: kind, 5: motion, reg: MOD, 27 if reg != 27 else 29: 0}, lr=site + 4)
+            return m.r(3)
+
+        def want(motion):
+            for lo, hi, nb in runs:
+                if lo <= motion <= hi:
+                    return 0x5000000 + nb + motion - lo
+            return 0x5000000 + motion
+        for site, reg in CE.KMAP_CALLERS:
+            bad = [(hex(x), hex(look(x, site=site, reg=reg)), hex(want(x))) for x in probe
+                   if look(x, site=site, reg=reg) != want(x)]
+            check('%s: the script lookup from 0x%08X (module r%d) for Kirby holding its copy: the copy runs %s -> '
+                  'its own entries, every other motion the game\'s' % (
+                      f['name'], site, reg, ', '.join('0x%X-0x%X->0x%X' % tuple(r) for r in runs)), bad, [])
+        check('%s: Kirby holding another copy (kind 0x%X): the game\'s scripts' % (f['name'], (bk + 1) % 0x3A),
+              [x for x in probe if look(x, copy=(bk + 1) % 0x3A) != 0x5000000 + x], [])
+        m.mu.mem_write(MGR, struct.pack('>I', 0x19))
+        check('another fighter (kind 0x19) with the same motions: the game\'s scripts',
+              [x for x in probe if look(x, kind=0x19) != 0x5000000 + x], [])
+        m.mu.mem_write(MGR, struct.pack('>I', 8))
+        m.mu.mem_write(INTS + 0x290, struct.pack('>I', bk))
+        m.run(CE.KMAP, 0x02760004, {3: MGR, 4: 8, 5: runs[0][0], 27: MOD}, lr=0x02760004)
+        check('the lookup called from elsewhere: the game\'s', m.r(3), 0x5000000 + runs[0][0])
+        # the vanilla function, the same answers for every probe (the hook replays its first words)
+        bad = []
+        for x in probe:
+            v.mu.mem_write(MGR, b'\0' * 0x400)
+            v.mu.mem_write(MGR, struct.pack('>IIII', 8, 0, 1, MT))
+            v.mu.mem_write(MT, b''.join(struct.pack('>I', 0x5000000 + i) for i in range(n)))
+            v.run(CE.KMAP, 0x01000000, {3: MGR, 4: 8, 5: x})
+            if v.r(3) != 0x5000000 + x:
+                bad.append(hex(x))
+        check('the game\'s lookup (vanilla) returns mtable[motion] for the probes', bad, [])
+        grant(bk)
+        check('%s: Kirby then granted the base\'s copy itself: KTAB updated, the game\'s scripts' % f['name'],
+              (m.w(ktab + 4), [x for x in probe if look(x) != 0x5000000 + x]), (bk, []))
+        # 20 Kirbys: KTAB stays in its 16 entries (round robin), nothing written outside it, knext, the stack
+        writes = []
+        for i in range(20):
+            ftr = OBJ + 0x20000 + 0x10000 * i
+            m.mu.mem_write(ftr + 0x726C, struct.pack('>I', WM))
+            m.run(CE.GRANT, CE.GRANT + 4, {6: f['kind'], 28: 0, 4: ftr})
+            writes += m.writes
+        stray = [hex(a) for a, _s in writes if not (labels['knext'] <= a < ktab + 8 * CE.KTAB_N)
+                 and not (STACK - 0x400 <= a < STACK + 8)]
+        check('20 grants: KTAB written only in its own 16 entries / knext', stray, [])
+        grant(8)
+        grant(0x3A)
+    kb = [f for f in fs if f.get('kirby_copy_bank')]
+    print('     own Kirby-copy banks: %d clone(s) with an id of their own' % len(kb))
+    for f in kb[:3]:
+        own, base = f['kirby_copy_bank']
+
+        def bid(handle_id, wanted, lr):
+            def body(uc, a, sz, u):        # the getter's real body: the handle's BINF id, then its epilogue
+                uc.reg_write(Rg(3), handle_id)
+                uc.reg_write(Rg(1), uc.reg_read(Rg(1)) + 0x10)
+                uc.reg_write(P.UC_PPC_REG_PC, uc.reg_read(Rg(0)))
+            h = m.mu.hook_add(UC_HOOK_CODE, body, begin=CE.COPYID + 8, end=CE.COPYID + 8)
+            m.run(CE.COPYID, lr, {28: wanted, 3: 0x7777}, lr=lr)
+            m.mu.hook_del(h)
+            return m.r(3)
+        hit = CE.COPYID_CALLER + 4
+        check('%s: Kirby\'s copy-handle finder (0x%08X): its own bank (%d) answers for the base\'s id %d, for its '
+              'own, and another bank does not; called from elsewhere the id is the bank\'s' % (
+                  f['name'], CE.COPYID_CALLER, own, base),
+              (bid(own, base, hit), bid(own, own, hit), bid(own + 1, base, hit), bid(own, base, 0x02761004)),
+              (base, own, own + 1, own))
+
+
+def m_labels(m, v):
+    """the extras part's labels (rebuilt from the marker's registry on the vanilla words: the same code)"""
+    base, rec = X.find_marker(m.x)
+    reg = rec['registry']
+    lay = X.layout(base, reg)
+    words, info = CE.build(v.w, reg['fighters'], R.KINDS.index, *lay['extras'])
+    bad = [hex(a) for a, w in words.items() if info['labels']['alias'] <= a < lay['extras'][1] and m.w(a) != w]
+    check('the extras part in the executable = the part rebuilt from its registry (past its RAM words)', bad[:4], [])
+    return info['labels']
 
 
 if __name__ == '__main__':

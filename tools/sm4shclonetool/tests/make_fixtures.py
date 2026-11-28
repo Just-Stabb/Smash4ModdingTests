@@ -11,6 +11,7 @@ OUT_DIR/data/
                          no stage icons were in the dumps)
   fighter/fox/           -> VFIGHTER/fox (effect/ and model/body/c00/model.vbn: all the dump has of Fox)
   fighter/szerosuit/     -> VFIGHTER/szerosuit with model/ cut to body/c00 and the articles (disk space)
+  fighter/kirby/script, motion/  -> VFIGHTER/kirby's (1.4: his ACMD and the Fox / ZSS copy packs, when there)
   stage/melee|end/BattleField_f/   synthetic (a few small files named like the stage's: no stage folders in the dumps)
   sound/config/          SOUND_CONFIG's bgm_fighter.fbb / commonsoundtable.csb cut to the game's record counts
                          (58 / 62: a modded copy's first records, the vanilla ones)
@@ -92,6 +93,11 @@ def main():
     link(os.path.join(vui, 'message'), os.path.join(data, 'ui', 'message'))
     link(os.path.join(vui, 'replace', 'chr'), os.path.join(data, 'ui', 'replace', 'chr'))
     link_tree(os.path.join(vfighter, 'fox'), os.path.join(data, 'fighter', 'fox'))
+    # (1.4) Kirby's vanilla ACMD (script/animcmd/body: motion.mtable + the four .bin) and his Fox / Zero Suit Samus
+    # copy motion packs (motion/<copy>body/main.pac), when the dump has them: his own copy scripts for the clones
+    for sub in ('script', 'motion'):
+        if os.path.isdir(os.path.join(vfighter, 'kirby', sub)):
+            link_tree(os.path.join(vfighter, 'kirby', sub), os.path.join(data, 'fighter', 'kirby', sub))
     link_tree(os.path.join(vfighter, 'szerosuit'), os.path.join(data, 'fighter', 'szerosuit'),
               lambda rel: rel.startswith('model/body/') and not rel.startswith('model/body/c00/'))
     # synthetic stage

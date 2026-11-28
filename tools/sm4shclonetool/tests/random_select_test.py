@@ -14,7 +14,8 @@ Checks:
 - PICKS picks from the full pool: every enabled id picked, none other, a chi-square test of uniformity;
 - a player's pick leaves out the ids the other players have (7 or more left);
 - remove(id) for every id 0-0xFF: exactly that bit for ids below the scan count (and its mirror bit), else nothing;
-- the fighter helper 0x0301CAE8's loop with a 200-entry database writes only its 12 bytes (the 96 clamp);
+- the fighter helper 0x0301CAE8's loop with a 200-entry database writes only its 12 bytes (the 96 clamp) and sets
+  no clone's bit (1.4);
 - the stage refill 0x02FFB76C: the stage clones with "random" in pool +0xA4, the ones set to false not, nothing
   written past its 16 bytes.
 """
@@ -214,6 +215,11 @@ def main():
     outside = [(a, s) for a, s in m.writes if not (LOCAL <= a < LOCAL + 12)]
     check('the available-fighters helper 0x0301CAE8 with 200 entries: its loop writes only its 12 bytes',
           outside[:4], [])
+    got = ids_of(m.words(LOCAL, 3))
+    clones = set(range(59, 59 + len(fighters)))
+    check('the helper (1.4): no clone id in its set (the online session\'s announced fighters; %d clones), the '
+          'game\'s available ids below 59 still in it' % len(fighters), (sorted(got & clones), len(got - clones) > 0),
+          ([], True))
     # stage refill A
     m.watch(False)
     m.watch(True)

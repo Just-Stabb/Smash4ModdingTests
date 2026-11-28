@@ -103,6 +103,9 @@ def main():
     text = open(o).read()
     check('extras_test with 40 clones (results call, aliases, Kirby\'s copy): %d ok, %d failed'
           % (text.count('\nok ') + text.startswith('ok '), text.count('\nFAIL ')), rc, 0)
+    for p in (e20, e20b, e40):                       # disk: the executables are no longer needed
+        if os.path.exists(p):
+            os.unlink(p)
     # ---------------------------------------------------------------- data side, 40 Fox clones
     data = os.path.join(fx, 'data')
     cui = os.path.join(fx, 'custom_ui')
@@ -142,7 +145,6 @@ def main():
     check('the package\'s executable lists the 40 fighter / 8 stage clones', (len(reg['fighters']), len(reg['stages'])),
           (40, 8))
     shutil.rmtree(out)                                                   # disk: the 40-clone project is large
-    os.unlink(e40)
     open(os.path.join(work, 'many_results.txt'), 'w').write('\n'.join(RES) + '\n\n%d checks, %d failed\n' % (
         len(RES), len(FAILS)))
     print('%d checks, %d failed' % (len(RES), len(FAILS)))

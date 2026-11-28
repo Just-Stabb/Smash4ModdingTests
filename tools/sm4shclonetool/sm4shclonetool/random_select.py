@@ -21,6 +21,10 @@ The patch (all accesses but the getter replaced; the getter's +0x98 stays a mirr
   starts from its +0x98 words); refill, count, remove and pick replaced by functions that use it, the scan over
   positions 0 .. max(0x51, 59 + new ids) - 1, every bit ANDed with the allow mask ("random": false clones out);
 - 0x0301CAE8 and the stages' 0x0301CCB4 (16-byte local) count at most 96 / 128 entries;
+- (1.4) 0x0301CAE8 sets no clone's bit (AVAIL_BIT): with the refill replaced its only callers are 0x0290D960 /
+  0x029E6CE0, which copy the set into the online session's player record (the 0x029E.... network module's object
+  [0x102F711C] + 0x2E00, +0x30: the fighters this console announces): a clone id is never offered to another console
+  (a vanilla peer has no such fighter), whatever its id (1.3: ids 59-95 were in it, 96 and up not);
 - stage pools (refills 0x02FFB76C, 0x02FFB8CC): each stored word ANDed with the stage allow mask (stage clones with
   "random": false out). Their 0x63-id bound holds every stage clone (at most 41, ids 0x38-0x60).
 """
@@ -33,6 +37,7 @@ REMOVE = 0x02FFC5BC
 PICK = 0x028E21B4
 AVAIL_COUNT = 0x0301CB40        # or. r27, r3, r3 (the database's entry count)
 STAGE_AVAIL_COUNT = 0x0301CD0C  # or. r27, r3, r3
+AVAIL_BIT, AVAIL_SKIP = 0x0301CB78, 0x0301CB8C   # (1.4) rlwinm r12, r26, 29, 3, 29 (the helper's bit set) / its next entry
 STAGE_STORE_AB = 0x02FFB814     # stwx r12, r31, r10
 STAGE_STORE_CD = 0x02FFB964     # stwx r12, r31, r25
 WORDS, SLOTS = 7, 4
@@ -41,7 +46,8 @@ FIRST_ID, OLD = 59, 0x51
 ORIGINALS = {REFILL: 'stwu r1, -0x38(r1)', COUNT_AT: 'li r11, 0x51', REMOVE: 'cmpwi r4, 0xff',
              PICK: 'stwu r1, -0x38(r1)', PICK + 4: 'stmw r26, 0x20(r1)', PICK + 8: 'mflr r0',
              PICK + 12: 'mr r30, r3', AVAIL_COUNT: 'or. r27, r3, r3', STAGE_AVAIL_COUNT: 'or. r27, r3, r3',
-             STAGE_STORE_AB: 'stwx r12, r31, r10', STAGE_STORE_CD: 'stwx r12, r31, r25'}
+             STAGE_STORE_AB: 'stwx r12, r31, r10', STAGE_STORE_CD: 'stwx r12, r31, r25',
+             AVAIL_BIT: 'rlwinm r12, r26, 29, 3, 29'}
 DB, MASKS = 0x102F7188, 0x1034069C       # [the character database], [the masks object]
 F_ENTRY, F_AVAIL, F_MASK, F_MII, F_RANDOM_ID = 0x0309FB24, 0x0301BA44, 0x0293C40C, 0x030A04C0, 0x030A0EFC
 F_INIT_GUARD, F_POOLOBJ, F_PLAYERS_A, F_PLAYERS_B, F_NONE = 0x020013BC, 0x0300174C, 0x0300266C, 0x02868080, 0x030A0F1C
@@ -398,8 +404,17 @@ stage_cd:                               # 0x02FFB964: stwx r12, r31, r25 (cr0 of
         and r12, r12, r11
         stwx r12, r31, r25
         b 0x%(cd)X
+avail_bit:                              # 0x0301CB78: the helper sets the bit of an available entry: not a clone's
+        cmplwi r26, %(first)d
+        blt ab_set
+        cmplwi r26, %(last)d
+        bge ab_set
+        b 0x%(skip)X
+ab_set: rlwinm r12, r26, 29, 3, 29
+        b 0x%(abk)X
 ''' % dict(s, rh=ha(RNG), rl=slo(RNG), av=AVAIL_COUNT + 4, sav=STAGE_AVAIL_COUNT + 4,
-           ab=STAGE_STORE_AB + 4, cd=STAGE_STORE_CD + 4))
+           ab=STAGE_STORE_AB + 4, cd=STAGE_STORE_CD + 4, first=FIRST_ID, last=FIRST_ID + n_fighters, skip=AVAIL_SKIP,
+           abk=AVAIL_BIT + 4))
 
 
 def build(read, fighters, stages, cave, limit):
@@ -423,6 +438,6 @@ def build(read, fighters, stages, cave, limit):
         words[PICK + 4 * i] = one(PICK + 4 * i, line)
     for site, lab in ((REFILL, 'refill'), (COUNT_AT, 'count'), (REMOVE, 'remove'),
                       (AVAIL_COUNT, 'avail_clamp'), (STAGE_AVAIL_COUNT, 'stage_avail_clamp'),
-                      (STAGE_STORE_AB, 'stage_ab'), (STAGE_STORE_CD, 'stage_cd')):
+                      (STAGE_STORE_AB, 'stage_ab'), (STAGE_STORE_CD, 'stage_cd'), (AVAIL_BIT, 'avail_bit')):
         words[site] = one(site, 'b 0x%X' % a.labels[lab])
     return words, {'labels': a.labels, 'tab': at['tab'], 'count': scan_count(len(fighters))}

@@ -27,11 +27,11 @@ DEFAULT_FONT = {'plate': 'mincho', 'title': 'mincho', 'other': 'gothic'}
 # capitals), two lines ((top, bottom), (top, bottom)), outline, shadow offset (x, y). Measured from the game's plates.
 GEOMETRY = {
     'chrn_11': {'size': (512, 128), 'cx': 151, 'width': 286, 'one': (46, 97), 'two': ((22, 65), (68, 111)),
-                'outline': 5, 'shadow': (6, 9), 'small_caps': False},
+                'outline': 5.5, 'shadow': (5, 9), 'small_caps': False, 'bold': 0.004, 'crisp': 1.1},
     'chrn_12': {'size': (256, 128), 'cx': 127, 'width': 220, 'one': (39, 81), 'two': ((22, 59), (62, 99)),
-                'outline': 3, 'shadow': (3, 5)},
+                'outline': 3.5, 'shadow': (3, 5), 'bold': 0.004, 'crisp': 1.0},
     'chrn_40': {'size': (1024, 512), 'cx': 318, 'width': 612, 'one': (111, 231), 'two': ((62, 170), (176, 281)),
-                'outline': 9, 'shadow': (8, 14)},
+                'outline': 9, 'shadow': (8, 15), 'bold': 0.0035, 'crisp': 1.1},
 }
 NARROW = '-'                # signs drawn with the narrow form (the wide hyphen is a long dash)
 SMALL_SIGNS = '&'           # signs drawn at the small capitals' height (the game's '& Watch')
@@ -41,7 +41,39 @@ SPACE = 0.30                # a word space / cap height
 TWO_LINES_FROM = 12         # a name with a space and this many characters or more goes on two lines (the game's
                             # plates: "Captain Falcon", "Zero Suit Samus", "Mr. Game & Watch" two; "Crazy Hand", "Meta
                             # Knight", "Little Mac" one; "Donkey Kong" two is the one exception); a "\n" in the title forces it
-BOLD = 0.045                # extra weight (dilation) / cap height: the game's letters are heavier than the font's
+# weight and edges (1.4, measured on 14 of the game's plates a set, tests/media_test.py): the letters' weight is the
+# font's own plus a round dilation of BOLD x the cap height (1.3 had 0.045 with a square filter: fills 21-34 % heavier
+# than the game's), the edges as crisp as the game's (coverage contrast CRISP about the half level, the picture
+# box-averaged from 4x), the outline a round dilation of `outline` pixels and the drop shadow that outline moved by
+# `shadow` (the game's: the best fit of its own rim on its own letters, IoU 0.97-0.99). Fill / outline values are the
+# base plate's own (plate_style); the game's letters have no gradient (top / bottom thirds equal)
+REFERENCE_WEIGHT = 0.1161      # the bundled DFMincho-SU's stroke thickness / cap height (font_weight), the fonts' zero
+WEIGHT_GAIN = 1.8              # how much of the difference the dilation / erosion takes back (DFGothic-SU: 1.8
+                               # brings its fill coverage and stems to the game's, -3 to +10 %; 1.0 left it 11-20 % heavier)
+_WEIGHTS = {}
+
+
+def font_weight(font_path):
+    """a font's mean stroke thickness / cap height ("HAMBURGEFONSTIV" in its capitals): other fonts are dilated or
+    eroded to the game's weight by the difference (a heavy font such as DFGothic-SU, 0.153, comes out as heavy as the
+    game's letters, not heavier)"""
+    if font_path not in _WEIGHTS:
+        try:
+            m, _b, _t = line_mask('HAMBURGEFONSTIV', font_path, 100, 1, True)
+            f = m > 127
+            dist, cur, k = np.zeros(f.shape, np.float32), f.copy(), 0
+            while cur.any() and k < 100:
+                k += 1
+                dist[cur] = k
+                cur = _erode(cur)
+            _WEIGHTS[font_path] = 2.0 * float(dist[f].mean()) / 100 if f.any() else REFERENCE_WEIGHT
+        except Exception:
+            _WEIGHTS[font_path] = REFERENCE_WEIGHT
+    return _WEIGHTS[font_path]
+
+
+BOLD = None                 # None: each set's own 'bold' / 'crisp' (GEOMETRY); a number overrides (tuning)
+CRISP = None
 
 
 def bundled_font(kind='mincho'):
@@ -168,8 +200,10 @@ def text_mask(text, font_path, set_name, size=None, lines=None):
     lines = split_lines(text, lines)
     boxes = [geo['one']] if len(lines) == 1 else list(geo['two'])
     canvas = Image.new('L', (w * scale, h * scale), 0)
-    bold = int(round(BOLD * (geo['one'][1] - geo['one'][0]) * sy * scale)) | 1
-    pad = (min(bold, 15) - 1) / 2                      # the dilation grows each letter by this (drawn pixels)
+    bold = geo.get('bold', BOLD) if BOLD is None else BOLD
+    crisp = geo.get('crisp', CRISP) if CRISP is None else CRISP
+    bold += WEIGHT_GAIN * (REFERENCE_WEIGHT - font_weight(font_path)) / 2   # any font to the game's weight (eroded if heavier)
+    pad = bold * (geo['one'][1] - geo['one'][0]) * sy * scale     # the dilation's radius (drawn pixels)
     for line, (top, bot) in zip(lines, boxes):
         hh = (bot - top + 1) * sy * scale - 2 * pad
         m, base, _t = line_mask(line, font_path, hh / scale, scale, geo.get('small_caps', True))
@@ -179,23 +213,39 @@ def text_mask(text, font_path, set_name, size=None, lines=None):
         im = Image.fromarray(m).resize((max(1, int(lw)), max(1, int(round(hh)))), Image.LANCZOS)
         x = int(geo['cx'] * sx * scale - im.size[0] / 2)
         canvas.paste(im, (x, int(top * sy * scale + pad)), im)
-    if bold > 1:
-        canvas = canvas.filter(ImageFilter.MaxFilter(min(bold, 15)))
-    canvas = canvas.resize((w, h), Image.LANCZOS)
-    return np.asarray(canvas, np.float32) / 255.0, geo, (sx, sy), lines
+    m = np.asarray(canvas, np.float32) / 255.0
+    if abs(pad) > 0.05:
+        if pad < 0:
+            m = 1.0 - m
+        r = abs(pad)
+        n = int(r)                         # a fractional radius: the two discs blended
+        lo = _dilate(m, n) if n else m
+        m = lo + (r - n) * (_dilate(m, n + 1) - lo)
+        if pad < 0:
+            m = 1.0 - m
+    m = np.asarray(Image.fromarray((m * 255 + 0.5).astype(np.uint8)).resize((w, h), Image.BOX), np.float32) / 255.0
+    if crisp != 1.0:
+        m = np.clip((m - 0.5) * crisp + 0.5, 0, 1) * (m > 0)
+    return m, geo, (sx, sy), lines
+
+
+def _disc(r):
+    n = int(np.ceil(r))
+    return [(dy, dx) for dy in range(-n, n + 1) for dx in range(-n, n + 1) if dx * dx + dy * dy <= r * r + 1e-6]
 
 
 def _dilate(m, r):
+    """grey dilation by a disc of radius r pixels (round outline corners, as the game's)"""
     if r <= 0:
         return m
-    im = Image.fromarray((m * 255).astype(np.uint8))
-    k = 2 * int(r) + 1
-    while k > 1:                         # MaxFilter takes odd sizes; big outlines in steps
-        step = min(k, 9)
-        step -= 1 - step % 2
-        im = im.filter(ImageFilter.MaxFilter(step))
-        k -= step - 1
-    return np.asarray(im, np.float32) / 255.0
+    out = m.copy()
+    h, w = m.shape
+    for dy, dx in _disc(r):
+        if dy or dx:
+            ys, yd = slice(max(0, dy), h + min(0, dy)), slice(max(0, -dy), h + min(0, -dy))
+            xs, xd = slice(max(0, dx), w + min(0, dx)), slice(max(0, -dx), w + min(0, -dx))
+            np.maximum(out[ys, xs], m[yd, xd], out=out[ys, xs])
+    return out
 
 
 def _shift(m, dx, dy):
@@ -222,8 +272,10 @@ def plate_style(img):
     vis = a[a[:, :, 3] > 200]
     f = tuple(int(v) for v in np.median(vis[vis[:, :3].sum(1) > 600][:, :3], 0)) if (vis[:, :3].sum(1) > 600).any() \
         else (255, 255, 255)
-    dark = vis[vis[:, :3].sum(1) < 200]
-    o = tuple(int(v) for v in np.median(dark[:, :3], 0)) if len(dark) else (24, 24, 24)
+    core = a[(a[:, :, 3] > 250) & (a[:, :, :3].sum(2) < 150)]        # the outline's own value (not its blended border)
+    dark = core if len(core) else vis[vis[:, :3].sum(1) < 200]
+    o = tuple(int(round(v)) for v in dark[:, :3].mean(0)) if len(dark) else (24, 24, 24)   # the mean (the game's
+    # outline is block-compressed: levels 16-32 around it, the median one of them)
     return (0, 0, 0, 0), f, o, 255
 
 
@@ -270,3 +322,69 @@ def metrics(img, set_name=None):
         y += 1
     return {'lines': lines, 'fill': (int(xs.min()), int(xs.max()), int(ys.min()), int(ys.max())),
             'centre': (xs.min() + xs.max()) / 2}
+
+
+# ---------------------------------------------------------------- measuring (tests/media_test.py, the tuning)
+def _erode(m, n=1):
+    for _ in range(n):
+        p = np.pad(m, 1)
+        m = p[1:-1, 1:-1] & p[:-2, 1:-1] & p[2:, 1:-1] & p[1:-1, :-2] & p[1:-1, 2:]
+    return m
+
+
+def channels(img):
+    """(raw RGBA array, fill coverage, ink coverage) of a plate picture, from its raw channels: an opaque plate
+    (chrn_11 / 40 / 41) has the letters' fill in red and fill + outline + shadow in green; a transparent one
+    (chrn_12) the fill white and the ink in alpha"""
+    a = np.asarray(img.convert('RGBA')).astype(np.float32)
+    if (a[:, :, 3] > 250).mean() > 0.98:
+        return a, a[:, :, 0] / 255, a[:, :, 1] / 255
+    return a, np.minimum(a[:, :, 0], a[:, :, 3]) / 255, a[:, :, 3] / 255
+
+
+def style_metrics(img):
+    """the letters' weight and tone: area (fill coverage, % of the plate), thick (mean stroke thickness: twice the
+    mean distance to the border, pixels), stem (median horizontal run of the fill), rim (outline + shadow coverage %),
+    fill / rim_value (the raw channel means inside the fill / the rim), soft (anti-aliased fill-border pixels per border
+    pixel), soft_rim (the same for the ink's outer border), grad (fill level, top third - bottom third)"""
+    a, f, ink = channels(img)
+    F, I = f > 0.5, ink > 0.5
+    R = I & ~F
+    dist, cur, k = np.zeros(F.shape, np.float32), F.copy(), 0
+    while cur.any() and k < 256:
+        k += 1
+        dist[cur] = k
+        cur = _erode(cur)
+    runs = []
+    for row in F:
+        d = np.diff(np.concatenate([[0], row.astype(np.int8), [0]]))
+        runs += list(np.nonzero(d == -1)[0] - np.nonzero(d == 1)[0])
+    core, rcore = _erode(F, 2), _erode(R, 1)
+    yy = np.nonzero(core.any(1))[0]
+    grad = 0.0
+    if len(yy):
+        t, b = yy.min() + (yy.max() - yy.min()) // 3, yy.max() - (yy.max() - yy.min()) // 3
+        grad = float(f[:t][core[:t]].mean() - f[b:][core[b:]].mean()) if core[:t].any() and core[b:].any() else 0.0
+    return {'area': 100.0 * F.mean(), 'thick': 2.0 * float(dist[F].mean()) if F.any() else 0.0,
+            'stem': float(np.median(runs)) if runs else 0.0, 'rim': 100.0 * R.mean(),
+            'fill': a[core].mean(0).round(1).tolist() if core.any() else None,
+            'rim_value': a[rcore].mean(0).round(1).tolist() if rcore.any() else None,
+            'soft': float(((f > 0.15) & (f < 0.85)).sum() / max(1, (F ^ _erode(F)).sum())),
+            'soft_rim': float(((ink > 0.15) & (ink < 0.85)).sum() / max(1, (I ^ _erode(I)).sum())), 'grad': grad}
+
+
+def in_game(img, fill=(255, 255, 255), outline=(16, 16, 16), panel=(58, 74, 110)):
+    """an approximation of how the screen draws a plate: an opaque channel plate (chrn_11 / 40) as a mask, red the
+    letters' fill (in `fill`), green the letters + outline + shadow (the rest in `outline`), over a panel colour; a
+    transparent plate (chrn_12) over the panel as it is"""
+    a, f, ink = channels(img)
+    out = np.empty(a.shape[:2] + (3,), np.float32)
+    out[:] = panel
+    if (a[:, :, 3] > 250).mean() > 0.98:
+        col = np.array(outline, np.float32) + (np.array(fill, np.float32) - outline) * \
+            (f / np.maximum(ink, 1e-3)).clip(0, 1)[:, :, None]
+        out = out * (1 - ink[:, :, None]) + col * ink[:, :, None]
+    else:
+        al = a[:, :, 3:4] / 255
+        out = out * (1 - al) + a[:, :, :3] * al
+    return Image.fromarray(out.clip(0, 255).astype(np.uint8), 'RGB')

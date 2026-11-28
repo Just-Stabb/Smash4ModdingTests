@@ -12,6 +12,7 @@ BattleField_f -> CloneField; 2: on build 1's executable, Zero Suit Samus -> zssc
 """
 import copy
 import json
+import re
 import os
 import struct
 import subprocess
@@ -226,7 +227,7 @@ def main():
     check('package: INSTALL_TO_data, INSTALL_TO_data(us_fr) (the region beside the data folder), INSTALL_TO_code/cross_f.rpx, '
           'README.txt, project file; no wrapper folder',
           sorted(os.listdir(out)), ['INSTALL_TO_code', 'INSTALL_TO_data', 'INSTALL_TO_data(us_fr)', 'README.txt',
-                                'sm4shclonetool_project.json'])
+                                'Sm4shCommand_names.txt', 'sm4shclonetool_project.json'])
     check('README lists the clones', all(n in readme for n in ('foxclone', 'zssclone', 'foxtwo', 'CloneField')), True)
 
     # ---------------------------------------------------------------- previews / placement
@@ -333,8 +334,9 @@ def own_checks(pkg, data, reg, exe_path):
     check('its banks: BINF names = their files, ids new and unique (%s)' % ', '.join('%s %d' % (n, i) for _f, n, i in own),
           all(nm == f[:-9] and bid not in old_ids for f, nm, bid in own) and len({b for _f, _n, b in own}) == len(own),
           True)
-    check('its Kirby-copy voice bank keeps the base\'s id (Kirby plays it by the base\'s row) (%s)'
-          % ', '.join('%s %d' % (n, i) for _f, n, i in kc), all(bid in old_ids for _f, _n, bid in kc), True)
+    check('its Kirby-copy voice bank has an id of its own (1.4: the base\'s and the clone\'s both load in one match; '
+          'the executable lets it answer for the base\'s id) (%s)' % ', '.join('%s %d' % (n, i) for _f, n, i in kc),
+          all(bid not in old_ids for _f, _n, bid in kc) and len(kc) > 0, True)
     check('its banks\' tones / packs are the base\'s byte for byte, its rows the base\'s label lists (%s)'
           % ', '.join('%d -> %s' % kv for kv in sorted(rowmap.items())), same and None not in rowmap.values(), True)
     import acmd
@@ -383,6 +385,9 @@ def extras_checks(work, out, pkg, data, reg, e3, standin, fx):
     check('extras_test (results call, sound aliases, Kirby\'s copy: emulated): %d ok, 0 failed (exit %d)'
           % (text.count('\nok ') + text.startswith('ok '), rc),
           [x for x in text.splitlines() if x.startswith('FAIL')], [])
+    check('extras_test emulated Kirby\'s own copy scripts (the lookup from all three binds) and the own copy bank',
+          [sum(1 for x in text.splitlines() if x.startswith('ok') and 'the script lookup from 0x' in x),
+           any(x.startswith('ok') and 'copy-handle finder' in x for x in text.splitlines())], [3, True])
     fs = {f['name']: f for f in reg['fighters']}
     # the announcer call
     t0 = SND.Table(open(os.path.join(data, 'sound', 'config', 'soundlabeltable.bin'), 'rb').read())
@@ -435,6 +440,7 @@ def extras_checks(work, out, pkg, data, reg, e3, standin, fx):
                                 os.path.isdir(os.path.join(kd, 'motion', n + 'body')), fs[n].get('kirby_hat'))
                                for n in ('foxclone', 'zssclone')] + [os.path.exists(os.path.join(kd, 'model', 'foxear'))],
           [(True, True, 'foxclonecap'), (True, True, 'zssclonecap'), False])
+    kirby_script_checks(pkg, fx, fs, out)
     # voices
     ls = V.lines(z, pkg)
     cats = sorted({x['category'] for x in ls})
@@ -467,6 +473,64 @@ def extras_checks(work, out, pkg, data, reg, e3, standin, fx):
           'others the title' % ', '.join(sorted(miss)), (miss, fr.text('MmelCharaN_01_Foxclone'),
                                                          fr.text('MmelCharaN_01_Zssclone')),
           ({k: [] for k in miss}, 'Renard Clone', 'Zero Clone'))
+
+
+def kirby_script_checks(pkg, fx, fs, out):
+    """(1.4) Kirby's own copy scripts: his motion.mtable grown by each clone's copy runs, every new entry's scripts
+    the base's copy scripts with the clone's effect ids / sound rows, jumps to its own copies; the names file"""
+    import struct as st
+    import zlib
+    import acmd
+    body = os.path.join('fighter', 'kirby', 'script', 'animcmd', 'body')
+    vb = os.path.join(fx, 'data', body)
+    if not os.path.exists(os.path.join(vb, 'motion.mtable')):
+        check('Kirby\'s own copy scripts: no Kirby ACMD in the fixtures (skipped)', True)
+        return
+    rd = lambda p: list(st.unpack('>%dI' % (os.path.getsize(p) // 4), open(p, 'rb').read()))  # noqa: E731
+    mt0, mt1 = rd(os.path.join(vb, 'motion.mtable')), rd(os.path.join(pkg, body, 'motion.mtable'))
+    files0 = {f: acmd.ACMDFile.load(os.path.join(vb, f)) for f in ('game.bin', 'effect.bin', 'sound.bin', 'expression.bin')}
+    files1 = {f: acmd.ACMDFile.load(os.path.join(pkg, body, f) if os.path.exists(os.path.join(pkg, body, f))
+                                    else os.path.join(vb, f)) for f in files0}
+    kinds = {f['name']: f['kind'] for f in fs.values()}
+    bad, n, runs = [], 0, {}
+    for name, f in fs.items():
+        for lo, hi, nb in f.get('kirby_slots') or []:
+            runs.setdefault(name, []).append((lo, hi, nb))
+            for i in range(hi - lo + 1):
+                h, nh = mt0[lo + i], mt1[nb + i]
+                if not h:
+                    if nh:
+                        bad.append((name, hex(lo + i), 'zero'))
+                    continue
+                for fn in files0:
+                    a, b = files0[fn].scripts.get(h), files1[fn].scripts.get(nh)
+                    if (a is None) != (b is None) or a is None:
+                        if (a is None) != (b is None):
+                            bad.append((name, hex(lo + i), fn))
+                        continue
+                    n += 1
+                    for c0, c1 in zip(a, b):
+                        for p0, p1 in zip(c0.params, c1.params):
+                            if p0 == p1:
+                                continue
+                            ok = (re.search('graphic|effect', c0.name, re.I) and p0 >> 24 in (3, 4) and
+                                  (p1 & 0xFF00FFFF) == (p0 & 0xFF00FFFF) and (p1 >> 16) & 0xFF == kinds[name]) or \
+                                (c0.name in ('JUMP', 'CALL') and p1 in mt1[nb:nb + hi - lo + 1]) or \
+                                (p0 >> 16 != p1 >> 16 and p0 & 0xFFFF == p1 & 0xFFFF)
+                            if not ok:
+                                bad.append((name, hex(lo + i), fn, c0.name, hex(p0), hex(p1)))
+    check('Kirby\'s own copy scripts: motion.mtable %d -> %d entries (the game\'s 1222 kept); %s; %d scripts are the base\'s '
+          'copy scripts with only the clone\'s effect ids / sound rows / own jump targets changed'
+          % (len(mt0), len(mt1), '; '.join('%s %s' % (k, ', '.join('0x%X-0x%X -> 0x%X' % r for r in v))
+                                          for k, v in runs.items()), n),
+          (mt1[:len(mt0)] == mt0, sorted(runs) == ['foxclone', 'foxtwo', 'zssclone'], bad[:4], n > 0),
+          (True, True, [], True))
+    names = open(os.path.join(out, 'Sm4shCommand_names.txt')).read().split('\n')
+    hashes = {zlib.crc32(x.split('->')[0].strip().lower().encode()) & 0xFFFFFFFF for x in names
+              if x.strip() and not x.startswith('//')}
+    new = {h for v in runs.values() for lo, hi, nb in v for h in mt1[nb:nb + hi - lo + 1] if h}
+    check('the names file (Sm4shCommand AnimNames.txt lines) names every new copy script (%d)' % len(new),
+          sorted(new - hashes), [])
 
 
 def customs_check(patched, original):

@@ -22,7 +22,8 @@ CLONES:
              call: own (default: its own copy of the base's announcer call) / share / a .wav file,
              music: own (default: its own copy of the base's victory fanfare) / share / a .wav file,
              kirby (1: Kirby copies it as its base; 0: no ability), kirby_hat: own (its own hat / copy motions) / share,
-             kirby_hat_dir (a folder to use as its copy hat model),
+             kirby_hat_dir (a folder to use as its copy hat model), kirby_scripts (1: Kirby's copy of it runs scripts
+             of its own, copies of the base's copy scripts with its sounds / effects (1.4, default); 0: the base's),
              plate (the name plates' text; default the title), plate_lines (1 / 2; default as the game splits),
              font_plate / font_title / font_other (mincho / gothic / game / a .ttf file),
              title@REGION / subtitle@REGION (a language's own title, e.g. title@us_fr=Renard),
@@ -46,7 +47,7 @@ from sm4shclonetool import roster as R  # noqa: E402
 from sm4shclonetool.session import Session  # noqa: E402
 
 INTS = {'costumes', 'series', 'sort_key', 'kind', 'ui_id', 'page', 'cosmetic', 'customs', 'fanfare', 'random',
-        'own_sound', 'own_effects', 'kirby', 'plate_lines'}
+        'own_sound', 'own_effects', 'kirby', 'kirby_scripts', 'plate_lines'}
 
 
 def extras(opt):
@@ -56,8 +57,9 @@ def extras(opt):
         if v and v.lower().endswith('.wav'):
             opt[k + '_wav'] = v
             opt[k] = 'wav'
-    if 'kirby' in opt:
-        opt['kirby'] = bool(opt['kirby'])
+    for key in ('kirby', 'kirby_scripts'):
+        if key in opt:
+            opt[key] = bool(opt[key])
     if 'kirby_hat' in opt:
         opt['kirby_hat_mode'] = opt.pop('kirby_hat')
     if 'plate' in opt:

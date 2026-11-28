@@ -154,18 +154,13 @@ def own_banks(rec, out_data, data_dir, log):
     ids = {r[0] for r in table.rows}
     rows = {}
     alias = {}
+    rec['kirby_copy_bank'] = None
     nxt = max([i for i in ids if BANK_IDS[0] <= i < BANK_IDS[1]] + [BANK_IDS[0]]) + 1
     cap = rec['cap']
     kinds = {'snd_se_%s.nus3bank' % cap: 'se', 'snd_vc_%s.nus3bank' % cap: 'vc',
              'snd_vc_%s_ouen.nus3bank' % cap: 'cheer', 'snd_se_%s_common.nus3bank' % cap: 'se_common'}
     for f in sorted(os.listdir(d)):
         if not f.endswith('.nus3bank'):
-            continue
-        if f.startswith('snd_se_vc_Kirby_copy_'):
-            # Kirby's copy voices: Kirby plays them from his own handles of this bank (no alias there), by the base's
-            # row: the clone's copy keeps the base's id (its own file, so its own tones)
-            log('own sound bank: %s keeps its base\'s id (Kirby plays it by the base\'s row; with the base in the '
-                'same match only the first one\'s copy voices load)' % f)
             continue
         p = os.path.join(d, f)
         data = open(p, 'rb').read()
@@ -182,6 +177,11 @@ def own_banks(rec, out_data, data_dir, log):
         open(p, 'wb').write(set_binf(data, new_name, new_id))
         if f in kinds:
             alias[kinds[f]] = old_id
+        if f.startswith('snd_se_vc_Kirby_copy_'):
+            # (1.4) Kirby's copy voices: an id of its own too (with the base's in the same match both load: nus3 refuses
+            # a second bank of one id); the executable's COPYID hook lets it answer for the base's id in Kirby's copy
+            # handles, and Kirby's own copy scripts for the clone play its own row
+            rec['kirby_copy_bank'] = [new_id, old_id]
         row = table.row_of(old_id)
         if row is None:
             log('own sound bank: %s: BINF %s id %d -> %s id %d (no soundlabeltable row of its own before)'
@@ -203,6 +203,7 @@ def own_banks(rec, out_data, data_dir, log):
             if f.endswith('.bin'):
                 total += remap_acmd(os.path.join(root, f), rows, f == 'sound.bin')
     rec['sound_alias'] = [alias.get(k, 0) for k in ('se', 'vc', 'cheer', 'se_common')]
+    rec.setdefault('kirby_copy_bank', None)
     log('own sound bank: the base\'s bank ids %s answer from the clone\'s own banks (the executable\'s alias: sounds '
         'the game plays by the base\'s rows from code, MSC, the voice sequences and commonsoundtable.csb)'
         % ', '.join('%s %d' % kv for kv in zip(('se', 'vc', 'cheer', 'se_common'), rec['sound_alias']) if kv[1]))

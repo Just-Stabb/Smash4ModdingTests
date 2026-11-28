@@ -26,7 +26,7 @@ your full UI every tile is its portrait. More in `screenshots/`: the stage tab, 
 
 ## Install
 
-1. Unzip `Sm4shCloneTool_v1_3.zip` anywhere.
+1. Unzip `Sm4shCloneTool_v1_4.zip` anywhere.
 2. Double-click **setup.bat** once (installs numpy and Pillow with pip).
 3. Double-click **run.bat** (the window) or use **run_cli.bat** (the command line).
 
@@ -96,7 +96,7 @@ For the clone in the Fighters tab:
 |---|---|---|
 | Announcer call | the character select's call and the results screen's "... <name>!": **own copy** of the base's call (new tones and labels in `sound/se/snd_se_narration_characall.nus3bank`, its 16 ids in `ui_sound_call_voice_db.bin`, and the executable's results call for its kind), **share** the base's, or **import WAV** (encoded to the game's DSP-ADPCM by the tool). **Preview** plays the WAV or the base's call | own |
 | Victory fanfare | **own copy** of the base's fanfare (a new BGM: `sound/bgm/snd_bgm_<base fanfare>_<Cap>.nus3bank`, a `bgm_property.mpb` entry, its `bgm_fighter.fbb` record), **share**, or **import WAV** (stereo, the BGM rate). The music after the fanfare is the mode's, the same for every fighter | own |
-| Kirby's copy | **Kirby copies the clone** with its base's copy ability (on), with its **own hat and copy motions** (`fighter/kirby/model/<name>cap/`, `motion/<name>body/`: copies of the base's, so you can change them; or the base's), or **import a hat model folder**. **Show hat** names the base's hat / motion folders and whether your data has them. Kirby's copy voices come from the clone's own `snd_se_vc_Kirby_copy_<Cap>` bank | on, own |
+| Kirby's copy | **Kirby copies the clone** with its base's copy ability (on), with its **own hat and copy motions** (`fighter/kirby/model/<name>cap/`, `motion/<name>body/`: copies of the base's, so you can change them; or the base's), or **import a hat model folder**. **Show hat** names the base's hat / motion folders and whether your data has them. **Own copy scripts** (1.4): Kirby's copy of the clone runs scripts of its own (new entries in Kirby's `motion.mtable`, copies of the base's copy scripts with the clone's effects and sounds; their names in `Sm4shCommand_names.txt`). Kirby's copy voices come from the clone's own `snd_se_vc_Kirby_copy_<Cap>` bank (1.4: its own bank id, so base and clone copy voices both load in one match) | on, own, own scripts |
 | Names in every language | the clone's title and title line (the character select, results, the Boxing Ring's screen) in each language your data has (`data/ui/message/melee.msbt` and the region folders beside it, `data(us_fr)/` ...): the typed ones, or a language's own (select it, type, **Set**) | the typed title |
 | Name plates | the plates' text (default the title; `\n` for your own line break) and lines (auto: two from 12 characters with a space, as the game does), the **font** for each text type (name plates, titles, other text pictures): the bundled DFMincho-SU / DFGothic-SU, a font in your data's `ui/font/` ("game": a UI mod's .ttf), or **Choose font file...**. The preview draws chrn_40 / 11 / 12 as the game's plates look (small capitals, outline, drop shadow, the base plate's colours) | bundled Mincho |
 
@@ -182,6 +182,10 @@ clone to the ones already there.
   - (1.3) sound: the clone's own banks answer for its base's bank ids (the SoundModule set-up's aliases, so sounds the
     game plays from code by the base's ids play the clone's tones); the results screen's announcer call for its kind;
     Kirby: a clone is copied as its base's kind, with its own hat / copy-motion folder names and Kirby-copy voice bank.
+  - (1.4) Kirby's copy scripts: the per-kind script lookup (`0x02E42518`) gives Kirby, while he holds a clone's copy,
+    the clone's own `motion.mtable` entries for the copy's motions; the clone's own Kirby-copy bank id answers for the
+    base's (`0x033EC060` from Kirby's copy-handle finder); the online session's announced-fighters set leaves the clones
+    out (`0x0301CB78`).
 - All of it lives in the free code space after the game's code (`0x04B78000`-`0x04BB8000`, inside the game's own code
   region), plus the words it hooks in place.
 - **How the tool knows your executable**: before patching it checks every word it will hook against the game's
@@ -215,29 +219,48 @@ on black; chrn_12: white letters, dark outline), each plate's size and format. I
 another look. The name text itself (`MmelChara*`) goes into every language's `melee.msbt` your data has (the region
 folders `data(xx_yy)/` beside your data folder too; their copies are written to `INSTALL_TO_data(xx_yy)/`).
 
+**Weight and tone (1.4)**, measured on 14 of the game's plates a set: the letters are as heavy as the game's (1.3's were
+12-18 % thicker strokes, 21-34 % more fill: a square dilation of 4.5 % of the cap height; now a round one of 0.35-0.4 %,
+over the names fill coverage and stroke thickness within 2 % of the game's), the edges as crisp (box-averaged, not
+Lanczos-smoothed, which had added a soft halo), the outline round-cornered like the game's (3.5 / 5.5 / 9 pixels for
+chrn_12 / 11 / 40) with the game's shadow offsets, the fill / outline in the base plate's raw channel values (the mean
+of its block-compressed outline, within 3 of 255 levels; no gradient: the game's letters have none). Another font is
+taken to the same weight (DFGothic-SU, much heavier as drawn, is thinned). `screenshots/plates_chrn_12.png` /
+`plates_chrn_40.png`: 1.2 / 1.3 / 1.4 / the game, raw channels and as the screen colours them.
+
 Also its own (1.3): the announcer call (select and results), the victory fanfare, its win cameras
 (`motion/camera/result/<name>/`), Kirby's copy hat / motions / copy voices, every voice line (its banks answer for the
 base's ids the game plays from code), its names in every language, name plates in the game's style.
+
+And (1.4): **Kirby's copy scripts** (game / effect / sound / expression: Kirby plays his copy of the clone from new
+`motion.mtable` entries whose scripts are copies of the base's copy scripts, with the clone's own effect ids and sound
+rows, so editing them changes only the clone's copy; the executable picks them while that Kirby holds the clone's copy),
+hence **Kirby's copy effects** (its scripts call the clone's own effect bank, which is loaded whenever Kirby can copy
+the clone: the clone is in the match), and **its own Kirby-copy voice bank id** (both the base's and the clone's copy
+voices load in one match; the clone's answers for the base's id too).
+
+**`Sm4shCommand_names.txt`** (in the output folder): the names of the scripts the tool adds (Kirby's copy scripts of
+each clone, `<clone><Move>` e.g. `zsscloneSpecialNStart`), in Sm4shCommand's `AnimNames.txt` format: paste the lines
+at the end of Sm4shCommand's `AnimNames.txt` to see them by name (the `Name -> folder/File.omo` lines let its Hitbox
+Viewer play the copy's animation).
 
 Shared with the base, because that is how a Smash 4 clone works:
 - **the base's native code**: special moves, status logic, articles' behaviour, anything the game does for that
   kind in code. The clone's files decide what it looks and sounds like and its ACMD / MSC / params, but its moveset
   structure is the base's. A clone and its base in one match behave like two copies of the base (each fighter keeps
   its state in itself; the kind's static specializer object is shared between every fighter of a kind already);
-- **Kirby's copy scripts and effects**: Kirby's ACMD for a copy ability is his own, by motion name, so his copy of the
-  clone runs the base's copy scripts on the clone's own copy motions and hat; those scripts call the base's effect ids,
-  which show only while the base's effect bank is loaded (the base in the match, or the clone without its own effect
-  bank); the Kirby-copy voice bank keeps the base's bank id
-  (Kirby plays it by the base's row): with the base and the clone in one match only the first one's copy voices load;
+- **Kirby's copy, as code**: his copy of the clone is granted as the base's copy ability (the base's native copy code:
+  the same moves); the files are the clone's (above). With "Own copy scripts" off, his copy of the clone runs the
+  base's copy scripts (the base's effects, which show only while the base's effect bank is loaded);
 - its Final Smash cutscene assets the game finds by kind (its `camera/final/` and `effect/Fin<Cap>/` are copied and
   renamed; the scene tables per kind are the base's), and a transformation (a clone of Bowser, Wario, Little Mac or
   Lucario transforms into the base's transformed kind);
 - the custom moves' unlock bits (the clone owns what its base owns: the save has no room for new characters);
 - the stage clones' random switches (see "Game modes").
 
-Not in this version (researched, not built: see the internals doc for what each needs): trophies of its own, Palutena's
-Guidance conversations, Smash Tour data beyond the base's, amiibo assignment, its own Final Smash scene-table entries
-and transformed kinds, its own copy scripts for Kirby.
+Not in this version (researched in 1.4, not built: the internals doc says what was traced and what each still needs):
+trophies of its own, Palutena's Guidance conversations, Smash Tour data of its own, amiibo rows / assignment, its own
+Final Smash scene-table entries and transformed kinds, the mode-by-mode emulation of every mode's set-up.
 
 ## Character select placement
 
@@ -258,7 +281,8 @@ keys order other menus and put the clone last). Without "after", the clone goes 
 | CPU AI | its AI params row and its own AI files | traced (1.1) |
 | Boxing Ring | its title line on the ring's screen: `ui/info/aurora_punch_out/`'s builder `0x026552B8` reads `MmelCharaA_<costume>_<UI name>` through `0x030A02A4` (character id, costume): the clone's labels, every costume and language | traced |
 | random stage switches | saved: 5 bits a stage at save `+0x38` (12 words, `0x02A517DC`), by the index `0x030A9230` gives a stage (the switch screen's list, DLC stages 9-16); a stage clone has no index (-1): it is always on, and never written to the save. Its "In the random stage select" option is its switch | traced |
-| All-Star, Stadium (Multi-Man, Target Blast, Home-Run), Trophy Rush, Events, Smash Tour, Records / Vault, replays, online | **not checked**: not traced with new kinds. Two places copy the 96-id available-fighters set (`0x0290D960` from the menus, `0x029E6CE0`) into structures whose readers were not traced: clones with ids 96 and up (the 38th clone on) are not in those sets. Test in Cemu first; please report any crash with the mode and what you selected | - |
+| online | (1.4) the two copies of the 96-id available-fighters set (`0x0290D960`, `0x029E6CE0`, the helper `0x0301CAE8`) go into the online session's player record (the network module's object `[0x102F711C] + 0x2E00`, `+0x30`: the fighters this console announces): no clone id is put in it any more (1.3 put ids 59-95 there), so a vanilla peer is never told of a fighter it doesn't have. Whether the online character select then refuses a clone was not seen | emulated (the helper: `random_select_test.py`); traced (the record) |
+| All-Star, Stadium (Multi-Man, Target Blast, Home-Run), Trophy Rush, Events, Smash Tour, Records / Vault, replays | **not checked**: their set-up code was not emulated with new kinds (see the internals doc, 1.4). Test in Cemu first; please report any crash with the mode and what you selected | - |
 
 ## Custom UIs
 
@@ -319,6 +343,8 @@ The window shows the current counts and limits under the plan ("Fighter clones: 
   the stand-in carried pre-patched).
 - 1.3's new parts not seen in a game: the announcer's results call, the bank aliases (the base's ids played from the
   clone's banks), Kirby copying a clone (hat / motions / voices), the own fanfare BGM, region-folder names.
+- 1.4's not seen in a game: Kirby's own copy scripts (the script lookup hook, his grown `motion.mtable`), the clone's
+  own Kirby-copy bank id, the online set without clones, the plates' new weight.
 - Many clones: 40 fighter and 8 stage clones were built and emulated; the enlarged code region (to about 0x04BD1000,
   356 KB, for 40 fighters and 8 stages), high kinds' resource ids (`kind * 0x11 + n`, map keys) and a select screen with 99 entries were not
   seen in a game.

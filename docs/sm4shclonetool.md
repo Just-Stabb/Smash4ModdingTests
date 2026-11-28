@@ -23,6 +23,7 @@ tools/sm4shclonetool/
     narration.py, music.py       (1.3) the clone's own announcer call / victory fanfare (data side)
     voices.py, audio.py          (1.3) every voice line by category, WAV replace; nus3bank tones, IDSP, WAV, preview
     plates.py, languages.py      (1.3) name plates in the game's style (fonts/), names in every region's melee.msbt
+    kirby_copy.py                (1.4) Kirby's own copy scripts for a clone (motion.mtable entries, script copies, names file)
     session.py                   folders, registry, plan (Check), build (the package), post-build checks
   tests/                         repository-only: fixtures, the vanilla stand-in, run_all.py, repo_test.py
   make_vendor.py                 regenerates vendor/ (the tool's adapted copies of the research modules)
@@ -430,3 +431,119 @@ vtable `0x100BAAFC`: +0x74 unlocked `0x026F2ED0`, +0x6C the switch `0x0293F298`,
 - **Base + clone in one match**: the per-kind state is per fighter; the shared things found are the kind's static
   specializer object (as for two players of one vanilla kind), the Kirby-copy voice bank id (above) and the Kirby
   loader's `res_kind` word (set at each helper call; the loader runs the match's fighters one after another).
+
+## 1.4
+
+### Kirby's own copy scripts, effects and voice bank (kirby_copy.py, clone_extras.py)
+
+How a Kirby copy motion finds its scripts (traced): the MotionAnimcmdModule binds (`0x027606C0` sets 0-3, `0x027608DC`
+the second layer, `0x02760CE8` the MSC rebind, vt +0x6C) ask `0x02E42518(mgr [0x102FF68C], kind, motion)` for the
+script hash: the kind's entry (16 of 0x40 bytes) `+0xC` = its `motion.mtable` data, `lwzx` by motion, unbounded; the
+hash is then looked up in game / effect / sound / expression.bin (`0x02E424D8`, `0x02BEE560`). Those three binds are
+its only callers. The animation is the motion's own (Kirby's static table, descriptor `0x103829BC`: 1222 motions, the
+copy packs `motion/<copy>body/` by file-name CRC). A copy's motions are the Kirby motions whose animations are in its
+copy folder: e.g. Fox `0x31F-0x324`, Zero Suit Samus `0x3F9-0x3FF`; Dr. Mario / Lucina / Dark Pit copies share
+Mario's / Marth's / Pit's folders with extra slots elsewhere (several runs). Kirby's copy effect scripts call the
+copied kind's bank (`0x3KK....`, e.g. ZSS `0x3190005`), his copy sound scripts the copied fighter's se row (ZSS row 27,
+bank 2028) and Kirby-copy row (132, bank 2098); some scripts `JUMP` to another copy script by hash.
+
+The tool (data, `kirby_copy.own_scripts`): finds the base's copy runs (its copy folder's packs against Kirby's motion
+table read from the executable), appends one `motion.mtable` entry per motion of the runs (the clone's own script
+names: `<clone><tail of the animation name>` when Kirby's script name is `<copy><tail>`, else
+`<clone>_kirbycopy_<motion>`), copies each script under the new hash with the base's effect ids moved to the clone's
+kind (KK), the base's sound rows to the clone's own rows (sound.own_banks' map, the Kirby-copy row included) and
+`JUMP` / `CALL` targets inside the runs to their copies; `rec["kirby_slots"] = [[lo, hi, newbase]]`. A rebuild finds
+its entries again (same names, same place). `<out>/Sm4shCommand_names.txt` lists the names (one section per clone).
+
+The executable (clone_extras.py, part "extras"):
+- GRANT (1.3's hook, `0x02EFCDA4`) also records {Kirby's int array `[[[[fighter+0x726C]+8]+0]+0xC]`, the kind he was
+  granted (the clone's own)} in KTAB (16 entries, round robin, RAM in the code space like the random pool), for the
+  copies copy_grant accepts (not 8, below 0x3A after the clone -> base map). r8-r12 only (r0 holds copy_grant's LR
+  until `0x02EFCDA8`);
+- KMAP `0x02E42518` (`li r0, 0x10` / `li r12, 0` replayed, back at `+8` through ctr): kind 8 called from one of the
+  three binds (return address `0x027607D0` / `0x027609F0` module r27, `0x02760D38` module r29), the module's
+  accessor `+4` -> WorkModule `+0x28` -> the int array; its KTAB kind a clone whose base is the current copy (int
+  0x100000A4, `+0x290`): a motion in one of the clone's runs becomes newbase + (motion - lo). Everything else: the
+  game's lookup;
+- COPYID `0x033EC060` (a bank handle's BINF id; `mflr r0` / `stwu` replayed): called from `0x027623F0` (the Kirby-copy
+  handle finder vt +0x2EC `0x027623B4`, which compares with r28), a clone's own Kirby-copy bank id answers for the base's
+  id. sound.own_banks now gives the clone's `snd_se_vc_Kirby_copy_<Cap>` its own BINF id and row
+  (`rec["kirby_copy_bank"] = [own, base]`): nus3 loads one bank an id, so 1.3's shared id lost the later player's copy
+  voices; now both load, Kirby's copy scripts of the clone play its own row, the base's ids it plays from code find it.
+
+Tests: `extras_test.py` runs GRANT / KMAP (with the game's lookup after it) / COPYID in unicorn: KTAB contents, the runs
+remapped for all three callers, other copies / kinds / callers untouched, the vanilla lookup's answers, 20 grants
+writing only KTAB; the copy-handle finder answering for the base's id. `run_all.py`: Kirby's grown `motion.mtable`
+(his 1222 entries unchanged), each new script = the base's copy script with only the clone's effect ids / sound rows /
+own jump targets changed, the names file naming them all, the copy bank's own id. Kirby's vanilla ACMD and copy packs
+come from the fighter dump (`VFIGHTER/kirby/script`, `motion/foxbody`, `motion/szerosuitbody`).
+
+Not covered: a Kirby who swallows a Kirby holding the clone's copy gets the base's copy (copy_grant is given the base
+kind: KTAB records the base); a clone of a clone copies its source's scripts with the vanilla base's rows (its rows
+answer through the alias).
+
+### The plates' weight and tone (plates.py)
+
+Measured on 14 of the game's plates a set (`style_metrics`, numpy only): fill coverage, stroke thickness (twice the
+mean distance to the edge), median stem run, rim coverage, raw channel values of the fill / rim cores, anti-aliased
+edge pixels per edge pixel, top / bottom gradient. The game's plates: no gradient; chrn_11 / 40 fill R=G=255 and rim
+R~29 G=255 B=0; chrn_12 fill 254.6, rim ~27 (block-compressed: 16-32), alpha 255. The rim is the fill dilated by a disc
+(best fit of the game's own rim on its own fill, IoU 0.97 / 0.97 / 0.99: radius 3.5 / 5.5 / 9, shadow (3, 5) / (5, 9) /
+(8, 15) for chrn_12 / 11 / 40). 1.3: square dilation 4.5 % of the cap height (fill +21-34 %, strokes +12-18 %), Lanczos
+down-sampling (soft edges +0.15-0.19). 1.4: per set `bold` 0.4 / 0.4 / 0.35 % (a round dilation, fractional radii
+blended), `crisp` (edge contrast) 1.0 / 1.1 / 1.1, box down-sampling; fill coverage x1.000-1.019, strokes x0.997-1.003 over the
+names; the outline value the mean of the base plate's outline core. Other fonts: `font_weight` (stroke / cap height of
+"HAMBURGEFONSTIV": DFMincho-SU 0.116, DFGothic-SU 0.153) and `WEIGHT_GAIN` 1.8 take them to the same weight (eroded
+when heavier). `media_test.py` checks the metrics with tolerances (TOL) and draws 1.2 / 1.3 / 1.4 / game, raw and as
+coloured on screen (`in_game`: an approximation of the screen's colouring of the channel plates).
+
+### Online: the 96-id sets (random_select.py)
+
+`0x0301CAE8` (a bit per available database entry, 96 at most since 1.1) is now called only from `0x0290D960`
+(`0x0290D708`, from the menus `0x02178E24`) and `0x029E6CE0` (`0x029E6CC4`): both copy its 12 bytes to `+0x30` of the
+object `0x029E2B84` returns (`[0x102F711C] + 0x2E00`: the 0x029E.... module, the online session's, whose code names
+`ChainMapperLinkInfo`, match / disconnection counters...: the fighters this console announces to its peers). No
+reader of those 12 bytes was found statically next to the 44 calls of `0x029E2B84` (the record is copied / sent
+whole). 1.4 sets no clone's bit there (hook `0x0301CB78`, the bit set, skipping ids 59 .. 59 + clones - 1): a vanilla
+peer is never told of a fighter id it doesn't have, for every clone id (1.3 announced ids 59-95). Not seen online.
+
+### Researched in 1.4, not built (what was traced; what each still needs)
+
+- **Trophies.** `ui_figure_db.bin` parsed to 0xB0-byte entries at `[db+0xC]` (count `+8`, `0x030A5C2C`); entry `+0x8B`
+  the character id: `get_figure_id_from_chara_id` (xtal, `0x030ED814`) -> `0x030A5788(db, id, type 0, -1)`, a linear
+  search over a category range (`0x030A135C`), -1 when none (a clone has no trophy: -1). Texts: labels `MmenFigN_%s`,
+  `MfigI_%s`, `MfigD_%s`, `MfigR_%s` (`0x030A18B8` / `0x030A1934`) in `ui/message/figure.msbt`; models
+  `model/figure/%s/body/c00/`. Ownership: the box screen's `box_data_%d_figure_get_state_%d` (xtal); the save's own
+  storage was not found: no accessor bounded by 743 / 716 in the save accessors (`0x02A4F000-0x02A58000`, whose bounds
+  are 0x60 / 0x63 / 0x3F / 0x139 / 0x264 / 0x270F), so neither the size of the ownership area nor an unused id that is
+  never read or written can be named. New trophy ids are therefore not made (writing an id past the save's area would
+  corrupt the save); reusing vanilla ids needs the ownership area traced (a write breakpoint on the save when a trophy
+  is won, in Cemu).
+- **Palutena's Guidance.** `ui_smashappeal_angeland.bin` = 120 groups: 60 pairs {lines: per line {number, 60, flag,
+  3 speakers x 6 portrait names `chr_14_<Name>_NN`, 15, 0}, sequences of 7 ints}. The texts are
+  `MmelAppeal_Angeland_<a>_<b>_<line>` (`0x0267DE68`: a = `[obj+0xB8]` + 1, b = `[obj+0x10C]` + 1), the voices
+  `snd_vc_smashappeal_Angeland_<JP|EU|US>_%02d.nus3bank` (`0x0267DC10`, region by `+0xAC` 0xC / 0xF / 0x27, the number
+  `[obj+0xB4]`), the param loaded by `0x026865D4`. Which index the character id selects was not found (`+0xB8` comes
+  from a resource lookup in `0x02686970`, `+0xB4` from `0x0267CF40` / `0x0267D32C` / `0x026815A4`): the voice banks
+  and `ui/message` for these texts are not in the test data either. Not built.
+- **Smash Tour.** `param/worldsmash/*` (stat / event / item params), `WorldSmashManager` states (`0x10048DD8`...), the
+  fighter models `worldsmash/model/fighter1-3`, `worldsmash/ui/lumen/ws_select_fighter`; its fighter pool reads the
+  character database through the same accessors (positional ids up to 0xC7). Not traced further; no data written.
+- **amiibo.** `ui_nfp_db.bin` (66 x 5) maps a fighter id to an amiibo character number; the figure writes go through
+  `nn::nfp::WriteApplicationArea` (`NfpViewComWriteFigureScene`, `menu_nfp_begin_write_chara`). What is written for a
+  kind / id was not traced, so no clone row is added and no amiibo can be assigned (the tool never touches figure data).
+- **Final Smash.** `0x030BF9C0` / `0x030C1FDC` map the transformed kinds 0x3A-0x3D to their bases (Bowser 0xF, Wario
+  0x16, Lucario 0x1E, Little Mac 0x29) for the Final Smash holder's resources (`0x030C2238`: `kind * 9 + 4 / + 6`);
+  their callers are `0x030BFA90`, `0x030C0618`, `0x030C07A8`, `0x030C0C34`, `0x030C127C`, `0x030C2020`, `0x030C20F4`,
+  `0x030C2238` (two). No table maps a base to its transformed kind (searched as words and bytes): the base's native
+  Final Smash code names the transformed kind itself, so a clone of Bowser presumably becomes the vanilla Giga Bowser
+  (0x3A). Open question (not run in game): if the holder's kind (`+0x20`) is the transformed kind when `0x030C2238`
+  releases, it releases the base's ids (0xF * 9 + n), not the clone's own; when it is the clone's kind, its own.
+  Not changed. New transformed kinds (cloned from 0x3A-0x3D) and a mapping in the tool's space need the
+  transform's spawn traced. Not built.
+- **Mode emulation.** Done for the online sets above, the random pools (1.2) and the results call (1.3); the other
+  modes' set-up code was not emulated.
+- **Base and clone in one match.** Per-kind arrays are per kind (kind_expand sizes them); a clone runs its base's
+  specializer, whose statics are shared exactly as between two players of the base (a vanilla ditto). The tool's own
+  globals: `res_kind` (the Kirby loader's, set per helper call, the loader runs players one after another), KTAB (per
+  Kirby, by int array). None found that changes behaviour; not seen in game.
