@@ -88,7 +88,7 @@ class M:
             0x0301BA8C: lambda: 1, 0x02948858: lambda: 1, 0x030A9B24: lambda: 0,
         }
         for a, f in st.items():
-            mu.hook_add(UC_HOOK_CODE, lambda uc, addr, size, f=f: self.ret(f()), begin=a, end=a)
+            mu.hook_add(UC_HOOK_CODE, lambda uc, addr, size, ud, f=f: self.ret(f()), begin=a, end=a)
         mu.mem_write(0x105759C0 + 0x10, struct.pack('>4I', 0x12345678, 0x9ABCDEF1, 0x0F1E2D3C, 0x55AA33CC))
 
     def r(self, n):
@@ -136,7 +136,7 @@ def main():
     off = {f['ui_id'] for f in fighters if f.get('random', True) is False}
     data_lo, data_hi = cave, cave + 32 * RS.SLOTS
     m.writes = []
-    m.call(lay['random'][0] and RS.REFILL, OBJ)
+    m.call(RS.REFILL, OBJ)
     slot = m.words(tab, 8 * RS.SLOTS)
     k = next(i for i in range(RS.SLOTS) if slot[8 * i] == OBJ)
     pool = slot[8 * k + 1:8 * k + 8]
