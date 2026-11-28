@@ -1,15 +1,24 @@
 #!/usr/bin/env python3
-"""The character select's random pool on a patched executable, in unicorn: the refill 0x02FFB610 (the game's own
-code, its database / availability calls stubbed: position i = id i, every fighter available, Miis 1-3 left out as
-the game's Mii check does), then the remove 0x02FFC5BC for every id 0-0xFF.
+"""The random pools of a patched executable, in unicorn (the tool's replaced refill / count / remove / pick and the
+game's own stage refill and helper loops; the database, availability and player calls stubbed: position i = id i,
+every fighter / stage available, Miis 1-3 left out as the game's Mii check does).
 
-  python3 tools/sm4shclonetool/tests/random_select_test.py PATCHED.rpx
+  python3 tools/sm4shclonetool/tests/random_select_test.py PATCHED.rpx [PICKS]
 
-Checks: the pool (+0x98, 96 bits) holds every game fighter and every clone with "random" (ids < 96), not the
-clones set to false nor any id >= 96; nothing is written past the 12 bytes (+0xA4 on stays as it was) nor below
-(+0x94); the function returns with its saved registers; remove clears exactly the bit of each id below the scan
-count and touches nothing for the others.
+Checks:
+- refill: the new pool (7 words, ids 0-223) holds the game's fighters 4-58 and every clone with "random", not the
+  ones set to false; +0x98-+0xA3 mirror ids 0-95; nothing else written (the stage pools +0xA4 on, the object, the
+  tool's other data);
+- a cycle: pick, then remove the picked id, until 7 are left: every enabled id exactly once, none disabled; then the
+  count function refills (under 8 left) and the pool is full again;
+- PICKS picks from the full pool: every enabled id picked, none other, counts within 30 % of the mean;
+- a player's pick leaves out the ids the other players have (7 or more left);
+- remove(id) for every id 0-0xFF: exactly that bit for ids below the scan count (and its mirror bit), else nothing;
+- the fighter helper 0x0301CAE8's loop with a 200-entry database writes only its 12 bytes (the 96 clamp);
+- the stage refill 0x02FFB76C: the stage clones with "random" in pool +0xA4, the ones set to false not, nothing
+  written past its 16 bytes.
 """
+import collections
 import os
 import struct
 import sys
@@ -19,127 +28,191 @@ sys.path.insert(0, os.path.dirname(HERE))
 from sm4shclonetool import exe as X  # noqa: E402
 from sm4shclonetool import random_select as RS  # noqa: E402
 from sm4shclonetool.rpx import Rpx  # noqa: E402
-from unicorn import Uc, UC_ARCH_PPC, UC_MODE_PPC32, UC_MODE_BIG_ENDIAN, UC_HOOK_CODE  # noqa: E402
-from unicorn.ppc_const import UC_PPC_REG_1, UC_PPC_REG_3, UC_PPC_REG_4, UC_PPC_REG_LR, UC_PPC_REG_PC  # noqa: E402
+from unicorn import Uc, UC_ARCH_PPC, UC_MODE_PPC32, UC_MODE_BIG_ENDIAN, UC_HOOK_CODE, UC_HOOK_MEM_WRITE  # noqa: E402
+from unicorn import ppc_const as P  # noqa: E402
 
 RET = 0x01000000
-OBJ = 0x7E000000
+OBJ, PLAYERS, LOCAL, STACK = 0x7E000000, 0x7E010000, 0x7E020000, 0x7F00F000
 FAILS = []
 
 
 def check(what, got, want):
     ok = got == want
-    print('%s %s%s' % ('ok  ' if ok else 'FAIL', what, '' if ok else ': %r (want %r)' % (got, want)))
+    print('%s %s%s' % ('ok  ' if ok else 'FAIL', what, '' if ok else ': %r (want %r)' % (got, want)), flush=True)
     if not ok:
         FAILS.append(what)
 
 
-def machine(path):
-    x = Rpx(path)
-    mu = Uc(UC_ARCH_PPC, UC_MODE_PPC32 | UC_MODE_BIG_ENDIAN)
-    spans = []
-    for addr, blob in x.memory().items():
-        lo, hi = addr & ~0xFFF, (addr + len(blob) + 0xFFF) & ~0xFFF
-        spans.append((lo, hi, addr, blob))
-    spans.sort()
-    merged = []
-    for lo, hi, _a, _b in spans:
-        if merged and lo <= merged[-1][1]:
-            merged[-1][1] = max(merged[-1][1], hi)
-        else:
-            merged.append([lo, hi])
-    for lo, hi in merged:
-        mu.mem_map(lo, hi - lo)
-    for _lo, _hi, addr, blob in spans:
-        mu.mem_write(addr, blob)
-    mu.mem_map(RET, 0x1000)
-    mu.mem_map(0x7E000000, 0x2000000)
-    return mu
+def R(n):
+    return getattr(P, 'UC_PPC_REG_%d' % n)
 
 
-def run_refill(path, n_clones, special_from):
-    mu = machine(path)
-    stubs = {}
+class M:
+    def __init__(self, path, n_ids, n_stages):
+        x = Rpx(path)
+        self.mu = mu = Uc(UC_ARCH_PPC, UC_MODE_PPC32 | UC_MODE_BIG_ENDIAN)
+        spans = []
+        for addr, blob in x.memory().items():
+            spans.append([addr & ~0xFFF, (addr + len(blob) + 0xFFF) & ~0xFFF, addr, blob])
+        bss = [s for s in x.secs if s[1] == 8 and s[3]]
+        for s in bss:
+            spans.append([s[3] & ~0xFFF, (s[3] + s[5] + 0xFFF) & ~0xFFF, None, None])
+        spans.sort()
+        merged = []
+        for lo, hi, _a, _b in spans:
+            if merged and lo <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], hi)
+            else:
+                merged.append([lo, hi])
+        for lo, hi in merged:
+            mu.mem_map(lo, hi - lo)
+        for _l, _h, addr, blob in spans:
+            if blob:
+                mu.mem_write(addr, blob)
+        mu.mem_map(RET, 0x1000)
+        mu.mem_map(0x7E000000, 0x2000000)
+        self.n_ids, self.n_stages = n_ids, n_stages
+        self.special_from = 59 + n_ids
+        self.writes = []
+        mu.hook_add(UC_HOOK_MEM_WRITE, lambda uc, acc, a, size, v, ud: self.writes.append((a, size)))
+        st = {
+            0x0309FB24: lambda: self.pos_id(self.r(4)),
+            0x0301BA44: lambda: 1 if 1 <= self.r(3) < 200 else 0,
+            0x0293C40C: lambda: 1,
+            0x030A04C0: lambda: 1 if self.r(4) in (1, 2, 3) else 0,
+            0x030A0EFC: lambda: 0, 0x030A0F1C: lambda: 4, 0x020013BC: lambda: 0,
+            0x0300174C: lambda: OBJ, 0x0300266C: lambda: 0, 0x02868080: lambda: PLAYERS,
+            0x0309FB18: lambda: 200,
+            0x0301CCB4: lambda: (mu.mem_write(self.r(3), b'\0' * 16), self.r(3))[1],
+            0x030A89CC: lambda: self.r(4) if self.r(4) < 0x38 + self.n_stages else 0xFF,
+            0x0301BA8C: lambda: 1, 0x02948858: lambda: 1, 0x030A9B24: lambda: 0,
+        }
+        for a, f in st.items():
+            mu.hook_add(UC_HOOK_CODE, lambda uc, addr, size, f=f: self.ret(f()), begin=a, end=a)
+        mu.mem_write(0x105759C0 + 0x10, struct.pack('>4I', 0x12345678, 0x9ABCDEF1, 0x0F1E2D3C, 0x55AA33CC))
 
-    def ret(v):
-        mu.reg_write(UC_PPC_REG_3, v & 0xFFFFFFFF)
-        mu.reg_write(UC_PPC_REG_PC, mu.reg_read(UC_PPC_REG_LR))
+    def r(self, n):
+        return self.mu.reg_read(R(n))
 
-    def pos_id(i):
-        return i if i < special_from else 200 + (i - special_from)
-    stubs[0x0301CAE8] = lambda: (mu.mem_write(mu.reg_read(UC_PPC_REG_3), b'\0' * 12), ret(mu.reg_read(UC_PPC_REG_3)))
-    stubs[0x0309FB24] = lambda: ret(pos_id(mu.reg_read(UC_PPC_REG_4)))
-    stubs[0x0301BA44] = lambda: ret(1 if 1 <= mu.reg_read(UC_PPC_REG_3) < 200 else 0)
-    stubs[0x0293C40C] = lambda: ret(1)
-    stubs[0x030A04C0] = lambda: ret(1 if mu.reg_read(UC_PPC_REG_4) in (1, 2, 3) else 0)
-    stubs[0x030A0EFC] = lambda: ret(0)
-    scanned = []
+    def ret(self, v):
+        self.mu.reg_write(R(3), (v or 0) & 0xFFFFFFFF)
+        self.mu.reg_write(P.UC_PPC_REG_PC, self.mu.reg_read(P.UC_PPC_REG_LR))
 
-    def hook(uc, addr, size, ud):
-        if addr in stubs:
-            if addr == 0x0309FB24:
-                scanned.append(mu.reg_read(UC_PPC_REG_4))
-            stubs[addr]()
-    mu.hook_add(UC_HOOK_CODE, hook)
-    mu.mem_write(OBJ, b'\x5A' * 0x200)
-    mu.reg_write(UC_PPC_REG_3, OBJ)
-    mu.reg_write(UC_PPC_REG_1, 0x7F00F000)
-    mu.reg_write(UC_PPC_REG_LR, RET)
-    for r in range(23, 32):                      # the saved registers come back
-        mu.reg_write(getattr(__import__('unicorn.ppc_const', fromlist=['x']), 'UC_PPC_REG_%d' % r), 0x1000 + r)
-    mu.emu_start(0x02FFB610, RET, count=200000)
-    regs = [mu.reg_read(getattr(__import__('unicorn.ppc_const', fromlist=['x']), 'UC_PPC_REG_%d' % r))
-            for r in range(23, 32)]
-    pool = struct.unpack('>3I', bytes(mu.mem_read(OBJ + 0x98, 12)))
-    return mu, pool, bytes(mu.mem_read(OBJ, 0x98)), bytes(mu.mem_read(OBJ + 0xA4, 0x100)), regs, scanned
+    def pos_id(self, i):
+        return i if i < self.special_from else 200 + (i - self.special_from)
+
+    def call(self, fn, *args, count=2000000):
+        for i, v in enumerate(args):
+            self.mu.reg_write(R(3 + i), v & 0xFFFFFFFF)
+        self.mu.reg_write(R(1), STACK)
+        self.mu.reg_write(P.UC_PPC_REG_LR, RET)
+        self.mu.emu_start(fn, RET, count=count)
+        return self.r(3)
+
+    def words(self, a, n):
+        return struct.unpack('>%dI' % n, bytes(self.mu.mem_read(a, 4 * n)))
 
 
-def ids_of(pool):
-    return {32 * w + b for w in range(3) for b in range(32) if pool[w] >> b & 1}
+def ids_of(words):
+    return {32 * w + b for w in range(len(words)) for b in range(32) if words[w] >> b & 1}
 
 
 def main():
     path = sys.argv[1]
+    picks = int(sys.argv[2]) if len(sys.argv) > 2 else 5000
     base, rec = X.find_marker(Rpx(path))
-    fighters = rec['registry']['fighters']
-    n = len(fighters)
-    special_from = 59 + n
-    count = RS.scan_count(n)
-    _mu, pool, below, above, regs, scanned = run_refill(path, n, special_from)
-    want = set(range(4, 59)) | {f['ui_id'] for f in fighters if f['ui_id'] < 96 and f.get('random', True)}
-    want = {i for i in want if i < count}
-    check('%d clones: the refill scans %d entries (positions 0-%d)' % (n, count, count - 1), scanned,
-          list(range(count)))
-    got = ids_of(pool)
-    check('the pool: the game\'s fighters 4-58 and the clones in random (%d), no Mii, no id >= 96'
-          % len([i for i in want if i >= 59]), sorted(got), sorted(want))
-    off = [f['ui_id'] for f in fighters if f.get('random', True) is False]
-    check('clones set to "random": false are not in it (%s)' % off, sorted(got & set(off)), [])
-    check('nothing written before +0x98', below, b'\x5A' * 0x98)
-    check('nothing written past the 12 bytes (+0xA4 on)', above, b'\x5A' * 0x100)
-    check('the function returns with r23-r31 restored', regs, [0x1000 + r for r in range(23, 32)])
-    # remove: every id
-    mu = machine(path)
-    mu.mem_write(OBJ, b'\x5A' * 0x200)
-    full = b'\xFF' * 12
+    reg = rec['registry']
+    fighters, stages = reg['fighters'], reg['stages']
+    lay = X.layout(base, reg)
+    cave = lay['random'][0]
+    tab = cave
+    n = RS.scan_count(len(fighters))
+    m = M(path, len(fighters), len(stages))
+    m.mu.mem_write(OBJ, b'\x5A' * 0x200)
+    m.mu.mem_write(OBJ + 0x98, b'\0' * 12)
+    for i in range(8):                                  # no other players
+        m.mu.mem_write(PLAYERS + 0x80 * i + 0x1E, b'\x01\xFF')
+    enabled = set(range(4, 59)) | {f['ui_id'] for f in fighters if f.get('random', True)}
+    off = {f['ui_id'] for f in fighters if f.get('random', True) is False}
+    data_lo, data_hi = cave, cave + 32 * RS.SLOTS
+    m.writes = []
+    m.call(lay['random'][0] and RS.REFILL, OBJ)
+    slot = m.words(tab, 8 * RS.SLOTS)
+    k = next(i for i in range(RS.SLOTS) if slot[8 * i] == OBJ)
+    pool = slot[8 * k + 1:8 * k + 8]
+    check('%d fighter clones: the refill scans ids 0-%d; the pool holds the game\'s fighters and the %d clones in '
+          'random, not the %d set to false' % (len(fighters), n - 1, len(enabled) - 55, len(off)),
+          sorted(ids_of(pool)), sorted(enabled))
+    check('+0x98-+0xA3 mirror ids 0-95', m.words(OBJ + 0x98, 3), pool[:3])
+    stray = [(a, s) for a, s in m.writes if not (STACK - 0x1000 <= a < STACK or data_lo <= a < data_hi or
+                                               OBJ + 0x98 <= a < OBJ + 0xA4)]
+    check('the refill writes only the stack, its pool slot and +0x98-+0xA3 (stage pools +0xA4 on untouched)',
+          stray[:4], [])
+    # a cycle
+    got = []
+    m.writes = []
+    while len(ids_of(m.words(tab + 32 * k + 4, 7))) > 7:
+        i = m.call(RS.PICK, 0xFFFFFFFF)
+        got.append(i)
+        m.call(RS.REMOVE, OBJ, i)
+    check('a cycle: pick + remove until 7 left: %d picks, every enabled id once, none disabled' % len(got),
+          (len(got) == len(set(got)), set(got) <= enabled, len(got)), (True, True, len(enabled) - 7))
+    stray = [(a, s) for a, s in m.writes if not (STACK - 0x1000 <= a < STACK or data_lo <= a < data_hi or
+                                               OBJ + 0x98 <= a < OBJ + 0xA4 or 0x105759C0 <= a < 0x105759E0)]
+    check('picks and removes write only the stack, the pool, its mirror and the random number state', stray[:4], [])
+    m.call(0x02FFC4A8, OBJ)
+    check('the count function refills under 8 left (the pool is full again)',
+          sorted(ids_of(m.words(tab + 32 * k + 4, 7))), sorted(enabled))
+    # uniformity
+    hist = collections.Counter(m.call(RS.PICK, 0xFFFFFFFF) for _ in range(picks))
+    mean = picks / len(enabled)
+    check('%d picks from the full pool: only enabled ids, every one picked' % picks,
+          (set(hist) <= enabled, set(hist) == enabled), (True, True))
+    lo, hi = min(hist.values()), max(hist.values())
+    check('counts within 30 %% of the mean %.1f (min %d, max %d)' % (mean, lo, hi),
+          lo >= 0.7 * mean and hi <= 1.3 * mean, True)
+    # a player's pick leaves out the others' ids
+    others = [5, 59, max(enabled)]
+    for i, cid in enumerate(others, 1):
+        m.mu.mem_write(PLAYERS + 0x80 * i + 0x1E, bytes([0, cid]))
+    res = {m.call(RS.PICK, 0) for _ in range(300)}
+    check('player 0\'s pick leaves out the ids of players 1-3 %s' % others, sorted(res & set(others)), [])
+    # remove for every id
     bad = []
-    for i in range(0, 0x100):
-        mu.mem_write(OBJ + 0x98, full)
-        mu.reg_write(UC_PPC_REG_3, OBJ)
-        mu.reg_write(UC_PPC_REG_4, i)
-        mu.reg_write(UC_PPC_REG_LR, RET)
-        mu.emu_start(0x02FFC5BC, RET, count=100)
-        p = struct.unpack('>3I', bytes(mu.mem_read(OBJ + 0x98, 12)))
-        cleared = set(range(96)) - ids_of(p)
-        if cleared != ({i} if i < count and i != 0xFF else set()):
-            bad.append((i, sorted(cleared)))
-        if bytes(mu.mem_read(OBJ + 0xA4, 0x100)) != b'\x5A' * 0x100 or bytes(mu.mem_read(OBJ, 0x98)) != b'\x5A' * 0x98:
-            bad.append((i, 'outside'))
-    check('remove(id): clears exactly bit id for ids < %d, nothing else and nothing for the rest' % count, bad[:5], [])
-    # the count loop's bound
-    x = Rpx(path)
-    check('the count of picks left covers the same %d bits' % count, x.r32(RS.COUNT_LOOP),
-          RS.one(RS.COUNT_LOOP, 'li r11, %d' % count))
+    full = struct.pack('>7I', *([0xFFFFFFFF] * 7))
+    for i in range(0x100):
+        m.mu.mem_write(tab + 32 * k + 4, full)
+        m.mu.mem_write(OBJ + 0x98, b'\xFF' * 12)
+        m.call(RS.REMOVE, OBJ, i)
+        cl = set(range(224)) - ids_of(m.words(tab + 32 * k + 4, 7))
+        mir = set(range(96)) - ids_of(m.words(OBJ + 0x98, 3))
+        want = {i} if i < n and i != 0xFF else set()
+        if cl != want or mir != {x for x in want if x < 96}:
+            bad.append((i, sorted(cl), sorted(mir)))
+    check('remove(id), ids 0-0xFF: exactly that bit below %d (and its mirror below 96), nothing for the rest' % n,
+          bad[:3], [])
+    # the fighter helper's loop with 200 database entries
+    m.writes = []
+    m.mu.reg_write(R(31), LOCAL)
+    m.mu.reg_write(R(30), 0)
+    m.mu.mem_write(LOCAL - 0x10, b'\0' * 0x40)
+    m.mu.reg_write(R(3), 200)
+    m.mu.reg_write(R(1), STACK)
+    m.mu.emu_start(0x0301CB40, 0x0301CB98, count=200000)
+    outside = [(a, s) for a, s in m.writes if not (LOCAL <= a < LOCAL + 12)]
+    check('the available-fighters helper 0x0301CAE8 with 200 entries: its loop writes only its 12 bytes',
+          outside[:4], [])
+    # stage refill A
+    m.writes = []
+    m.mu.mem_write(OBJ + 0xA4, b'\0' * 16)
+    m.call(0x02FFB76C, OBJ, 1)
+    st = ids_of(m.words(OBJ + 0xA4, 4))
+    want = set(range(1, 0x38)) | {s['cosmetic'] for s in stages if s.get('random', True)}
+    check('stage pool +0xA4 (%d stage clones, %d set to false): the game\'s stage ids and the clones in random'
+          % (len(stages), sum(1 for s in stages if s.get('random', True) is False)),
+          sorted(st), sorted(x for x in want if x < 0x63))
+    stray = [(a, s) for a, s in m.writes if not (STACK - 0x1000 <= a < STACK or OBJ + 0xA4 <= a < OBJ + 0xB4)]
+    check('the stage refill writes only the stack and its 16 bytes', stray[:4], [])
     print('%d failed' % len(FAILS))
     sys.exit(1 if FAILS else 0)
 

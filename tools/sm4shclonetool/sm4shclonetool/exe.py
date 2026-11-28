@@ -32,7 +32,7 @@ MAX_SPACE = 0x300000                 # at most (3 MB: the kinds part's calls bac
 # (the effect wrappers stay where v1 put them: the game's own calls to imported functions point into this space in
 # the file, and a wrapper on one of those addresses would look like such a call to tools that check for them)
 PARTS = [('marker', 0x0000, 0x4000), ('stage', 0x4000, 0x5000), ('customs', 0x5000, 0x6000),
-         ('effects', 0x6000, 0x8000), ('random', 0x8000, 0x8100)]
+         ('effects', 0x6000, 0x8000), ('random', 0x8000, 0x9000)]
 WEAPONS_AT = 0xA000                  # past 0x04B811D0, the last of the file's import-call targets
 DUMMY_OFF = 0x3FF8                   # the marker block's last 8 bytes: never read or run (moved relocations land here)
 # SHA-1 of the cross_f.rpx the research was done on; reported, not required (see README)
@@ -171,7 +171,7 @@ def check_sites(path):
         from . import random_select as RS
         try:
             img = K.Image(path)
-            RS.build(img.w, [], DEFAULT_BASE + 0x8000, DEFAULT_BASE + 0x8100)
+            RS.build(img.w, [], [], DEFAULT_BASE + 0x8000, DEFAULT_BASE + 0x9000)
         except AssertionError as e:
             out.append(str(e))
     finally:
@@ -278,9 +278,6 @@ def build(in_path, out_path, reg, force=False, log=print, work=None):
             if reg['fighters']:
                 B, info = K.build(spec_path, view)
                 add('kind expansion', B.words, B.reloc_args())
-                from . import random_select as RS
-                rv = Rpx(view)
-                add('random select', RS.build(rv.r32, reg['fighters'], *lay['random']))
                 if any(f.get('weapons') for f in reg['fighters']):
                     WB, _wi = W.build(spec_path, view)
                     add('weapons', WB.words, WB.reloc_args())
@@ -293,6 +290,10 @@ def build(in_path, out_path, reg, force=False, log=print, work=None):
                     json.dump(cspec, open(spec_path + '.c', 'w'))
                     C = BC.build(spec_path + '.c', view)[0]
                     add('custom moves', C)
+            if reg['fighters'] or reg['stages']:
+                from . import random_select as RS
+                rv = Rpx(view)
+                add('random select', RS.build(rv.r32, reg['fighters'], reg['stages'], *lay['random'])[0])
             if reg['stages']:
                 new = [(s['name'], s['cosmetic']) for s in reg['stages']]
                 sw, sp, count = SS.build(new, view)
