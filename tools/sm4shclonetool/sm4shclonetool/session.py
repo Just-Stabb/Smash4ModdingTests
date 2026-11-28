@@ -222,14 +222,16 @@ class Session:
             self.log(n)
         os.makedirs(self.pkg_data, exist_ok=True)
         csb_names = None
+        read = None
         if self.exe:
             x = Rpx(self.exe)
             csb_names = [x.cstr(x.r32(CSB_TABLE + 4 * i)) for i in range(62)]
+            read = x.r32
         for what, rec, spec in recs:
             self.log('--- %s %s (from %s)' % (what, rec['name'], rec['source']))
             if what == 'fighter':
                 F.build(rec, self.data, self.ui, self.pkg_data, reg, (portraits or {}).get(rec['name']), self.log,
-                        rec.get('renumber', ()), csb_names)
+                        rec.get('renumber', ()), csb_names, read)
             else:
                 S.build(rec, self.data, self.ui, self.pkg_data, reg, (icons or {}).get(rec['name']), self.log)
         summary = {'clones': [r['name'] for _w, r, _s in recs]}
@@ -258,18 +260,24 @@ class Session:
         return summary
 
     def _prune(self):
+        from . import languages as L
         n = 0
-        for root, _d, fs in os.walk(self.pkg_data):
-            for f in fs:
-                p = os.path.join(root, f)
-                rel = os.path.relpath(p, self.pkg_data)
-                q = os.path.join(self.data, rel)
-                if os.path.exists(q) and os.path.getsize(p) == os.path.getsize(q) and _same(p, q):
-                    os.unlink(p)
-                    n += 1
-        for root, ds, fs in sorted(os.walk(self.pkg_data), reverse=True):
-            if not os.listdir(root) and root != self.pkg_data:
-                os.rmdir(root)
+        pairs = [(self.pkg_data, self.data)] + [(L.out_root(self.pkg_data, k), d)
+                                                for k, d in L.region_dirs(self.data).items()]
+        for pkg, data in pairs:
+            if not os.path.isdir(pkg):
+                continue
+            for root, _d, fs in os.walk(pkg):
+                for f in fs:
+                    p = os.path.join(root, f)
+                    rel = os.path.relpath(p, pkg)
+                    q = os.path.join(data, rel)
+                    if os.path.exists(q) and os.path.getsize(p) == os.path.getsize(q) and _same(p, q):
+                        os.unlink(p)
+                        n += 1
+            for root, ds, fs in sorted(os.walk(pkg), reverse=True):
+                if not os.listdir(root) and root != self.pkg_data:
+                    os.rmdir(root)
         return n
 
     # ------------------------------------------------------------ checks after the build
@@ -322,7 +330,9 @@ class Session:
                  '1. Copy the contents of INSTALL_TO_data/ over your game\'s data folder (the files your mod',
                  '   manager / Sm4shExplorer installs into content/patch/data), keeping the folder layout.',
                  '   In Sm4shExplorer, set every packaged folder that gets a NEW file (ui/replace/chr/chr_*,',
-                 '   ui/replace/stage/stage_*) to "Pack this folder" before rebuilding, or the game reads past the pack.']
+                 '   ui/replace/stage/stage_*) to "Pack this folder" before rebuilding, or the game reads past the pack.',
+                 '   INSTALL_TO_data(<region>)/ folders (if any) go over the matching data(<region>)/ folders: the',
+                 '   clones\' names in that region\'s language.']
         if os.path.exists(os.path.join(self.pkg_code, 'cross_f.rpx')):
             lines += ['2. Replace code/cross_f.rpx with INSTALL_TO_code/cross_f.rpx (keep a copy of your old one).',
                       '   It is your executable with the clone patch; the clones do not load without it.']

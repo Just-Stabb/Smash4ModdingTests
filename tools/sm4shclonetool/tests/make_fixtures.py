@@ -122,6 +122,52 @@ def main():
     stb = os.environ.get('S4CT_SOUNDLABELTABLE') or os.path.join(sconf, 'soundlabeltable.bin')
     if os.path.exists(stb):
         link(stb, os.path.join(sd, 'soundlabeltable.bin'))
+    # the announcer's narration bank (sound/se/snd_se_narration_characall.nus3bank: SOUND_CONFIG's, or
+    # S4CT_CHARACALL), matching the soundlabeltable above
+    nb = os.environ.get('S4CT_CHARACALL') or os.path.join(sconf, 'snd_se_narration_characall.nus3bank')
+    if os.path.exists(nb):
+        link(nb, os.path.join(data, 'sound', 'se', 'snd_se_narration_characall.nus3bank'))
+    # synthetic files where the dumps have none: the results screen's win cameras, Kirby's Fox / Zero Suit Samus copy
+    # hats and motions (the folder names the executable's tables give), a second language (data(us_fr) beside data)
+    for rel, blob in (('motion/camera/result/fox/1/camera_motion.omo', b'OMO ' * 8),
+                      ('motion/camera/result/fox/1/camera_motion.vbn', b'VBN ' * 8),
+                      ('motion/camera/result/szerosuit/2/camera_motion.omo', b'OMO ' * 8),
+                      ('fighter/kirby/model/foxear/c00/model.nud', b'NUD ' * 16),
+                      ('fighter/kirby/model/foxear/c00/model.nut', b'NTWU' + b'\0' * 28),
+                      ('fighter/kirby/motion/foxbody/SpecialNStart.omo', b'OMO ' * 16),
+                      ('fighter/kirby/model/szerosuithair/c00/model.nud', b'NUD ' * 16),
+                      ('fighter/kirby/motion/szerosuitbody/SpecialNStart.omo', b'OMO ' * 16)):
+        p = os.path.join(data, rel)
+        if not os.path.exists(p):
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            open(p, 'wb').write(blob)
+    # the BGM config (SOUND_CONFIG's bgm_property.mpb, or S4CT_BGM_PROPERTY) and a small synthetic fanfare bank for Zero
+    # Suit Samus's BGM (no BGM banks in the dumps): the narration bank's layout, one stereo tone
+    mpb = os.environ.get('S4CT_BGM_PROPERTY') or os.path.join(sconf, 'bgm_property.mpb')
+    if os.path.exists(mpb):
+        link(mpb, os.path.join(sd, 'bgm_property.mpb'))
+    fan = os.path.join(data, 'sound', 'bgm', 'snd_bgm_Z24_F_ZeroSamus.nus3bank')
+    if os.path.exists(nb) and not os.path.exists(fan):
+        import math
+        from sm4shclonetool import audio as AU
+        b = AU.Bank(open(nb, 'rb').read())
+        b.raw = b.raw[:1]
+        b.pack = bytearray()
+        tone = [[int(8000 * math.sin(i * 0.03 * (c + 1))) for i in range(9000)] for c in range(2)]
+        b.replace(0, AU.idsp_encode(tone, 47999))
+        h, _n, blk = AU._parse(b.raw[0])
+        b.raw[0] = AU._entry(h, 'Z24_F_ZeroSamus', blk)
+        b.set_binf('snd_bgm_Z24_F_ZeroSamus', 5000)
+        os.makedirs(os.path.dirname(fan), exist_ok=True)
+        open(fan, 'wb').write(b.data())
+    fr = os.path.join(out, 'data(us_fr)', 'ui', 'message', 'melee.msbt')
+    if not os.path.exists(fr):
+        sys.path.insert(0, os.path.join(os.path.dirname(HERE), 'vendor'))
+        import msbt
+        m = msbt.Msbt(open(os.path.join(vui, 'message', 'melee.msbt'), 'rb').read())
+        m.set('MmelCharaN_01_Fox', 'Fox (FR)')
+        os.makedirs(os.path.dirname(fr), exist_ok=True)
+        open(fr, 'wb').write(m.build())
     # test portraits
     for st, size in (('chr_00', (128, 128)), ('chr_10', (128, 128)), ('chr_11', (256, 256)), ('chr_13', (128, 64)),
                      ('stock_90', (64, 64))):

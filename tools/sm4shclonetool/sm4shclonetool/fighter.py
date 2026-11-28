@@ -137,7 +137,13 @@ def record(spec, reg):
             'fanfare': bool(spec.get('fanfare', True)), 'random': bool(spec.get('random', True)),
             'own_sound': bool(spec.get('own_sound', True)), 'own_effects': bool(spec.get('own_effects', True)),
             'plates': bool(spec.get('plates', True)), 'plate_text': spec.get('plate_text'),
-            'plate_lines': spec.get('plate_lines'), 'fonts': dict(spec.get('fonts') or {})}
+            'plate_lines': spec.get('plate_lines'), 'fonts': dict(spec.get('fonts') or {}),
+            'call': spec.get('call') or ('wav' if spec.get('call_wav') else 'own'), 'call_wav': spec.get('call_wav'),
+            'kirby': bool(spec.get('kirby', True)), 'kirby_hat_mode': spec.get('kirby_hat_mode') or 'own',
+            'kirby_hat_dir': spec.get('kirby_hat_dir'),
+            'titles': dict(spec.get('titles') or {}),
+            'music': spec.get('music') or ('wav' if spec.get('music_wav') else 'own'), 'music_wav': spec.get('music_wav'),
+            'voices': dict(spec.get('voices') or {})}
 
 
 def sort_keys(param_dirs, reg, after=None, value=None):
@@ -161,7 +167,7 @@ def sort_keys(param_dirs, reg, after=None, value=None):
 
 
 # ---------------------------------------------------------------- build
-def build(rec, data_dir, ui_dir, out_data, reg, portraits=None, log=print, renumber=(), csb_names=None):
+def build(rec, data_dir, ui_dir, out_data, reg, portraits=None, log=print, renumber=(), csb_names=None, read=None):
     """writes the clone's data files into out_data (laid out like the game's data/). reg: the registry WITH rec.
     portraits: {(set, costume NN): png path}. renumber: ids whose first sort key goes up by one."""
     param_dirs = [os.path.join(out_data, 'param'), os.path.join(data_dir, 'param')]
@@ -208,13 +214,126 @@ def build(rec, data_dir, ui_dir, out_data, reg, portraits=None, log=print, renum
         logs += customs(rec, data_dir, ui_dir, out_data, ui_dirs)
     if rec.get('fanfare', True):
         logs += sound_config(rec, data_dir, out_data, reg, csb_names)
+        from . import music
+        music.own_fanfare(rec, data_dir, out_data, read, rec.get('music', 'own'), rec.get('music_wav'), logs.append)
     logs += result_panel(rec, data_dir, out_data)
     if rec.get('own_sound'):
         from . import sound
         sound.own_banks(rec, out_data, data_dir, logs.append)
+    else:
+        rec['sound_alias'] = []
+    if rec.get('voices'):
+        from . import voices as V
+        ls = V.lines(rec, out_data)
+        for tname, wav in sorted(rec['voices'].items()):
+            hit = next((x for x in ls if x['name'] == tname or '%s:%d' % (x['file'], x['tone']) == tname), None)
+            if hit is None:
+                logs.append('voice %s: no such tone in the clone\'s banks' % tname)
+                continue
+            V.replace(rec, out_data, hit['file'], hit['tone'], wav)
+            logs.append('voice %s (%s, %s) = %s' % (hit['name'], hit['file'], hit['category'], os.path.basename(wav)))
+    logs += win_cameras(rec, data_dir, out_data)
+    from . import narration
+    narration.own_call(rec, data_dir, out_data, read, rec.get('call', 'own'), rec.get('call_wav'), logs.append)
+    if read is not None:
+        logs += kirby_files(rec, data_dir, out_data, read)
+    from . import languages
+    logs += languages.names(rec, data_dir, out_data)
     for line in logs:
         log(line)
     return logs
+
+
+def _copy_tree(src, dst, rename=None):
+    n = 0
+    for root, _ds, fs in os.walk(src):
+        for f in fs:
+            p = os.path.join(root, f)
+            q = os.path.join(dst, os.path.relpath(p, src))
+            if rename:
+                q = os.path.join(os.path.dirname(q), rename(os.path.basename(q)))
+            os.makedirs(os.path.dirname(q), exist_ok=True)
+            shutil.copyfile(p, q)
+            n += 1
+    return n
+
+
+def win_cameras(rec, data_dir, out_data):
+    """the results screen's winner cameras: motion/camera/result/<model name>/<n>/ (the result scene's script loads them
+    by the kind's folder name, get_fighter_model_name_from_fighter_kind 0x030ED508: the clone's own name; without them
+    "NOT FOUND CAMERA!" and default/1/), copies of the source's"""
+    src = R.first([os.path.join(out_data, 'motion', 'camera', 'result'),
+                   os.path.join(data_dir, 'motion', 'camera', 'result')], rec['source'])
+    dst = os.path.join(out_data, 'motion', 'camera', 'result', rec['name'])
+    if not src:
+        return ['win cameras: no motion/camera/result/%s/ in the data folder (the results screen uses its default '
+                'camera for the clone)' % rec['source']]
+    if os.path.isdir(dst):
+        return ['win cameras: motion/camera/result/%s/ already in the package' % rec['name']]
+    n = _copy_tree(src, dst)
+    return ['win cameras: motion/camera/result/%s/ (%d files, copies of %s\'s)' % (rec['name'], n, rec['source'])]
+
+
+KIRBY_BODY, KIRBY_HAT = 0x1041A6D0, 0x1041A7B8     # Kirby's copy tables: motion folder name, hat name (per kind)
+
+
+def kirby_files(rec, data_dir, out_data, read):
+    """Kirby's copy of the clone: its own hat (fighter/kirby/model/<name>cap/, a copy of the base's hat) and copy
+    motions (fighter/kirby/motion/<name>body/), when the base has them in the data folder; the executable then loads
+    them for a Kirby who copies the clone (clone_extras.py). rec["kirby"] False: Kirby gets no ability (vanilla)."""
+    rec['kirby_body'] = rec['kirby_hat'] = None
+    rec['kirby_voice'] = False
+    if not rec.get('kirby', True):
+        return ['Kirby: does not copy the clone (option off: no ability, as the game does for new kinds)']
+    if rec.get('kirby_hat_mode', 'own') == 'share':
+        return ['Kirby: copies the clone as its base (the base\'s hat and motions)']
+    bk = R.KINDS.index(rec['base'])
+    body = _rstr(read, read(KIRBY_BODY + 4 * bk))
+    hat = _rstr(read, read(KIRBY_HAT + 4 * bk))
+    logs = []
+    kd = [os.path.join(out_data, 'fighter', 'kirby'), os.path.join(data_dir, 'fighter', 'kirby')]
+    if body:
+        src = R.first(kd, os.path.join('motion', body + 'body'))
+        if src:
+            n = _copy_tree(src, os.path.join(out_data, 'fighter', 'kirby', 'motion', rec['name'] + 'body'))
+            rec['kirby_body'] = rec['name']
+            logs.append('Kirby: copy motions fighter/kirby/motion/%sbody/ (%d files, copies of %sbody)' % (
+                rec['name'], n, body))
+        else:
+            logs.append('Kirby: no fighter/kirby/motion/%sbody/ in the data folder: the copy uses the base\'s motions'
+                        % body)
+    if hat or rec.get('kirby_hat_dir'):
+        src = rec.get('kirby_hat_dir') if rec.get('kirby_hat_dir') and os.path.isdir(rec['kirby_hat_dir']) else \
+            R.first(kd, os.path.join('model', hat or ''))
+        if src:
+            n = _copy_tree(src, os.path.join(out_data, 'fighter', 'kirby', 'model', rec['name'] + 'cap'))
+            rec['kirby_hat'] = rec['name'] + 'cap'
+            logs.append('Kirby: copy hat fighter/kirby/model/%scap/ (%d files, a copy of %s)' % (rec['name'], n, hat))
+        else:
+            logs.append('Kirby: no fighter/kirby/model/%s/ in the data folder: the copy wears the base\'s hat' % hat)
+    else:
+        logs.append('Kirby: the base\'s copy has no hat')
+    v = os.path.join(out_data, 'fighter', rec['name'], 'sound', 'snd_se_vc_Kirby_copy_%s.nus3bank' % rec['cap'])
+    if os.path.exists(v) or os.path.exists(os.path.join(data_dir, 'fighter', rec['name'], 'sound',
+                                                        os.path.basename(v))):
+        rec['kirby_voice'] = True
+        logs.append('Kirby: his copy voices of the clone load from its own %s' % os.path.basename(v))
+    return logs
+
+
+def _rstr(read, a):
+    if not a:
+        return None
+    out = bytearray()
+    while len(out) < 64:
+        w = read((a + len(out)) & ~3)
+        b = w.to_bytes(4, 'big')
+        start = (a + len(out)) & 3
+        for c in b[start:]:
+            if c == 0:
+                return out.decode('latin1')
+            out.append(c)
+    return out.decode('latin1')
 
 
 def _renumber(out_data, ids, cid, logs):

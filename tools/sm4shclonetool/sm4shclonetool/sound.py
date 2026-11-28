@@ -90,6 +90,27 @@ class Table:
         self.rows.append([0xFFFFFFFF, 0, 0, 0])
         return len(self.rows) - 1
 
+    def set_row(self, row, tones):
+        """row's label list replaced (the label area rebuilt: every other row keeps its list, rows that shared a list
+        still share it)"""
+        lists = {}
+        for i, r in enumerate(self.rows):
+            if i != row and r[1]:
+                lists.setdefault((r[2], r[1]), bytes(self.labels[r[2]:r[2] + 4 * r[1]]))
+        area, where = bytearray(), {}
+        for key in sorted(lists):
+            where[key] = len(area)
+            area += lists[key]
+        for i, r in enumerate(self.rows):
+            if i != row and r[1]:
+                r[2] = where[(r[2], r[1])]
+            elif i != row:
+                r[2] = min(r[2], len(area))
+        off = len(area)
+        area += struct.pack('<%di' % len(tones), *tones)
+        self.rows[row][1], self.rows[row][2] = len(tones), off
+        self.labels = area
+
     def add_row(self, bank_id, tones):
         row = self.free_row()
         off = len(self.labels)
@@ -132,9 +153,19 @@ def own_banks(rec, out_data, data_dir, log):
     table = Table(open(tp, 'rb').read())
     ids = {r[0] for r in table.rows}
     rows = {}
+    alias = {}
     nxt = max([i for i in ids if BANK_IDS[0] <= i < BANK_IDS[1]] + [BANK_IDS[0]]) + 1
+    cap = rec['cap']
+    kinds = {'snd_se_%s.nus3bank' % cap: 'se', 'snd_vc_%s.nus3bank' % cap: 'vc',
+             'snd_vc_%s_ouen.nus3bank' % cap: 'cheer', 'snd_se_%s_common.nus3bank' % cap: 'se_common'}
     for f in sorted(os.listdir(d)):
         if not f.endswith('.nus3bank'):
+            continue
+        if f.startswith('snd_se_vc_Kirby_copy_'):
+            # Kirby's copy voices: Kirby plays them from his own handles of this bank (no alias there), by the base's
+            # row: the clone's copy keeps the base's id (its own file, so its own tones)
+            log('own sound bank: %s keeps its base\'s id (Kirby plays it by the base\'s row; with the base in the '
+                'same match only the first one\'s copy voices load)' % f)
             continue
         p = os.path.join(d, f)
         data = open(p, 'rb').read()
@@ -149,6 +180,8 @@ def own_banks(rec, out_data, data_dir, log):
         ids.add(new_id)
         new_name = f[:-len('.nus3bank')]
         open(p, 'wb').write(set_binf(data, new_name, new_id))
+        if f in kinds:
+            alias[kinds[f]] = old_id
         row = table.row_of(old_id)
         if row is None:
             log('own sound bank: %s: BINF %s id %d -> %s id %d (no soundlabeltable row of its own before)'
@@ -169,6 +202,10 @@ def own_banks(rec, out_data, data_dir, log):
         for f in fs:
             if f.endswith('.bin'):
                 total += remap_acmd(os.path.join(root, f), rows, f == 'sound.bin')
+    rec['sound_alias'] = [alias.get(k, 0) for k in ('se', 'vc', 'cheer', 'se_common')]
+    log('own sound bank: the base\'s bank ids %s answer from the clone\'s own banks (the executable\'s alias: sounds '
+        'the game plays by the base\'s rows from code, MSC, the voice sequences and commonsoundtable.csb)'
+        % ', '.join('%s %d' % kv for kv in zip(('se', 'vc', 'cheer', 'se_common'), rec['sound_alias']) if kv[1]))
     log('own sound bank: %d ACMD sound ids moved to the clone\'s rows %s' % (
         total, ', '.join('%d -> %d' % (a, b[0]) for a, b in sorted(rows.items()))))
     return rows

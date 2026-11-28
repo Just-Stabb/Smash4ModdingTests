@@ -53,7 +53,10 @@ def layout(base, reg=None):
     out = {name: (base + lo, base + hi) for name, lo, hi in PARTS}
     wsize = (0x10000 + 0x1800 * n_weapons(reg) + 0xFFF) & ~0xFFF
     out['weapons'] = (base + WEAPONS_AT, base + WEAPONS_AT + wsize)
-    out['kinds'] = (base + WEAPONS_AT + wsize, base + MAX_SPACE)
+    from . import clone_extras as CE
+    esize = CE.size_for(len((reg or {}).get('fighters', [])))
+    out['extras'] = (base + WEAPONS_AT + wsize, base + WEAPONS_AT + wsize + esize)
+    out['kinds'] = (base + WEAPONS_AT + wsize + esize, base + MAX_SPACE)
     return out
 
 
@@ -169,9 +172,14 @@ def check_sites(path):
             except AssertionError as e:
                 out.append('%s: %s' % (name, e))
         from . import random_select as RS
+        from . import clone_extras as CE
         try:
             img = K.Image(path)
             RS.build(img.w, [], [], DEFAULT_BASE + 0x8000, DEFAULT_BASE + 0x9000)
+        except AssertionError as e:
+            out.append(str(e))
+        try:
+            CE.check(img.w)
         except AssertionError as e:
             out.append(str(e))
     finally:
@@ -319,6 +327,11 @@ def build(in_path, out_path, reg, force=False, log=print, work=None):
                     json.dump(cspec, open(spec_path + '.c', 'w'))
                     C = BC.build(spec_path + '.c', view)[0]
                     add('custom moves', C)
+            if reg['fighters']:
+                from . import clone_extras as CE
+                from . import roster as R
+                rv = Rpx(view)
+                add('clone extras', CE.build(rv.r32, reg['fighters'], R.KINDS.index, *lay['extras'])[0])
             if reg['fighters'] or reg['stages']:
                 from . import random_select as RS
                 rv = Rpx(view)

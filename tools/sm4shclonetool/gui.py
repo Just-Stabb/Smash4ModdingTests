@@ -74,10 +74,14 @@ class App:
         nb = ttk.Notebook(root)
         nb.pack(fill='both', expand=True, padx=6, pady=4)
         self.nb = nb
-        self.ftab, self.stab = ttk.Frame(nb), ttk.Frame(nb)
+        self.ftab, self.stab, self.xtab, self.vtab = ttk.Frame(nb), ttk.Frame(nb), ttk.Frame(nb), ttk.Frame(nb)
         nb.add(self.ftab, text='Fighters')
+        nb.add(self.xtab, text='Fighter extras (call, fanfare, Kirby, plates, languages)')
+        nb.add(self.vtab, text='Voices (a built clone)')
         nb.add(self.stab, text='Stages')
         self._fighter_tab()
+        self._extras_tab()
+        self._voices_tab()
         self._stage_tab()
         self._bottom()
         root.after(100, self._poll)
@@ -163,7 +167,8 @@ class App:
         ttk.Button(af, text='All', width=4, command=lambda: self.weapons.select_set(0, 'end')).pack(side='right')
         self.weapons = tk.Listbox(opt, selectmode='multiple', height=3, exportselection=False)
         self.weapons.pack(fill='x')
-        ttk.Label(opt, text='Kirby: vanilla Kirby can\'t copy new kinds (no copy ability).', foreground='#806020').pack(anchor='w')
+        ttk.Label(opt, text='Announcer call, fanfare, Kirby\'s copy, name plates, languages: the "Fighter extras" tab.',
+                  foreground='#205080').pack(anchor='w')
         pf = ttk.LabelFrame(mid, text='Portraits (default: the base\'s, new texture ids)')
         pf.pack(fill='x', pady=4)
         self.p_set = ttk.Combobox(pf, values=PORTRAIT_SETS, width=9, state='readonly')
@@ -186,6 +191,304 @@ class App:
         self.css_label.pack(fill='both', expand=True)
         self.css_info = ttk.Label(right, text='', wraplength=820)
         self.css_info.pack(fill='x')
+
+    def _extras_tab(self):
+        t = self.xtab
+        left = ttk.Frame(t)
+        left.pack(side='left', fill='y', padx=6, pady=4)
+        self.x = {}
+
+        def radio(parent, key, values, default):
+            v = tk.StringVar(value=default)
+            self.x[key] = v
+            fr = ttk.Frame(parent)
+            fr.pack(anchor='w')
+            for val, label in values:
+                ttk.Radiobutton(fr, text=label, value=val, variable=v,
+                                command=self._schedule_plate).pack(side='left')
+            return fr
+
+        def wav_row(parent, key):
+            v = tk.StringVar()
+            self.x[key] = v
+            fr = ttk.Frame(parent)
+            fr.pack(fill='x')
+            ttk.Entry(fr, textvariable=v, width=40).pack(side='left')
+            ttk.Button(fr, text='WAV...', command=lambda: v.set(filedialog.askopenfilename(
+                filetypes=[('WAV', '*.wav'), ('all', '*.*')]) or v.get())).pack(side='left')
+            ttk.Button(fr, text='Preview', command=lambda k=key: self._preview_sound(k)).pack(side='left')
+        a = ttk.LabelFrame(left, text='Announcer call (character select and results screen)')
+        a.pack(fill='x', pady=3)
+        radio(a, 'call', [('own', 'Own copy of the base\'s (default)'), ('share', 'Share the base\'s'),
+                          ('wav', 'Import WAV')], 'own')
+        wav_row(a, 'call_wav')
+        m = ttk.LabelFrame(left, text='Victory fanfare (results screen; the results music after it is the mode\'s)')
+        m.pack(fill='x', pady=3)
+        radio(m, 'music', [('own', 'Own copy of the base\'s (default)'), ('share', 'Share the base\'s'),
+                           ('wav', 'Import WAV')], 'own')
+        wav_row(m, 'music_wav')
+        k = ttk.LabelFrame(left, text='Kirby\'s copy of the clone')
+        k.pack(fill='x', pady=3)
+        self.x_kirby = tk.BooleanVar(value=True)
+        ttk.Checkbutton(k, text='Kirby copies the clone (its base\'s copy ability)', variable=self.x_kirby).pack(anchor='w')
+        radio(k, 'kirby_hat', [('own', 'Own hat + copy motions (copies of the base\'s)'), ('share', 'The base\'s')], 'own')
+        hf = ttk.Frame(k)
+        hf.pack(fill='x')
+        self.x['kirby_hat_dir'] = tk.StringVar()
+        ttk.Label(hf, text='Import hat model folder:').pack(side='left')
+        ttk.Entry(hf, textvariable=self.x['kirby_hat_dir'], width=28).pack(side='left')
+        ttk.Button(hf, text='Folder...', command=lambda: self.x['kirby_hat_dir'].set(
+            filedialog.askdirectory() or self.x['kirby_hat_dir'].get())).pack(side='left')
+        ttk.Button(hf, text='Show hat', command=self._show_hat).pack(side='left')
+        self.x_hat_info = ttk.Label(k, text='', wraplength=520)
+        self.x_hat_info.pack(anchor='w')
+        lg = ttk.LabelFrame(left, text='Names in every language (empty: the title / title line above)')
+        lg.pack(fill='x', pady=3)
+        self.lang_tree = ttk.Treeview(lg, columns=('title', 'subtitle'), height=5)
+        self.lang_tree.heading('#0', text='language')
+        self.lang_tree.heading('title', text='title')
+        self.lang_tree.heading('subtitle', text='title line (Boxing Ring)')
+        self.lang_tree.column('#0', width=90)
+        self.lang_tree.pack(fill='x')
+        ef = ttk.Frame(lg)
+        ef.pack(fill='x')
+        self.x['lang_title'] = tk.StringVar()
+        self.x['lang_sub'] = tk.StringVar()
+        ttk.Entry(ef, textvariable=self.x['lang_title'], width=22).pack(side='left')
+        ttk.Entry(ef, textvariable=self.x['lang_sub'], width=22).pack(side='left')
+        ttk.Button(ef, text='Set for the selected language', command=self._set_lang).pack(side='left')
+        self.lang_over = {}
+        right = ttk.LabelFrame(t, text='Name plates (chrn_*): the game\'s style; preview of the plate')
+        right.pack(side='left', fill='both', expand=True, padx=6, pady=4)
+        pf = ttk.Frame(right)
+        pf.pack(fill='x')
+        ttk.Label(pf, text='Plate text (empty: the title; a line break: \\n):').grid(row=0, column=0, sticky='w')
+        self.x['plate'] = tk.StringVar()
+        ttk.Entry(pf, textvariable=self.x['plate'], width=30).grid(row=0, column=1)
+        ttk.Label(pf, text='Lines:').grid(row=0, column=2)
+        self.x['plate_lines'] = tk.StringVar(value='auto')
+        ttk.Combobox(pf, textvariable=self.x['plate_lines'], values=['auto', '1', '2'], width=5,
+                     state='readonly').grid(row=0, column=3)
+        self.font_vars = {}
+        for i, (tt, label) in enumerate((('plate', 'Font: name plates'), ('title', 'Font: titles'),
+                                         ('other', 'Font: other text images'))):
+            ttk.Label(pf, text=label).grid(row=1 + i, column=0, sticky='w')
+            v = tk.StringVar(value='bundled')
+            self.font_vars[tt] = v
+            ttk.Combobox(pf, textvariable=v, values=['bundled', 'mincho', 'gothic', 'game'], width=28).grid(
+                row=1 + i, column=1, sticky='w')
+            ttk.Button(pf, text='Choose font file...', command=lambda v=v: v.set(filedialog.askopenfilename(
+                filetypes=[('fonts', '*.ttf *.otf *.ttc'), ('all', '*.*')]) or v.get())).grid(row=1 + i, column=2,
+                                                                                          columnspan=2)
+            v.trace_add('write', lambda *_: self._schedule_plate())
+        self.x['plate'].trace_add('write', lambda *_: self._schedule_plate())
+        self.x['plate_lines'].trace_add('write', lambda *_: self._schedule_plate())
+        self.plate_label = tk.Label(right, background='#404040')
+        self.plate_label.pack(fill='both', expand=True)
+        self.plate_info = ttk.Label(right, text='')
+        self.plate_info.pack(fill='x')
+
+    def _schedule_plate(self):
+        if getattr(self, '_pp', None):
+            self.root.after_cancel(self._pp)
+        self._pp = self.root.after(300, self.plate_preview)
+
+    def _font_choice(self, tt):
+        v = self.font_vars[tt].get().strip()
+        return None if v in ('', 'bundled') else v
+
+    def plate_preview(self):
+        from sm4shclonetool import plates as PL
+        try:
+            text = self.x['plate'].get().replace('\\n', '\n') or self.fv['title'].get() or self.fv['name'].get() \
+                or 'Clone'
+            lines = None if self.x['plate_lines'].get() == 'auto' else int(self.x['plate_lines'].get())
+            dirs = [self.vars['data'].get()] if self.vars['data'].get() else []
+            font = PL.resolve_font(self._font_choice('plate'), 'plate', dirs)
+            from PIL import Image
+            pics = []
+            for st in ('chrn_40', 'chrn_11', 'chrn_12'):
+                style = None
+                base = self.fv['source'].get()
+                if self.session and base:
+                    ui = next((f['ui_name'] for f in R.base_choices(self.session.param_dirs(), self.session.reg)
+                               if f['name'] == base), None)
+                    q = T.find_icon(self.session.ui_dirs(), [st], ui) if ui else None
+                    img = T.decode(q) if q else None
+                    style = PL.plate_style(img) if img is not None else None
+                pics.append(PL.render(text, st, font, None, style, lines)[0])
+            w = max(p.size[0] for p in pics)
+            out = Image.new('RGBA', (w, sum(p.size[1] + 6 for p in pics)), (64, 64, 64, 255))
+            y = 0
+            for p in pics:
+                out.paste(p, (0, y), p)
+                y += p.size[1] + 6
+            self.plate_img = photo(out, (760, 600))
+            self.plate_label.configure(image=self.plate_img)
+            self.plate_info.configure(text='%s; font %s' % (' / '.join(PL.split_lines(text, lines)),
+                                                            os.path.basename(font or '?')))
+        except Exception as e:
+            self.plate_info.configure(text='plate preview: %s' % e)
+
+    def _preview_sound(self, key):
+        from sm4shclonetool import audio as AU
+        p = self.x[key].get()
+        if p and os.path.exists(p):
+            AU.play(p)
+            return
+        if key == 'call_wav' and self.session:
+            from sm4shclonetool import narration as N
+            base = self.fv['source'].get()
+            rec = next((f for f in R.base_choices(self.session.param_dirs(), self.session.reg) if f['name'] == base),
+                       None)
+            if rec:
+                tones = N.call_tones({'ui_id': rec['id'], 'base_ui_id': rec['id']}, self.session.data,
+                                     self.session.pkg_data)
+                if tones:
+                    AU.play(tones[0][1])
+                    return
+        self.say('no sound to preview (choose a WAV, or the data folder has no narration bank for the base)')
+
+    def _show_hat(self):
+        d = self.x['kirby_hat_dir'].get()
+        if d and os.path.isdir(d):
+            fs = [os.path.relpath(os.path.join(r, f), d) for r, _ds, fl in os.walk(d) for f in fl]
+            self.x_hat_info.configure(text='hat folder: %d files: %s' % (len(fs), ', '.join(fs[:8])))
+            return
+        base = self.fv['source'].get()
+        if not (self.session and base and self.session.exe):
+            self.x_hat_info.configure(text='pick a base fighter (and the executable) first')
+            return
+        from sm4shclonetool.rpx import Rpx
+        from sm4shclonetool import fighter as F
+        x = Rpx(self.session.exe)
+        try:
+            bk = R.KINDS.index(next(f['base'] for f in self.session.reg['fighters'] if f['name'] == base)
+                               if any(f['name'] == base for f in self.session.reg['fighters']) else base)
+        except ValueError:
+            return
+        hat = F._rstr(x.r32, x.r32(F.KIRBY_HAT + 4 * bk))
+        body = F._rstr(x.r32, x.r32(F.KIRBY_BODY + 4 * bk))
+        d = os.path.join(self.session.data, 'fighter', 'kirby')
+        self.x_hat_info.configure(text='the base\'s copy: hat fighter/kirby/model/%s/ (%s), motions motion/%sbody/ (%s)'
+                                  % (hat, 'in your data' if hat and os.path.isdir(os.path.join(d, 'model', hat))
+                                     else 'not in your data', body,
+                                     'in your data' if body and os.path.isdir(os.path.join(d, 'motion', body + 'body'))
+                                     else 'not in your data'))
+
+    def _fill_languages(self):
+        from sm4shclonetool import languages as L
+        self.lang_tree.delete(*self.lang_tree.get_children())
+        if not self.session:
+            return
+        for key, _p in L.languages(self.session.data):
+            o = self.lang_over.get(key, {})
+            self.lang_tree.insert('', 'end', iid=key, text=key, values=(o.get('title', ''), o.get('subtitle', '')))
+
+    def _set_lang(self):
+        sel = self.lang_tree.selection()
+        for key in sel:
+            o = {}
+            if self.x['lang_title'].get().strip():
+                o['title'] = self.x['lang_title'].get().strip()
+            if self.x['lang_sub'].get().strip():
+                o['subtitle'] = self.x['lang_sub'].get().strip()
+            self.lang_over[key] = o
+        self._fill_languages()
+
+    def extras_opts(self):
+        o = {'call': self.x['call'].get(), 'music': self.x['music'].get(), 'kirby': self.x_kirby.get(),
+             'kirby_hat_mode': self.x['kirby_hat'].get()}
+        for k in ('call', 'music'):
+            if o[k] == 'wav':
+                if self.x[k + '_wav'].get():
+                    o[k + '_wav'] = self.x[k + '_wav'].get()
+                else:
+                    o[k] = 'own'
+        if self.x['kirby_hat_dir'].get():
+            o['kirby_hat_dir'] = self.x['kirby_hat_dir'].get()
+        if self.x['plate'].get():
+            o['plate_text'] = self.x['plate'].get().replace('\\n', '\n')
+        if self.x['plate_lines'].get() != 'auto':
+            o['plate_lines'] = int(self.x['plate_lines'].get())
+        fonts = {tt: self._font_choice(tt) for tt in self.font_vars if self._font_choice(tt)}
+        if fonts:
+            o['fonts'] = fonts
+        titles = {k: v for k, v in self.lang_over.items() if v and k != 'main'}
+        if titles:
+            o['titles'] = titles
+        return o
+
+    def _voices_tab(self):
+        t = self.vtab
+        top = ttk.Frame(t)
+        top.pack(fill='x', padx=6, pady=4)
+        ttk.Label(top, text='Clone (built in this project):').pack(side='left')
+        self.v_clone = ttk.Combobox(top, width=20, state='readonly')
+        self.v_clone.pack(side='left')
+        self.v_clone.bind('<<ComboboxSelected>>', lambda e: self._fill_voices())
+        ttk.Button(top, text='Refresh', command=self._fill_voices).pack(side='left', padx=4)
+        ttk.Button(top, text='Preview', command=self._voice_play).pack(side='left')
+        ttk.Button(top, text='Replace with WAV...', command=self._voice_replace).pack(side='left', padx=4)
+        ttk.Button(top, text='Import a folder of WAVs (by tone name)...', command=self._voice_folder).pack(side='left')
+        ttk.Label(t, text='Every line of the clone\'s own banks (voice, sounds, cheer, Kirby\'s copy voices). A line the '
+                  'game plays from code by the base\'s id (KO screams, damage, MSC) plays this same tone: the clone\'s '
+                  'banks answer for the base\'s ids. Replacing changes only the clone\'s package files.',
+                  wraplength=1300).pack(fill='x', padx=6)
+        self.v_tree = ttk.Treeview(t, columns=('name', 'bank', 'secs'), height=28)
+        for c, w, h in (('#0', 110, 'category'), ('name', 420, 'tone'), ('bank', 360, 'bank:tone'), ('secs', 70, 's')):
+            self.v_tree.heading(c, text=h)
+            self.v_tree.column(c, width=w)
+        self.v_tree.pack(fill='both', expand=True, padx=6, pady=4)
+        self.v_lines = []
+
+    def _voice_rec(self):
+        name = self.v_clone.get()
+        return next((f for f in (self.session.reg['fighters'] if self.session else []) if f['name'] == name), None)
+
+    def _fill_voices(self):
+        from sm4shclonetool import voices as V
+        if self.session:
+            self.v_clone.configure(values=[f['name'] for f in self.session.reg['fighters']])
+        rec = self._voice_rec()
+        self.v_tree.delete(*self.v_tree.get_children())
+        if not rec:
+            return
+        self.v_lines = sorted(V.lines(rec, self.session.pkg_data), key=lambda x: (x['category'], x['name']))
+        for i, x in enumerate(self.v_lines):
+            self.v_tree.insert('', 'end', iid=str(i), text=x['category'],
+                               values=(x['name'], '%s:%d' % (x['file'], x['tone']), '%.2f' % x['seconds']))
+
+    def _voice_sel(self):
+        sel = self.v_tree.selection()
+        return [self.v_lines[int(i)] for i in sel] if sel else []
+
+    def _voice_play(self):
+        from sm4shclonetool import audio as AU
+        from sm4shclonetool import voices as V
+        for x in self._voice_sel()[:1]:
+            AU.play(V.tone_data(self._voice_rec(), self.session.pkg_data, x['file'], x['tone']))
+
+    def _voice_replace(self):
+        from sm4shclonetool import voices as V
+        sel = self._voice_sel()
+        if not sel:
+            return
+        p = filedialog.askopenfilename(filetypes=[('WAV', '*.wav'), ('all', '*.*')])
+        if p:
+            for x in sel:
+                V.replace(self._voice_rec(), self.session.pkg_data, x['file'], x['tone'], p)
+                self.say('voice %s replaced with %s' % (x['name'], os.path.basename(p)))
+            self._fill_voices()
+
+    def _voice_folder(self):
+        from sm4shclonetool import voices as V
+        rec = self._voice_rec()
+        d = filedialog.askdirectory()
+        if rec and d:
+            for w, f, n in V.import_folder(rec, self.session.pkg_data, d):
+                self.say('voice %s (%s) <- %s' % (n, f, w))
+            self._fill_voices()
 
     def _stage_tab(self):
         t = self.stab
@@ -279,7 +582,10 @@ class App:
         self.say(txt)
         self._fill_fighters()
         self._fill_stages()
+        self._fill_languages()
+        self._fill_voices()
         self._schedule_preview()
+        self._schedule_plate()
 
     def _fill_fighters(self):
         for w in self.f_grid.winfo_children():
@@ -409,6 +715,7 @@ class App:
                'customs': self.customs.get(), 'fanfare': self.fanfare.get(), 'random': self.random.get(),
                'own_sound': self.own_sound.get(), 'own_effects': self.own_effects.get(),
                'weapons': [self.weapons.get(i) for i in self.weapons.curselection()]}
+        opt.update(self.extras_opts())
         if v['subtitle']:
             opt['subtitle'] = v['subtitle']
         for k in ('series', 'costumes', 'sort_key', 'kind', 'ui_id'):
@@ -569,7 +876,7 @@ def main():
     for k in ('data', 'ui', 'exe', 'out'):
         ap.add_argument('--' + k)
     ap.add_argument('--screenshot')
-    ap.add_argument('--tab', default='fighters')
+    ap.add_argument('--tab', default='fighters', help='fighters, extras, voices or stages')
     ap.add_argument('--fighter', help='with --screenshot: SOURCE:NAME to fill in')
     ap.add_argument('--stage', help='with --screenshot: SOURCE:NAME to fill in')
     a = ap.parse_args()
@@ -589,9 +896,13 @@ def main():
                 app.sv['name'].set(name)
                 app.sv['page'].set(pg[0] if pg else '1')
                 app.sv['cosmetic'].set('0x%X' % (0x38 + len(app.session.reg['stages'])))
-            if a.tab == 'stages':
-                app.nb.select(1)
+            tabs = {'fighters': 0, 'extras': 1, 'voices': 2, 'stages': 3}
+            app.nb.select(tabs.get(a.tab, 0))
+            if a.tab == 'voices' and app.session and app.session.reg['fighters']:
+                app.v_clone.set(app.session.reg['fighters'][-1]['name'])
+                app._fill_voices()
             app.preview()
+            app.plate_preview()
             app.check()
             root.after(1500, grab)
 

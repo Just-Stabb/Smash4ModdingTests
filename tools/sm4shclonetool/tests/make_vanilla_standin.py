@@ -194,10 +194,36 @@ OTHERS = [
     (0x02D1FDD8, 'lwzx r5, r10, r8'),         # the stage path function (its siblings at 0x02D1FDEC / 0x02D1FE00)
     (0x02A53C68, 'bge 0x02A53C94'),           # the save-record getter: index >= count -> the null record
     (0x02A53C6C, 'mulli r0, r4, 0x50'),       # (then lwz r12, 0(r3); add r4, r12, r0 as at 0x02A53C70)
+    # Kirby's copy sites (1.3's clone_extras.py hooks them; the modded executable has another mod's stubs there): the
+    # game's instructions, as the research documented them (the stubs replay them) and the code around them uses them
+    (0x02EFCDA4, 'mr r28, r6'),               # copy_grant: the copied kind (r28 tested against 8 / 0x3A next)
+    (0x030C46A8, 'mr r28, r4'),               # copy resources: the helper's kind (cmpwi r28, -1 / 8, cmplwi 0x3A)
+    (0x030C5254, 'mr r16, r4'),               # the loader's (cmpwi r16, -1 / 8, cmplwi 0x3A)
+    (0x030C5BD0, 'mr r23, r4'),               # the release's (cmpwi r23, -1, cmplwi 0x3A)
+    (0x030C4710, 'lbz r10, 0(r7)'),           # the motion folder name's first byte (cmpwi r10, 0 next)
+    (0x030C4830, 'lwzx r7, r23, r21'),        # the hat name (r23 = the hat table 0x1041A7B8, r21 = kind * 4)
+    (0x02EFCEE0, 'stw r28, 0x290(r7)'),       # copy_grant: the copy kind into Kirby's int 0x100000A4
 ]
 
 
+def restore_others(x):
+    n = 0
+    for a, t in STAGE + OTHERS:
+        w = K.one(a, t)
+        if x.r32(a) != w:
+            x.w32(a, w)
+            n += 1
+    return n
+
+
 def main():
+    if sys.argv[1] == '--others':                      # an existing stand-in: only the OTHERS / STAGE words again
+        x = Rpx(sys.argv[2])
+        n = restore_others(x)
+        if n:
+            x.save(sys.argv[2])
+        print('stand-in %s: %d words restored' % (sys.argv[2], n))
+        return
     src, dst = sys.argv[1:3]
     x = Rpx(src)
     tables = restore_weapon_switches(x)
