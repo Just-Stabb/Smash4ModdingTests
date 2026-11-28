@@ -204,6 +204,7 @@ def build(rec, data_dir, ui_dir, out_data, reg, portraits=None, log=print, renum
         logs += customs(rec, data_dir, ui_dir, out_data, ui_dirs)
     if rec.get('fanfare', True):
         logs += sound_config(rec, data_dir, out_data, reg, csb_names)
+    logs += result_panel(rec, data_dir, out_data)
     if rec.get('own_sound'):
         from . import sound
         sound.own_banks(rec, out_data, data_dir, logs.append)
@@ -368,3 +369,24 @@ def csb_merge(recs, nval, want):
         else:
             done.append((i, 'kept (the file\'s own)'))
     return recs, done
+
+
+def result_panel(rec, data_dir, out_data):
+    """the results screen's loser-panel framing (param/ui/result_param.bin, keyed by the model name): the source's
+    entry under the clone's name (its win poses are the source's copies)"""
+    import result_param as RP
+    p = R.first([os.path.join(out_data, 'param'), os.path.join(data_dir, 'param')], 'ui/result_param.bin')
+    if not p:
+        return ['no param/ui/result_param.bin: the clone\'s loser panel is drawn empty on the results screen']
+    d = open(p, 'rb').read()
+    names = [e[0] for e in RP.entries(d)[1]]
+    if rec['name'] in names:
+        return ['param/ui/result_param.bin already has %s' % rec['name']]
+    if rec['source'] not in names:
+        return ['param/ui/result_param.bin has no entry for %s to copy' % rec['source']]
+    new = RP.add(d, rec['name'], rec['source'])
+    dst = os.path.join(out_data, 'param', 'ui', 'result_param.bin')
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    open(dst, 'wb').write(new)
+    assert [e[0] for e in RP.entries(new)[1]] == names + [rec['name']]
+    return ['param/ui/result_param.bin: entry %s = %s\'s (loser panel camera, win frames)' % (rec['name'], rec['source'])]

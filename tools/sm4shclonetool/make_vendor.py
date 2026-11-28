@@ -58,6 +58,8 @@ HEADERS = {
             '(from Sammi Husky\'s SALT, MIT).',
     'nut': 'Smash 4 Wii U textures (.nut, NTWU / NTP3): read a texture to RGBA and write one back. Header layout and '
            'the GX2 (de)swizzle follow Smash Forge\'s NUT.cs / GTX.cs (MIT; GTX.cs ports AboodXD\'s GTX Extractor).',
+    'result_param': 'param/ui/result_param.bin: the results scene\'s per-fighter framing (the loser panel camera eye / '
+                    'target and the win poses\' frames), keyed by the fighter\'s model (folder) name: read and add entries.',
     'chara_layout': 'Lumen (.lm) files: read the character select\'s face-layout sprite (frames num_NNN, places '
                     'face_NNN) and simulate its display list.',
 }
@@ -72,6 +74,7 @@ DROP = {
                      'ODD_X0', 'EVEN_X0', 'DX'},
     'add_fighter': {'main', 'load_records', 'KINDS'}, 'add_stage': {'main'},
     'nut': {'main'},
+    'result_param': {'main'},
 }
 
 # source edits before parsing: (module, old, new); old must be found
