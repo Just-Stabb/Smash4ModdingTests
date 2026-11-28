@@ -567,6 +567,7 @@ class App:
         ttk.Button(btn, text='Check', command=self.check).pack(side='left')
         ttk.Button(btn, text='Build', command=self.build).pack(side='left', padx=4)
         ttk.Button(btn, text='Open output', command=self.open_output).pack(side='left')
+        ttk.Button(btn, text='Repair package', command=self.repair).pack(side='left', padx=4)
         self.log = tk.Text(f, height=8, wrap='word', background='#10141c', foreground='#d8e0f0')
         self.log.pack(side='left', fill='both', expand=True, padx=6)
 
@@ -881,7 +882,33 @@ class App:
                 self.pending_f, self.pending_s = [], []
                 self.root.after(0, lambda: (self.plan_list.delete(0, 'end'), self.reload()))
             except Exception as e:
-                self.say('BUILD FAILED: %s' % e)
+                self.say('BUILD FAILED (the package was put back as it was before this build): %s' % e)
+                self.say(traceback.format_exc())
+        threading.Thread(target=run, daemon=True).start()
+
+    def repair(self):
+        """rebuilds the package from the project (a package a stopped build left with a clone it doesn't list)"""
+        if not self.session:
+            return
+        problems = self.session.repair_problems()
+        if problems:
+            for p in problems:
+                self.say('ERROR: ' + p)
+            return
+        if not messagebox.askyesno('Repair package', 'Rebuild the package from the project\'s %d clone(s)?\n\n'
+                                   'The shared files are made again from the data folder; each clone\'s own files '
+                                   '(portraits, sounds, its folders, your edits to them) are kept; anything that '
+                                   'belongs to no clone of the project is dropped. If it fails, the package is left as '
+                                   'it is now.' % (len(self.session.reg['fighters']) + len(self.session.reg['stages']))):
+            return
+
+        def run():
+            try:
+                self.session.repair()
+                self.say('=== Repaired %s: you can build new clones again' % self.session.out)
+                self.root.after(0, self.reload)
+            except Exception as e:
+                self.say('REPAIR FAILED (the package is as it was): %s' % e)
                 self.say(traceback.format_exc())
         threading.Thread(target=run, daemon=True).start()
 

@@ -698,3 +698,44 @@ at `0x04B78000` (a fixed address outside the module's sections is refused), henc
 Not covered: the research tests (`kind_expand_test`, `weapon_expand_test`, `base_effects_test`, `stage_slot_test`) on
 a relocated image (they read the patched rpx's file; their parts are relocated by the same checked table), and of
 course the console and Cemu themselves.
+
+## 1.5.1: builds are all or nothing; Repair package
+
+**The bug.** `Session.build` wrote into the package as it went (`fighter_param.bin` kind, `ui_character_db.bin` id,
+`melee.msbt` labels, the other databases, files) and wrote the project file last. A build that raised part way left
+those entries while the registry did not list the clone; `fighter.validate` reads the package first, so every later
+clone (which takes the next kind / id, the same ones) was refused.
+
+**Transactions** (`sm4shclonetool/rollback.py`). `Session._transaction` wraps the build's writes (and the repair):
+- the output folder is mirrored into `.sm4shclonetool_rollback/tree/` with hard links (`os.link`; `copy2` where it
+  fails) and a manifest of each file's size / mtime_ns; `state.json` says when the mirror is complete;
+- while it runs, `builtins.open` / `io.open` are wrapped: a write-mode open (`w`, `a`, `x`, `+`) of a file inside the
+  folder that still has another link is first replaced by its own copy (`copy2` + `os.replace`), so the snapshot's
+  inode keeps the old data. `os.replace`, `os.remove`, `shutil.rmtree` only unlink names, and new files have one link.
+  (`shutil.copyfile`, `pathlib.write_bytes`, PIL and `wave` all go through `open`; the tool has no `os.open` /
+  `mmap` / numpy `tofile` writes);
+- on an exception every top-level entry is moved back from the mirror (an entry already moved is skipped, so an
+  interrupted restore can run again) and entries the build added are removed; a snapshot file whose size / mtime
+  changed (written by something that bypassed `open`) is reported. On success the mirror is deleted;
+- `Session.__init__` calls `rollback.recover`: a mirror left by a killed build is restored; a mirror whose state is
+  not complete (killed while mirroring, nothing written yet) is just removed.
+
+**Repair** (`Session.repair`, `cli.py repair`, the GUI's "Repair package"). Moves `INSTALL_TO_data*` and
+`Sm4shCommand_names.txt` aside, then builds every registered clone again from the data folder in the batches the
+project's `builds` list recorded (a fighter placed with `after` / `sort_key` gets its `renumber` shift recomputed
+against the database before its batch, as `plan` did; `renumber` is dropped after each batch, as the next build found
+the records, so the executable's marker is the same). Then, for each file of the old package: a file the data folder
+has (a shared file) keeps the rebuilt version; any other file (a clone's own) is moved back over the rebuilt one, or
+kept if the rebuild didn't make it, unless it names a clone the project doesn't list (`_stray_names`: melee.msbt
+labels and fighter / stage folders in neither the data folder nor the registry, and their `snd_se_<Cap>` banks'
+Cap names), which is dropped. `repair_problems` refuses a data folder that already has kinds >= 0x41 / ids 59-199
+(a package installed in it) and lists missing WAVs / fonts / hat folders the records name.
+
+**Tests** (`tests/rollback_test.py`, run by `run_all`): the transaction alone (truncate, `r+`, append, `copyfile`
+over, pathlib, rmtree, new folders, `os.replace`; success; killed; killed while restoring; killed while mirroring);
+on the fixtures with the game's v288 executable: a fighter build failing after its parameters / labels / portraits /
+folder and one failing at the executable leave the package byte for byte as before (and the project file, and the next
+kind 0x42 / id 60 free); a build killed with `os._exit` is undone when the project is opened; a package broken the 1.5
+way (a failed build without the transaction) is refused with the Repair hint, repaired to exactly the files of the two
+good builds (the custom PNG portrait and an edit to a clone's own file kept, the unfinished clone's 8 files dropped),
+and then takes the same clone; a repair failing part way leaves the package as it was.

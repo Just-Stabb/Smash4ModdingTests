@@ -366,6 +366,7 @@ python cli.py voices --data DATA --out OUT --name wolf --replace snd_vc_Wolf_app
 python cli.py plate  --text "Fox Clone" --set chrn_40 --png plate.png
 python cli.py build  --data DATA --out OUT --exe EXE --fighter fox:wolf --exe-output aroma      (or cemu, all, rpx,cemu)
 python cli.py patchinfo --patch OUT/INSTALL_TO_sd/wiiu/sm4shclonetool/0005000010144F00.patch --exe cross_f.rpx
+python cli.py repair --data DATA --out OUT --exe EXE      (1.5.1: rebuild a package a stopped build left broken)
 ```
 
 `python cli.py --help` lists every key.
@@ -385,6 +386,25 @@ The window shows the current counts and limits under the plan ("Fighter clones: 
 | stage-select ids | 0x38-0xC7 | ids up to 0xC7 are found by position |
 | code space | grows with the clones (about 6.5 KB a fighter, more with articles) | from `0x04B78000`; past `0x04BB8000` the executable's code region is enlarged (as other code mods do; tested on Cemu by such mods, not on a console) |
 | effect banks in one match | 8 | the game's bank slot table; a clone whose base isn't in the match uses two. A per-match limit, not a clone count |
+
+## When a build fails (1.5.1)
+
+A build is all or nothing. Before it writes anything, the project folder is snapshotted
+(`<output>/.sm4shclonetool_rollback/`, hard links: no extra disk space; a plain copy on a drive without hard links). If
+any step fails, the folder is put back exactly as it was: no labels, parameter rows, kind or character id of the
+unfinished clone are left, and the same clone (or any other) can be built again. If the tool is closed or crashes in
+the middle of a build, the folder is put back the next time the project is opened (the log says so).
+
+**Repair package** (button beside Build; `cli.py repair --data ... --exe ... --out ...`) fixes a package an earlier
+version left broken (before 1.5.1 a failed build left the new clone's kind / id / labels behind, and every later clone
+was refused as "already in ui_character_db.bin" / "fighter_param.bin already has kind" / "melee.msbt already has
+labels"; Check now points to Repair when it sees that). It rebuilds the package from the project's clone list: the
+shared files (parameters, labels, databases, sound tables, Kirby's files, the executable outputs) are made again from
+the data folder; each listed clone's own files (its fighter / stage folders, portraits, icons, plates, sounds, and any
+edits you made to them in the package) are kept as they were; the unfinished clone's files are dropped (the log lists
+them). Data must be your data folder without this project's package installed, and the WAVs / fonts the clones were
+built with must still be where they were (Repair says which are missing). If the repair itself fails, the package is
+left as it was. Edits made by hand to the package's shared files (e.g. `fighter_param.bin`) are not kept.
 
 ## What is not confirmed in game
 

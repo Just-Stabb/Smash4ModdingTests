@@ -218,6 +218,7 @@ def main():
     own_checks(pkg, data, reg, e3)
     extras_checks(work, out, pkg, data, reg, e3, standin, fx)
     outputs_checks(work, data, reg, e3, standin)
+    rollback_checks(work, data, standin, fx)
     st_icon = os.path.join(pkg, 'ui', 'replace', 'stage', 'stage_10', 'stage_10_CloneField.nut')
     check('stage icon stage_10_CloneField.nut: the imported PNG, a new texture id',
           [T.decode(st_icon) is not None, T.texture_ids(T.read_nut(st_icon))[0][1] != 0x28000999], [True, True])
@@ -474,6 +475,18 @@ def extras_checks(work, out, pkg, data, reg, e3, standin, fx):
           'others the title' % ', '.join(sorted(miss)), (miss, fr.text('MmelCharaN_01_Foxclone'),
                                                          fr.text('MmelCharaN_01_Zssclone')),
           ({k: [] for k in miss}, 'Renard Clone', 'Zero Clone'))
+
+
+def rollback_checks(work, data, standin, fx):
+    """1.5.1: a build that stops part way leaves nothing behind; repairing a package a stopped build broke"""
+    o = os.path.join(work, 'rollback_test.txt')
+    rc = run([sys.executable, os.path.join(HERE, 'rollback_test.py'), os.path.join(work, 'rollback'), data, standin,
+              os.path.join(fx, 'png')], o)
+    text = open(o).read()
+    check('rollback_test (a failed / killed build leaves the package as it was; repair of a broken 1.5 package): '
+          '%d ok, 0 failed (exit %d)' % (text.count('\nok ') + text.startswith('ok '), rc),
+          [x for x in text.splitlines() if x.startswith(('FAIL', 'Traceback'))] + ([] if rc == 0 else ['exit %d' % rc]),
+          [])
 
 
 def outputs_checks(work, data, reg, e3, standin):

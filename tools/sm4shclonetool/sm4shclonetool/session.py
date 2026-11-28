@@ -22,9 +22,13 @@ from . import exe as X
 from . import fighter as F
 from . import preview as P
 from . import roster as R
+from . import rollback as RB
 from . import stage as S
 from .rpx import Rpx
 
+REPAIR_OLD = '.sm4shclonetool_repair_old'
+LEFTOVERS = ('is already in ui_character_db.bin', 'fighter_param.bin already has kind',
+             'melee.msbt already has labels', 'is already in ui_stage_db.bin', 'melee.msbt already has')
 CSB_TABLE = 0x10340F8C           # commonsoundtable.csb names (62, the executable's)
 
 
@@ -60,6 +64,7 @@ class Session:
         self.out = os.path.abspath(out)
         self.force = force
         self.log = log
+        RB.recover(self.out, log)            # a build cut off (tool closed / crashed): the folder as it was before it
         self.proj = R.load_project(self.out)
         self.exe_info = None
         self.reg = self._registry()
@@ -168,6 +173,11 @@ class Session:
             reg['stages'].append(rec)
             recs.append(('stage', rec, spec))
             files += self._stage_files(rec)
+        if any(k in e for e in errors for k in LEFTOVERS):
+            errors.append('the package has the kind / character id / labels of a clone the project does not list: '
+                          'leftovers of a build that did not finish (before 1.5.1), or Data points at a folder the '
+                          'package is installed in. Use "Repair package" (cli.py repair) to rebuild the package from '
+                          'the project; the clones you have keep their files')
         if fighters:
             lim = self.limits(reg)
             if lim['css_entries'] > lim['css_capacity']:
@@ -257,21 +267,42 @@ class Session:
             raise X.ExeError('\n'.join(errors))
         for n in notes:
             self.log(n)
+        return self._transaction(lambda: self._write(reg, recs, portraits, icons))
+
+    def _transaction(self, work):
+        """work() runs with the project folder snapshotted: if it raises, the folder is put back as it was (nothing
+        of an unfinished clone is left: no labels, parameter rows, kind or character id) and the error is raised"""
+        try:
+            with RB.Transaction(self.out, self.log):
+                return work()
+        except BaseException:
+            self.proj = R.load_project(self.out)
+            self.reg = self._registry()
+            raise
+
+    def _exe_reader(self):
+        if not self.exe:
+            return None, None
+        x = Rpx(self.exe)
+        return [x.cstr(x.r32(CSB_TABLE + 4 * i)) for i in range(62)], x.r32
+
+    def _build_rec(self, what, rec, reg, portraits, icons, csb_names, read):
+        self.log('--- %s %s (from %s)' % (what, rec['name'], rec['source']))
+        if what == 'fighter':
+            F.build(rec, self.data, self.ui, self.pkg_data, reg, (portraits or {}).get(rec['name']), self.log,
+                    rec.get('renumber', ()), csb_names, read)
+        else:
+            S.build(rec, self.data, self.ui, self.pkg_data, reg, (icons or {}).get(rec['name']), self.log)
+
+    def _write(self, reg, recs, portraits, icons):
         os.makedirs(self.pkg_data, exist_ok=True)
-        csb_names = None
-        read = None
-        if self.exe:
-            x = Rpx(self.exe)
-            csb_names = [x.cstr(x.r32(CSB_TABLE + 4 * i)) for i in range(62)]
-            read = x.r32
+        csb_names, read = self._exe_reader()
         for what, rec, spec in recs:
-            self.log('--- %s %s (from %s)' % (what, rec['name'], rec['source']))
-            if what == 'fighter':
-                F.build(rec, self.data, self.ui, self.pkg_data, reg, (portraits or {}).get(rec['name']), self.log,
-                        rec.get('renumber', ()), csb_names, read)
-            else:
-                S.build(rec, self.data, self.ui, self.pkg_data, reg, (icons or {}).get(rec['name']), self.log)
+            self._build_rec(what, rec, reg, portraits, icons, csb_names, read)
         summary = {'clones': [r['name'] for _w, r, _s in recs]}
+        return self._finish(reg, summary, {'added': summary['clones']})
+
+    def _finish(self, reg, summary, build_entry):
         if self.exe:
             summary.update(self._build_exe(reg))
         removed = self._prune()
@@ -282,14 +313,162 @@ class Session:
         self.reg = reg
         self.proj['registry'] = reg
         self.proj['settings'] = {'data': self.data, 'ui': self.ui, 'exe': self.exe, 'out': self.out}
-        self.proj.setdefault('builds', []).append({'when': datetime.datetime.now().isoformat(timespec='seconds'),
-                                                   'tool': VERSION, 'added': summary['clones']})
+        entry = {'when': datetime.datetime.now().isoformat(timespec='seconds'), 'tool': VERSION}
+        entry.update(build_entry)
+        self.proj.setdefault('builds', []).append(entry)
         R.save_project(self.out, self.proj)
         self.write_readme()
         summary['checks'] = self.check_package()
         for line in summary['checks']:
             self.log('check: ' + line)
         return summary
+
+    # ------------------------------------------------------------ repair
+    def repair_problems(self, reg=None):
+        """[reasons the package can't be rebuilt from the project] (empty: repair() can run)"""
+        reg = reg or self.reg
+        out = []
+        if not reg['fighters'] and not reg['stages']:
+            out.append('the project has no clones (nothing to rebuild: delete the INSTALL_TO_* folders to start over)')
+        dp = [os.path.join(self.data, 'param')]
+        g, _ = R.load_db(dp, 'fighter/fighter_param.bin')
+        if g is not None and any(e[0][1] >= 0x41 for e in g[2]):
+            out.append('the data folder already has new fighter kinds (a package is installed in it): set Data to '
+                       'your data folder without this project\'s package')
+        g, _ = R.load_db(dp, 'ui/ui_character_db.bin')
+        if g is not None and any(59 <= e[0][1] < 200 for e in g[2]):
+            out.append('the data folder already has new character ids (a package is installed in it): set Data to '
+                       'your data folder without this project\'s package')
+        missing = sorted({p for f in reg['fighters'] for p in _paths_in(f) if not os.path.exists(p)})
+        out += ['%s (a file the clones were built with) is missing: put it back, or remove it from the clone in '
+                'the project file' % p for p in missing]
+        return out
+
+    def _batches(self, reg):
+        """the clones in the builds that added them (the character select order depends on which clones were
+        placed in one build): [[('fighter' | 'stage', rec)]]"""
+        names = {f['name']: ('fighter', f) for f in reg['fighters']}
+        names.update({s['name']: ('stage', s) for s in reg['stages']})
+        order = [f['name'] for f in reg['fighters']] + [s['name'] for s in reg['stages']]
+        seen, batches = set(), []
+        for b in self.proj.get('builds', []):
+            got = [n for n in b.get('added', []) if n in names and n not in seen]
+            if got:
+                seen |= set(got)
+                batches.append(sorted(got, key=order.index))
+        batches += [[n] for n in order if n not in seen]
+        return [[names[n] for n in b] for b in batches]
+
+    def _stray_names(self, old, reg):
+        """the names (internal / Cap / UI) of clones the broken package has and the project doesn't list: from
+        melee.msbt's labels and the fighter / stage folders that are in neither the data folder nor the project"""
+        import re
+        import msbt
+        mine = {x.lower() for f in reg['fighters'] for x in (f['name'], f['cap'], f['ui_name'])}
+        mine |= {st['name'].lower() for st in reg['stages']}
+        out = set()
+        pkg = os.path.join(old, 'INSTALL_TO_data')
+        mp = os.path.join(pkg, 'ui', 'message', 'melee.msbt')
+        dp = R.first([self.ui, os.path.join(self.data, 'ui')], 'message/melee.msbt')
+        if os.path.exists(mp):
+            have = set(msbt.Msbt(open(dp, 'rb').read()).labels) if dp else set()
+            for lab in msbt.Msbt(open(mp, 'rb').read()).labels:
+                if lab in have:
+                    continue
+                m = re.match(r'^MmelChara\w*?_\d+_(\w+)$', lab) or re.match(r'^MmelStage[A-Z]_(\w+)$', lab)
+                if m and m.group(1).lower() not in mine:
+                    out.add(m.group(1))
+        for sub in ('fighter', os.path.join('stage', 'melee'), os.path.join('stage', 'end')):
+            d = os.path.join(pkg, sub)
+            if not os.path.isdir(d):
+                continue
+            for n in os.listdir(d):
+                if n.lower() in mine or os.path.exists(os.path.join(self.data, sub, n)):
+                    continue
+                out.add(n)
+                snd = os.path.join(d, n, 'sound')
+                if os.path.isdir(snd):
+                    for f in os.listdir(snd):
+                        m = re.match(r'^snd_(?:se|vc)_(\w+?)(?:_\w+)?\.nus3bank$', f)
+                        if m and m.group(1).lower() not in mine:
+                            out.add(m.group(1))
+        return out
+
+    def repair(self):
+        """rebuilds the package from the project's clone list, for a package left broken (e.g. by a build that
+        stopped part way before 1.5.1: the next kind / character id / labels taken by a clone the project doesn't
+        list). The shared files (parameters, labels, databases, sound tables, Kirby's files) are made again from
+        the data folder; each listed clone's own files (its fighter / stage folders, portraits, icons, plates,
+        sounds, also any edits made to them in the package) are kept as they were; what belongs to no listed clone
+        is dropped. Returns a summary (rebuilt / kept / dropped files)."""
+        reg = copy.deepcopy(self.reg)
+        problems = self.repair_problems(reg)
+        if problems:
+            raise X.ExeError('\n'.join(problems))
+        wk = X.weapon_kinds(reg)
+        for f in reg['fighters']:
+            f['weapon_kinds'] = wk.get(f['name'], f.get('weapon_kinds', {}))
+        return self._transaction(lambda: self._repair(reg))
+
+    def _repair(self, reg):
+        from . import languages as L
+        from .kirby_copy import NAMES_FILE
+        old = os.path.join(self.out, REPAIR_OLD)
+        if os.path.exists(old):
+            shutil.rmtree(old)
+        os.makedirs(old)
+        moved = [n for n in os.listdir(self.out) if n.startswith('INSTALL_TO_data') or n == NAMES_FILE]
+        for n in moved:
+            os.replace(os.path.join(self.out, n), os.path.join(old, n))
+        self.log('=== repair: rebuilding the package of %d fighter / %d stage clone(s) from the project'
+                 % (len(reg['fighters']), len(reg['stages'])))
+        os.makedirs(self.pkg_data, exist_ok=True)
+        csb_names, read = self._exe_reader()
+        for batch in self._batches(reg):
+            for what, rec in batch:               # the shifts the build placing them computed (before the batch)
+                if what == 'fighter' and rec.get('sort'):
+                    g, _ = R.load_db(self.param_dirs(), 'ui/ui_character_db.bin')
+                    rec['renumber'] = [e[0][1] for e in g[2] if e[0][1] < 200 and e[0][1] != rec['ui_id']
+                                       and e[13][1] >= rec['sort'][0]]
+            for what, rec in batch:
+                self._build_rec(what, rec, reg, None, None, csb_names, read)
+            for what, rec in batch:
+                rec.pop('renumber', None)             # (as the next build found them)
+        # each clone's own files (new files, not the data folder's) as they were in the package
+        roots = {'INSTALL_TO_data': self.data}
+        for k, d in L.region_dirs(self.data).items():
+            roots[os.path.basename(L.out_root(self.pkg_data, k))] = d
+        strays = self._stray_names(old, reg)
+        if strays:
+            self.log('repair: the unfinished clone(s) in the package: %s' % ', '.join(sorted(strays)))
+        kept, dropped, rebuilt = [], [], []
+        for top in moved:
+            src_top = os.path.join(old, top)
+            if not os.path.isdir(src_top):
+                continue
+            for root, _d, fs in os.walk(src_top):
+                for fn in fs:
+                    p = os.path.join(root, fn)
+                    rel = os.path.relpath(p, src_top)
+                    dst = os.path.join(self.out, top, rel)
+                    data_root = roots.get(top)
+                    shared = data_root is not None and os.path.exists(os.path.join(data_root, rel))
+                    if shared:
+                        if os.path.exists(dst) and not _same(p, dst):
+                            rebuilt.append(os.path.join(top, rel))
+                    elif os.path.exists(dst) or not _names_any(os.path.join(top, rel), strays):
+                        os.makedirs(os.path.dirname(dst), exist_ok=True)
+                        os.replace(p, dst)               # a listed clone's own file (or one of yours), as it was
+                        kept.append(os.path.join(top, rel))
+                    else:
+                        dropped.append(os.path.join(top, rel))
+        shutil.rmtree(old)
+        for x in dropped:
+            self.log('dropped (no clone of the project has it): %s' % x)
+        self.log('repair: shared files made again (%d differed from the broken package), %d clone file(s) kept, %d '
+                 'dropped' % (len(rebuilt), len(kept), len(dropped)))
+        summary = {'clones': [], 'repair': {'rebuilt': rebuilt, 'kept': len(kept), 'dropped': dropped}}
+        return self._finish(reg, summary, {'added': [], 'repair': True})
 
     def _build_exe(self, reg):
         """the executable outputs (exe_output): INSTALL_TO_code/cross_f.rpx, INSTALL_TO_sd/ (the Aroma plugin and its
@@ -470,6 +649,32 @@ class Session:
 
     def sss(self, reg=None, highlight=(), out=None):
         return P.render_sss(self.param_dirs(), self.ui_dirs(), reg or self.reg, highlight, out)
+
+
+def _names_any(rel, names):
+    """rel names one of names (a whole folder name, or a part of a file name between _ . - )"""
+    import re
+    parts = {x.lower() for x in re.split(r'[\\/_.\-]', rel) if x}
+    return any(n.lower() in parts for n in names)
+
+
+def _paths_in(rec):
+    """the files a clone record names (WAVs, fonts, a Kirby hat folder): absolute paths"""
+    out = []
+
+    def go(v):
+        if isinstance(v, str):
+            if os.path.isabs(v):
+                out.append(v)
+        elif isinstance(v, dict):
+            for x in v.values():
+                go(x)
+        elif isinstance(v, (list, tuple)):
+            for x in v:
+                go(x)
+    for k in ('call_wav', 'music_wav', 'voices', 'fonts', 'kirby_hat_dir'):
+        go(rec.get(k))
+    return out
 
 
 def _same(a, b):
