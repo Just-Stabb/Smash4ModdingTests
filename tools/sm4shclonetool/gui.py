@@ -120,6 +120,9 @@ class App:
         for label in EXE_OUTPUT_LABELS.values():
             ttk.Radiobutton(o, text=label, value=label, variable=self.exe_output,
                             command=self._exe_output_changed).pack(side='left', padx=6)
+        ttk.Button(o, text='Rebuild executable outputs', command=self.rebuild_outputs).pack(side='left', padx=6)
+        self.outputs_state = ttk.Label(o, text='', foreground='#205080')
+        self.outputs_state.pack(side='left', padx=6)
         f.columnconfigure(1, weight=1)
 
     def exe_output_key(self):
@@ -132,6 +135,43 @@ class App:
         if self.session:
             from sm4shclonetool.session import exe_outputs
             self.session.exe_output = exe_outputs(self.exe_output_key())
+        self._show_outputs()
+
+    def _show_outputs(self):
+        """which executable outputs the package has (each build makes them again, with the chosen one)"""
+        if not getattr(self, 'outputs_state', None):
+            return
+        if not self.session:
+            self.outputs_state.config(text='')
+            return
+        from sm4shclonetool.session import EXE_OUTPUT_NAMES
+        have = self.session.present_outputs()
+        self.outputs_state.config(text='package has: %s' % (', '.join(EXE_OUTPUT_NAMES[o] for o in have) or 'none yet'))
+
+    def rebuild_outputs(self):
+        """the project's clones written again for the chosen executable output, adding no clone"""
+        if not self.session:
+            return
+        s = self.session
+        if not s.reg['fighters'] and not s.reg['stages']:
+            self.say('Rebuild executable outputs: the project has no clones yet (build one first)')
+            return
+        if not s.exe:
+            self.say('Rebuild executable outputs: choose the executable (cross_f.rpx) first')
+            return
+
+        def run():
+            try:
+                s.rebuild_outputs()
+                from sm4shclonetool.session import EXE_OUTPUT_NAMES
+                self.say('=== Executable outputs made for %d clone(s): %s' % (
+                    len(s.reg['fighters']) + len(s.reg['stages']),
+                    ', '.join(EXE_OUTPUT_NAMES[o] for o in s.present_outputs())))
+                self.root.after(0, self.reload)
+            except Exception as e:
+                self.say('REBUILD FAILED (the package was put back as it was): %s' % e)
+                self.say(traceback.format_exc())
+        threading.Thread(target=run, daemon=True).start()
 
     def _browse(self, k, is_dir):
         p = filedialog.askdirectory() if is_dir else filedialog.askopenfilename(
@@ -806,6 +846,7 @@ class App:
             txt = 'No executable: data files only'
         self.exe_state.configure(text=txt)
         self.say(txt)
+        self._show_outputs()
         self._fill_fighters()
         self._fill_stages()
         self._fill_languages()
@@ -871,13 +912,29 @@ class App:
         self.fv['costumes'].set(str(f['costumes']))
         self.fv['series'].set(str(f['series']))
         self.fv['after'].set(f['ui_name'])
-        if not self.fv['name'].get():
-            self.fv['name'].set(f['name'] + 'clone')
+        # the names follow the base picked (1.5.2: reselecting a base no longer keeps the first base's names)
+        name = self._free_name(f['name'])
+        self.fv['name'].set(name)
+        for k in ('cap', 'ui_name', 'title'):
+            self.fv[k].set(name.capitalize())
+        self._last_auto = name.capitalize()
         self.weapons.delete(0, 'end')
         for a in s.articles(f['name']):
             self.weapons.insert('end', a)
         if self.independent.get():
             self.weapons.select_set(0, 'end')
+
+    def _free_name(self, base):
+        """<base>clone (<base>clone2, 3, ... if taken), at most 16 characters"""
+        taken = {f['name'] for f in self.session.reg['fighters']} | {f['name'] for f in self.pending_f}
+        taken |= {c.lower() for f in self.session.reg['fighters'] for c in (f['cap'], f['ui_name'])}
+        taken |= {c.lower() for f in self.pending_f for c in (f.get('cap', ''), f.get('ui_name', ''))}
+        for n in range(1, 100):
+            suffix = 'clone' + (str(n) if n > 1 else '')
+            name = base[:16 - len(suffix)] + suffix
+            if name not in taken:
+                return name
+        return base[:11] + 'clone'
 
     def _preset(self):
         on = self.independent.get()
@@ -1147,6 +1204,8 @@ def main():
     ap.add_argument('--import-target', help='with --screenshot --tab import: the fighter to show')
     ap.add_argument('--fighter', help='with --screenshot: SOURCE:NAME to fill in')
     ap.add_argument('--stage', help='with --screenshot: SOURCE:NAME to fill in')
+    ap.add_argument('--repick', action='append', help='with --screenshot: base fighters to pick after --fighter, in order '
+                    '(the names each pick leaves are printed)')
     a = ap.parse_args()
     root = tk.Tk()
     app = App(root, a)
@@ -1158,6 +1217,11 @@ def main():
                 f = next(x for x in R.base_choices(app.session.param_dirs(), app.session.reg) if x['name'] == src)
                 app._pick_fighter(f)
                 app.fv['name'].set(name)
+            app.repicks = []
+            for src in a.repick or []:
+                f = next(x for x in R.base_choices(app.session.param_dirs(), app.session.reg) if x['name'] == src)
+                app._pick_fighter(f)
+                app.repicks.append({k: app.fv[k].get() for k in ('source', 'name', 'cap', 'ui_name', 'title')})
             if a.stage:
                 src, name, *pg = a.stage.split(':')
                 app.sv['source'].set(src)
@@ -1194,7 +1258,8 @@ def main():
                     'css': {k: v for k, v in getattr(app, 'css_slots', {}).items() if k != 'slot'},
                     'limits': app.limits_label.cget('text'), 'plate': app.plate_info.cget('text'),
                     'voices': len(app.v_lines), 'languages': len(app.lang_tree.get_children()),
-                    'imported': len(app.i_done.get_children()), 'effect_entries': app.i_elist.size()}
+                    'imported': len(app.i_done.get_children()), 'effect_entries': app.i_elist.size(),
+                    'repicks': getattr(app, 'repicks', []), 'outputs': app.outputs_state.cget('text')}
             print(json.dumps(info))
             root.destroy()
         root.after(500, shoot)

@@ -745,6 +745,29 @@ way (a failed build without the transaction) is refused with the Repair hint, re
 good builds (the custom PNG portrait and an edit to a clone's own file kept, the unfinished clone's 8 files dropped),
 and then takes the same clone; a repair failing part way leaves the package as it was.
 
+## 1.5.2: switching the executable output; names follow the base picked
+
+**Outputs.** Before, `_build_exe` removed every output not chosen (`shutil.rmtree` of `INSTALL_TO_code` / `_sd` /
+`_cemu`), and the GUI's Build always took the clone in the form, so a built project couldn't be written for another
+output without adding a clone; with the package's own `INSTALL_TO_code/cross_f.rpx` as the executable read, choosing
+the Aroma output deleted that file before reading it (1.5.1's transaction then put it back and the build failed).
+Now `Session.outputs()` = the chosen outputs + `present_outputs()` (those the package has); `_build_exe`, `plan`
+and `check_package` use it and nothing is removed. `Session.rebuild_outputs()` = `build([], [])` (refused with no
+clones or no executable), the GUI's "Rebuild executable outputs" and `cli.py outputs`. The patch made from a patched
+rpx is the one made from the game's (`vanilla_view`): the same sites, cave bytes and cave relocations; only the Aroma
+file's `meta.source_sha1` (the input file's SHA-1, which the plugin does not read) records which file it came from.
+
+**Names.** `App._pick_fighter` used to set the internal name only when it was empty, so picking another base kept
+the first base's names. It now sets the internal name to `_free_name(base)` (`<base>clone`, `clone2`... when a clone
+or a planned clone has the name, Cap or UI name; cut to 16 characters) and the Cap name, UI name and title to its
+capitalised form.
+
+**Tests.** `tests/outputs_test.py` (run by `run_all`): SD card -> Cemu -> rpx on a built project (the other outputs
+kept and the same, the data and the clones untouched, the rpx = one built straight from the game's executable), the
+package's own rpx as the executable for the SD output (kept; the patch the same as from the game's), then a clone added
+with only the rpx chosen (the rpx, every Aroma file and the Cemu pack made for both clones). `gui_test`: fox, typed
+name, then falco / fox (foxclone taken: foxclone2) / metaknight, and the "package has" label.
+
 ## 2.0: the importer, article cloning
 
 The importer adds animations (motion kinds), effects, sounds and articles to a fighter, vanilla or a clone; article

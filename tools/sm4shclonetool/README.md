@@ -46,14 +46,16 @@ your full UI every tile is its portrait. More in `screenshots/`: the stage tab, 
 | Current cross_f.rpx | the executable to patch; the label on the right says what it is (vanilla / patched by Sm4shCloneTool, with its clones / not vanilla) |
 | Output / project folder | where the package and `sm4shclonetool_project.json` go; use the same folder for every clone of one project |
 | Patch anyway | for an executable that is not vanilla because another mod uses the code space after the game's: the clone code then goes after that mod's code (see "The executable") |
-| Executable output (1.5) | what the executable patch is written as: **patched cross_f.rpx** (default), **Aroma plugin patch file** (a Wii U with Aroma runs the game's own executable; the plugin patches it in memory), **Cemu graphic pack** (Cemu patches the game's own executable in memory), or all three. See "Without a modified executable" |
+| Executable output (1.5) | what the executable patch is written as: **patched cross_f.rpx** (default), **Aroma plugin patch file** (a Wii U with Aroma runs the game's own executable; the plugin patches it in memory), **Cemu graphic pack** (Cemu patches the game's own executable in memory), or all three. See "Without a modified executable". **Rebuild executable outputs** (beside it, 1.5.2) writes the project's clones again for the chosen output without adding a clone; the package keeps the outputs it has (see "Switching the executable output") |
 
 Press **Load / refresh** after changing a folder.
 
 ### Fighters tab
 
 Click a **base fighter** in the roster (icons from your UI's `chr_10`, else `chr_00` / `stock_90` / `chr_13`; a `*`
-marks your clones, which can be bases too). Then fill in:
+marks your clones, which can be bases too). Each click fills the internal name, Cap name, UI name and title from that
+base (`<base>clone`, or `<base>clone2`, `3`, ... when taken; 1.5.2: picking another base replaces the names of the one
+picked before). Then fill in:
 
 | field | what | rules |
 |---|---|---|
@@ -271,6 +273,17 @@ region, which the Wii U maps read-only for the game (Cemu does not enforce it): 
 likely fault at the first such write (e.g. the character select's random pick); not tested. The Aroma plugin keeps
 the whole code space in its own memory instead. Use the patched rpx with Cemu, the Aroma plugin on a console.
 
+### Switching the executable output (1.5.2)
+
+A project built for one way of running the clones can be built for another at any time: e.g. built for the SD card
+(Aroma) and later for Cemu, or as a patched `cross_f.rpx`. Choose the output and press **Rebuild executable outputs**
+(`python cli.py outputs --data DATA --out OUT --exe EXE --exe-output cemu`); the project's clones are written again for
+it, no clone is added. The package **keeps** the outputs it already has, and every build (a new clone too) makes each
+of them again, so none is left with an older set of clones. To drop one, delete its `INSTALL_TO_code`, `INSTALL_TO_sd`
+or `INSTALL_TO_cemu` folder. The executable read can be the game's own or the one this tool patched (also the package's
+own `INSTALL_TO_code/cross_f.rpx`, which a switch no longer deletes); the outputs are the same either way. Install only
+one of them in the game.
+
 ## What a clone owns, and what it shares
 
 A fully independent clone owns: its fighter kind and character id; every database row (fighter / AI / amiibo /
@@ -473,6 +486,7 @@ python cli.py plate  --text "Fox Clone" --set chrn_40 --png plate.png
 python cli.py build  --data DATA --out OUT --exe EXE --fighter fox:wolf --exe-output aroma      (or cemu, all, rpx,cemu)
 python cli.py patchinfo --patch OUT/INSTALL_TO_sd/wiiu/sm4shclonetool/0005000010144F00.patch --exe cross_f.rpx
 python cli.py repair --data DATA --out OUT --exe EXE      (1.5.1: rebuild a package a stopped build left broken)
+python cli.py outputs --data DATA --out OUT --exe EXE --exe-output cemu   (1.5.2: the clones for another output)
 python cli.py import --data DATA --out OUT --exe EXE --motion szerosuit:NewSpin=spin.omo,copy=Attack11,part=lhand@spin_lhand.omo
 python cli.py import --data DATA --out OUT --exe EXE --effect fox:szerosuit:5 --effect-file wolf:other.010d0000.efc:3,name=PtcWolfBurst
 python cli.py import --data DATA --out OUT --exe EXE --sound wolf:howl.wav,alias=Howl,bank=vc --sound fox:click.idsp

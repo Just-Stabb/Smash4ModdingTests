@@ -222,6 +222,7 @@ def main():
     extras_checks(work, out, pkg, data, reg, e3, standin, fx)
     outputs_checks(work, data, reg, e3, standin)
     rollback_checks(work, data, standin, fx)
+    switch_checks(work, data, standin)
     st_icon = os.path.join(pkg, 'ui', 'replace', 'stage', 'stage_10', 'stage_10_CloneField.nut')
     check('stage icon stage_10_CloneField.nut: the imported PNG, a new texture id',
           [T.decode(st_icon) is not None, T.texture_ids(T.read_nut(st_icon))[0][1] != 0x28000999], [True, True])
@@ -499,6 +500,17 @@ def rollback_checks(work, data, standin, fx):
           [])
 
 
+def switch_checks(work, data, standin):
+    """1.5.2: a built project rebuilt for another executable output (SD card -> Cemu -> rpx, from the package's own rpx)"""
+    o = os.path.join(work, 'outputs_test.txt')
+    rc = run([sys.executable, os.path.join(HERE, 'outputs_test.py'), os.path.join(work, 'switch'), data, standin], o)
+    text = open(o).read()
+    check('outputs_test (a built project written again for the SD card / Cemu / a patched rpx; outputs kept and '
+          'refreshed): %d ok, 0 failed (exit %d)' % (text.count('\nok ') + text.startswith('ok '), rc),
+          [x for x in text.splitlines() if x.startswith(('FAIL', 'Traceback'))] + ([] if rc == 0 else ['exit %d' % rc]),
+          [])
+
+
 def outputs_checks(work, data, reg, e3, standin):
     """1.5: the executable outputs: the Aroma plugin's patch file and the Cemu graphic pack (patchset_test.py), and
     their packaging (a build with --exe-output all, then aroma only)"""
@@ -546,8 +558,9 @@ def outputs_checks(work, data, reg, e3, standin):
           [True, True, True])
     s = Session(data, out2, e3, None, log=lambda _s: None, exe_output='aroma')
     s.build([])
-    check('--exe-output aroma: the executable output is the Aroma files only (INSTALL_TO_code / INSTALL_TO_cemu removed)',
-          sorted(d for d in os.listdir(out2) if d.startswith('INSTALL_TO_')), ['INSTALL_TO_data', 'INSTALL_TO_sd'])
+    check('--exe-output aroma on a package with all three: none removed (1.5.2: the outputs a package has are kept and '
+          'made again)', sorted(d for d in os.listdir(out2) if d.startswith('INSTALL_TO_')),
+          ['INSTALL_TO_cemu', 'INSTALL_TO_code', 'INSTALL_TO_data', 'INSTALL_TO_sd'])
 
 
 def kirby_script_checks(pkg, fx, fs, out):
