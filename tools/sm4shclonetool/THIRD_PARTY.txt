@@ -32,6 +32,14 @@ Research and formats
   CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
   THE SOFTWARE.
 
+The Aroma plugin (aroma/, 1.5)
+- Its source (aroma/src, the Makefile) is the tool's own (MIT). The built plugin, aroma/sm4shclonetool.wps, links:
+  the Wii U Plugin System WUPS (wiiu-env/WiiUPluginSystem, GPL-3.0), Aroma's libkernel and libnotifications
+  (wiiu-env; see their repositories for their licences), wut (devkitPro, zlib licence) and devkitPPC's newlib (BSD-style
+  licences). Because it links WUPS the .wps is distributed under the GPL-3.0's terms; its complete source is in aroma/.
+- Cemu's graphic-pack patch format and module checksum were followed from Cemu's source (MPL-2.0); no Cemu code is
+  included.
+
 Fonts (fonts/, see fonts/FONTS_NOTICE.txt)
 - DFMincho-SU and DFGothic-SU, (c) DynaLab Inc. 1997 (as stated in the font files). Included for non-commercial use;
   this tool is free and non-commercial. Not covered by the tool's MIT licence.

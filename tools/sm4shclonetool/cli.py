@@ -33,6 +33,12 @@ CLONES:
        keys: title, series, page (1 / 2), cosmetic, random (0: never picked by the random stage select)
   --stage-icon NAME:SET=PNG
   --force                                 patch an executable that is not vanilla (another mod's code space) anyway
+  --exe-output rpx|aroma|cemu|all         what the executable patch is written as (a comma list for several):
+       rpx (default): INSTALL_TO_code/cross_f.rpx, the patched executable;
+       aroma: INSTALL_TO_sd/ for a Wii U with Aroma: the plugin (wiiu/environments/aroma/plugins/sm4shclonetool.wps)
+              and the patch file it reads (wiiu/sm4shclonetool/<title id>.patch); the game's own cross_f.rpx stays;
+       cemu: INSTALL_TO_cemu/graphicPacks/Sm4shCloneTool_Clones/ (rules.txt, patches.txt), a Cemu graphic pack
+  python cli.py patchinfo --patch FILE.patch   what an Aroma patch file holds (and its checks)
 """
 import argparse
 import json
@@ -136,7 +142,10 @@ def parse_clones(a, s):
 def main():
     ap = argparse.ArgumentParser(description='Sm4shCloneTool %s' % VERSION, epilog=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('command', choices=['info', 'roster', 'check', 'build', 'css', 'sss', 'voices', 'plate'])
+    ap.add_argument('command', choices=['info', 'roster', 'check', 'build', 'css', 'sss', 'voices', 'plate',
+                                        'patchinfo'])
+    ap.add_argument('--exe-output', default='rpx')
+    ap.add_argument('--patch')
     ap.add_argument('--name')
     ap.add_argument('--replace', action='append')
     ap.add_argument('--import-folder')
@@ -171,6 +180,21 @@ def main():
         for st in info['registry']['stages']:
             print('  stage clone %s cosmetic 0x%X from %s' % (st['name'], st['cosmetic'], st['source']))
         return
+    if a.command == 'patchinfo':
+        from sm4shclonetool import patchset as PS
+        ps = PS.read_plugin(open(a.patch, 'rb').read())
+        print('%s: Sm4shCloneTool %s patch for v%d (titles %s): %d game words, a %d byte cave (%d relocated words); '
+              'fighters %s, stages %s' % (a.patch, ps.meta.get('tool'), ps.version, ', '.join('%016X' % t for t in ps.titles),
+                                          len(ps.sites), len(ps.blob), len(ps.cave_relocs),
+                                          ', '.join(ps.meta.get('fighters', [])) or '-',
+                                          ', '.join(ps.meta.get('stages', [])) or '-'))
+        if a.exe:
+            from sm4shclonetool.rpx import Rpx
+            x = Rpx(a.exe)
+            bad = [s_['addr'] for s_ in ps.sites if x.r32(s_['addr']) != s_['orig']]
+            print('%s: %s' % (a.exe, 'every original word matches (the plugin would patch it)' if not bad else
+                              '%d word(s) differ (first 0x%08X): the plugin would refuse' % (len(bad), bad[0])))
+        return
     if a.command == 'plate':
         from sm4shclonetool import plates as PL
         font = PL.resolve_font(a.font, 'plate', [a.data] if a.data else [])
@@ -178,7 +202,8 @@ def main():
         img.save(a.png or 'plate.png')
         print('%s: %s (%s), font %s' % (a.png or 'plate.png', ' / '.join(lines), a.set, font))
         return
-    s = Session(a.data, a.out or os.path.join(os.getcwd(), 'sm4shclonetool_out'), a.exe, a.ui, a.force)
+    s = Session(a.data, a.out or os.path.join(os.getcwd(), 'sm4shclonetool_out'), a.exe, a.ui, a.force,
+                exe_output=a.exe_output)
     if a.command == 'voices':
         from sm4shclonetool import voices as V
         rec = next((f for f in s.reg['fighters'] if f['name'] == a.name), None)

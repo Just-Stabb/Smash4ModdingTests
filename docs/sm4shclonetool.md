@@ -24,7 +24,9 @@ tools/sm4shclonetool/
     voices.py, audio.py          (1.3) every voice line by category, WAV replace; nus3bank tones, IDSP, WAV, preview
     plates.py, languages.py      (1.3) name plates in the game's style (fonts/), names in every region's melee.msbt
     kirby_copy.py                (1.4) Kirby's own copy scripts for a clone (motion.mtable entries, script copies, names file)
+    patchset.py, ppcflow.py      (1.5) the patch as data: relocatable export, the Aroma patch file, the Cemu graphic pack
     session.py                   folders, registry, plan (Check), build (the package), post-build checks
+  aroma/                         (1.5) the Aroma plugin: source, Makefile, the built sm4shclonetool.wps
   tests/                         repository-only: fixtures, the vanilla stand-in, run_all.py, repo_test.py
   make_vendor.py                 regenerates vendor/ (the tool's adapted copies of the research modules)
   make_package.py                the standalone zip
@@ -547,3 +549,152 @@ peer is never told of a fighter id it doesn't have, for every clone id (1.3 anno
   specializer, whose statics are shared exactly as between two players of the base (a vanilla ditto). The tool's own
   globals: `res_kind` (the Kirby loader's, set per helper call, the loader runs players one after another), KTAB (per
   Kirby, by int array). None found that changes behaviour; not seen in game.
+
+## 1.5: the executable patch as data (Aroma plugin, Cemu graphic pack)
+
+The patched rpx ("route 1") needs the creator's players to install a modified `cross_f.rpx`. 1.5 adds two outputs that
+patch the game's own executable in memory instead (`Session(exe_output=...)`, `cli.py --exe-output rpx|aroma|cemu|all`,
+the window's "Executable output"): an Aroma plugin with a per-project patch file, and a Cemu graphic pack. The patched
+rpx itself is unchanged (the same generators, byte for byte; only the marker's `tool` field says 1.5).
+
+### Files
+
+```
+sm4shclonetool/patchset.py   export (relocation classification, veneers), apply (the plugin's algorithm in Python),
+                             the plugin file (plugin_bytes / read_plugin), Cemu (cemu_patches / cemu_rules / cemu_hash)
+sm4shclonetool/ppcflow.py    PowerPC register reads / writes (decode) and a forward liveness check (dead_at)
+aroma/                       the plugin: src/patch_core.c (parse / check / apply, no Wii U calls), src/main.c (WUPS
+                             hooks, MCP, KernelCopyData, notifications), src/cave.S (the cave buffer in .text),
+                             Makefile, README.md (install, the file format, what is confirmed), sm4shclonetool.wps
+exe.generate(view, base, reg) the generators run at any base (exe.build = generate + the rpx writing, unchanged)
+tests/patchset_test.py, tests/plugin_host.c   the checks below
+```
+
+### What the patched rpx changes beyond code words, and what the in-memory loaders do instead
+
+| the patched rpx | why | Aroma plugin | Cemu graphic pack |
+|---|---|---|---|
+| `.text` grown from `0x04B77E1C` to the code space's end (at least `0x04BB8000`; the section's zlib size prefix and its compressed size) | room for the cave after the game's code | nothing can grow a loaded section: the cave goes into the plugin's own memory (a 1 MB + 64 KB block of its `.text`, `cave.S`), relocated | the cave goes into a Cemu code cave (Cemu allocates it, `codeCaveSize`), relocated |
+| the RPL file info's `textSize` (+4) raised past `0x2BB8670` when the cave passes `0x04BB8670` (about 30+ fighters) | the loader maps the text region the file asks for | not needed (no part of the patch is in the game's region past its code); the limit is the plugin's buffer (`CAVE_KB`, 1024 KB: 40 fighters + 8 stages need 381 KB) | not needed; Cemu's cave area is 4 MB for every pack |
+| relocations at patched words moved to a dummy word in the marker block (`r_offset`; 124 for run_all's registry: HA16 / LO16 against the game's own sections) | so the loader does not write the original back over a patched word | not needed: the plugin writes after the loader. Its "original" check reads the loaded words; every relocation at a patched word resolves to the file's own word (the main executable loads at its link addresses; checked for all 124: `R_PPC_ADDR16_HA` / `LO` against `.text` / `.data` / `.rodata` symbols, the result = the file's word), so the file's originals are the loaded ones | the same: Cemu applies graphic packs after the module is loaded and relocated |
+| the marker block at `0x04B78000` (registry, originals, moved relocations, zlib JSON) | incremental, idempotent re-patching | the patch file carries the originals (and a JSON summary: tool version, clones, the source's SHA-1); nothing in memory | the originals are not needed (Cemu matches the module checksum) |
+| the CRC section, recompressed sections, the file's layout (`rpx_compact`) | a valid RPX | file only | file only |
+| the cave's run-time data (the random pools, KTAB / knext / res_kind, the new characters' records) in the code region | (Cemu does not protect code) | in the plugin's memory, which the game can write (assumed, see below) | in Cemu's code cave (writable in Cemu) |
+
+No data section, `.bss` size or import changes: every game word the patch writes is in `.text` (`0x021E6E30`-`0x033EC060`
+for run_all's registry).
+
+**The patched rpx on a console** therefore has two problems the tests can't show (they run in unicorn, which maps
+everything writable, as Cemu does): the cave's run-time data sits in the code region, which Cafe OS maps read-only for
+the game (the first write, e.g. the random pick's pool, would fault); and, past about 30 fighters, the raised text
+region. Neither was tried on a console. The plugin avoids both.
+
+### Making the patch relocatable (`patchset.export`)
+
+The generators (`kind_expand`, `weapon_expand`, `base_effects_cave`, `base_customs_cave`, `stage_slot_cave`,
+`clone_extras`, `random_select`) all take their part's address from `exe.configure(base)`. `export` runs them at the
+tool's base `L = 0x04B78000` and at `L + 0x10000`, `L + 0x2000` and `L + 0x20000` (4 generations, about 35 s), on the
+input's vanilla view, and requires the same set of written addresses (game words by address, cave words by offset).
+Every word that differs between the builds is classified by how it differs:
+
+| kind | +0x10000 | +0x2000 | where |
+|---|---|---|---|
+| ADDR32 | +0x10000 | +0x2000 | cave data (251 words for run_all's registry); none in the game |
+| HA16 / HI16 | +1 in the low half | +0 / +1 | `lis` / `addis` (67 in the cave, 67 in the game) |
+| LO16 | 0 | +0x2000 in the low half | `addi` / `addic` / `ori` / a load's displacement (68 / 67) |
+| REL24 game -> cave | the branch +0x10000 | +0x2000 | the hooks (39) |
+| REL24 cave -> game | the branch -0x10000 | -0x2000 | calls / jumps back into the game (72) |
+
+Anything else fails the export (a word that would need another kind of fix-up). Then the table is checked against the
+generators: applied with delta +0x20000 it must give the `L + 0x20000` build word for word, and the full targets
+(below) must give the `L + 0x2000` build; every unclassified word must be equal in all four builds. Data words that
+look like branches (strings, hashes with opcode 18) are left alone because they don't change.
+
+**Full targets** (for Cemu, which places the cave at any 256-aligned address): every HA16 is paired with the LO16
+words that use its register before it is redefined (`ppcflow.decode`), giving the address it builds; a LO16 without a
+high half here is known modulo 0x10000, all it needs. A high half shared by low halves in different 256-byte blocks
+would break at some Cemu address; none occurs (checked, `multi`).
+
+**Veneers.** From the plugin's memory (under `0x02000000`) or Cemu's (`0x01800000` up) the game's code past
+`0x03800000` is out of a branch's reach, so every cave -> game branch is replaced by a branch to a veneer appended to
+the cave: `lis rN, t@h / ori rN, rN, t@l / mtctr rN / bctr`. It clobbers rN and ctr, so `ppcflow.dead_at` proves both
+dead at the target: every path from there (followed through branches, into the cave's own hooks, with calls ending
+the volatile registers and returns ending r0 / r5-r12 / ctr) writes them before reading them, on the patched image.
+For a call (`bl`), the registers a callee leaves undefined anyway (r0 / r11 / r12, ctr) must be dead after the call
+in the cave. r12 is preferred, r11 next (`0x03127994`, the SETUP hook's return, and `0x02EA8D50` / `0x02EA8D54` read
+r12). An address without a free register fails the export. The 41 veneers of run_all's registry (63 for 40 + 8
+clones) all found one. `ppcflow.decode` was checked against capstone's operands on 46,000 of the game's instructions
+(paired-single opcodes left out: capstone decodes them as VSX).
+
+**Game -> cave branches** become absolute (`ba` / `bla`): the plugin's and Cemu's caves are below `0x02000000`, which
+an absolute branch reaches from anywhere. HA16 hooks (`lis` / `addic` pairs, the jump tables' bases) move with the
+cave.
+
+### The plugin's placement and file
+
+The plugin puts the cave at `base = L (mod 0x10000)` in its buffer: then delta is a multiple of 0x10000, LO16 words
+don't change, ADDR32 += delta, HA16 += delta >> 16, REL24 hooks become absolute. The file (format 1, `aroma/README.md`)
+holds the game words (address, original, new at `L`, kind), the cave relocations (offset | kind << 28), the cave as at
+`L` with its veneers, the title ids (`0005000010144F00`, `0005000010145000`, `0005000010110E00`), the game version (288)
+and a CRC-32. The tool writes one file under each title id's name (`INSTALL_TO_sd/wiiu/sm4shclonetool/`).
+
+The plugin (`ON_APPLICATION_START`, Smash 4 only): reads the file, checks it and the update's version
+(`MCP_GetTitleInfo(0005000E-...)`), checks every original word, computes every new word (a hook that can't reach the
+cave stops it), zeroes and fills the cave, relocates it, flushes it (DC flush / IC invalidate), then writes the game's
+words with `KernelCopyData` (physical addresses from `OSEffectiveToPhysical`; the game's code is read-only to
+applications) and flushes each. Nothing of the game is written before every check passes.
+
+Where the cave lives: the plugin's own `.text` (`cave.S`, zeros, 1 MB + 64 KB: the 64 KB to place it at `L` mod
+0x10000). `.text` because that memory is certainly executable (the plugin's own code runs from it); it must also be
+writable (the game writes the cave's run-time data) and below `0x02000000` (the absolute branches). Aroma loads WUMS
+modules and plugins into its module area under `0x01000000` (as far as known), mapped readable / writable / executable;
+the plugin checks the address at run time and refuses past `0x02000000`, but cannot test the permissions without
+risking a fault. If the plugin's `.text` turns out not to be writable from the game, the cave's data part has to move
+to a writable block (the relocation table already tells data from code: ADDR32 / HA16 targets; not built).
+
+### Cemu (`cemu_patches`, `cemu_rules`)
+
+`patches.txt` in the Cemuhook format, which Cemu's `ParseCemuhookPatchesTxtInternal` reads (Cemu prefers `patch_*.asm`
+files when a pack has any; this pack has none): one group `[Sm4shCloneTool_v288]`, `moduleMatches`, `codeCaveSize`
+(informational: Cemu takes the cave's size from its highest cave-relative address), `_cave = 0x00000000`, then one
+`0xADDR = .int EXPR` line per word: cave words at their cave-relative offsets (an address up to 8 MB is relative to the
+cave in Cemu's `_relocateAddress`), game words at their addresses (inside the module's sections). Expressions use only
+`+`, numbers, `_cave` and the functions `ha()` / `lo()` (Cemu's `ExpressionParser` with the patch resolver's function
+callback; not the `@ha` suffixes, whose meaning changed in Cemu 2.7). Every word a generator wrote is written (zeros
+too: Cemu's cave memory may hold an earlier session's data), padding is not. `rules.txt`: `[Definition]`, the three
+title ids, `path = "Super Smash Bros. for Wii U/Mods/Sm4shCloneTool_Clones"`, version 6.
+
+`moduleMatches` is Cemu's module checksum (`RPLModule::patchCRC`, `RPLLoader_BeginCemuhookCRC` in Cemu's rpl.cpp):
+CRC-32 over `\x7FRPX`, the section count and the symtab / strtab / shstrtab indices (little-endian ints), then per
+section its name offset, type, flags, address, decompressed size and alignment (little-endian words) and its
+decompressed data. For the v288 file as Nintendo ships it: `0x63FAA900` (`patchset.V288_CEMU_HASH`); a vanilla input
+with another checksum (e.g. a decompressed copy) is listed too.
+
+Cemu's format can express everything the patch needs: words at fixed module addresses, a relocated cave, symbolic
+32-bit values and high / low halves of cave addresses. What it can't do is grow the module's sections or keep the cave
+at `0x04B78000` (a fixed address outside the module's sections is refused), hence the relocation.
+
+### Tests (`tests/patchset_test.py`, in run_all; `many_clones_test.py`)
+
+- the patch set from the vanilla rpx = the one from the patched rpx (its vanilla view); its game words = the marker's;
+- applied at `L` without veneers: the patched rpx's memory image byte for byte (every section, but the marker block);
+  the same for 40 fighters + 8 stages (`many_clones_test.py`);
+- the plugin file reads back; a damaged one is refused; its cave with the veneered branches made direct = the rpx's;
+  every veneer is lis / ori / mtctr / bctr to its target;
+- relocated as the plugin places it (`0x00908000`) and as Cemu would (`0x01800100`, evaluated from patches.txt): every
+  hook branch absolute to the same offset, and `extras_test.py` (37 checks) and `random_select_test.py` (14) run on the
+  relocated image through an overlay (`X.find_marker` / `Rpx` monkeypatched; the extras labels shifted), plus the
+  custom-move map `0x02A4D40C` for ids 0-63, all as on the patched rpx;
+- the plugin's `patch_core.c` compiled for the PC (`plugin_host.c`, `-Wall -Wextra -Werror`): the same game words (in
+  order) and cave bytes as `patchset.apply` for two buffers; it refuses a changed word (rc 6), a damaged file (1),
+  another title (3), update v272 (4), a buffer past `0x02000000` (5), writing nothing;
+- patches.txt / rules.txt through a strict parser written from Cemu's (`cemu_parse`: groups, `moduleMatches`, symbol
+  lines relocated as Cemu does, `.int` with one expression, cave-relative or in-section addresses, no word written
+  twice); evaluated at `0x00908000` it equals the plugin's image;
+- `ppcflow.decode` against capstone (above).
+- run_all: a build with `--exe-output all` (the rpx = build 3's image, three identical patch files that read back, the
+  plugin, the Cemu files, the README's three install paths), then `aroma` only (the other outputs removed).
+
+Not covered: the research tests (`kind_expand_test`, `weapon_expand_test`, `base_effects_test`, `stage_slot_test`) on
+a relocated image (they read the patched rpx's file; their parts are relocated by the same checked table), and of
+course the console and Cemu themselves.

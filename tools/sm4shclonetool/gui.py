@@ -31,6 +31,8 @@ TITLE = 'Sm4shCloneTool %s' % VERSION
 SETTINGS = os.path.join(os.path.expanduser('~'), '.sm4shclonetool.json')
 ICON = 48
 ICON_SETS = ['chr_10', 'chr_00', 'stock_90', 'chr_13']
+EXE_OUTPUT_LABELS = {'rpx': 'patched cross_f.rpx (default)', 'aroma': 'Aroma plugin patch file (Wii U)',
+                     'cemu': 'Cemu graphic pack', 'all': 'all three'}
 
 
 def photo(img, size=None):
@@ -70,6 +72,9 @@ class App:
         st = load_settings()
         self.vars = {k: tk.StringVar(value=getattr(args, k, None) or st.get(k, '')) for k in ('data', 'ui', 'exe', 'out')}
         self.force = tk.BooleanVar(value=False)
+        self.exe_output = tk.StringVar(value=EXE_OUTPUT_LABELS.get(getattr(args, 'exe_output', None) or
+                                                                   st.get('exe_output') or 'rpx',
+                                                                   EXE_OUTPUT_LABELS['rpx']))
         self._folders()
         nb = ttk.Notebook(root)
         nb.pack(fill='both', expand=True, padx=6, pady=4)
@@ -105,7 +110,24 @@ class App:
         ttk.Button(f, text='Load / refresh', command=self.reload).grid(row=1, column=3, padx=8)
         self.exe_state = ttk.Label(f, text='', foreground='#205080')
         self.exe_state.grid(row=2, column=3, rowspan=2, padx=8, sticky='w')
+        o = ttk.Frame(f)
+        o.grid(row=4, column=0, columnspan=4, sticky='w', padx=4, pady=(2, 0))
+        ttk.Label(o, text='Executable output:').pack(side='left')
+        for label in EXE_OUTPUT_LABELS.values():
+            ttk.Radiobutton(o, text=label, value=label, variable=self.exe_output,
+                            command=self._exe_output_changed).pack(side='left', padx=6)
         f.columnconfigure(1, weight=1)
+
+    def exe_output_key(self):
+        return next((k for k, v in EXE_OUTPUT_LABELS.items() if v == self.exe_output.get()), 'rpx')
+
+    def _exe_output_changed(self):
+        st = load_settings()
+        st['exe_output'] = self.exe_output_key()
+        save_settings(st)
+        if self.session:
+            from sm4shclonetool.session import exe_outputs
+            self.session.exe_output = exe_outputs(self.exe_output_key())
 
     def _browse(self, k, is_dir):
         p = filedialog.askdirectory() if is_dir else filedialog.askopenfilename(
@@ -564,12 +586,14 @@ class App:
 
     def reload(self):
         s = {k: v.get() for k, v in self.vars.items()}
+        s['exe_output'] = self.exe_output_key()
         save_settings(s)
         if not s['data'] or not s['out']:
             messagebox.showinfo(TITLE, 'Choose the game data folder and an output folder first.')
             return
         try:
-            self.session = Session(s['data'], s['out'], s['exe'] or None, s['ui'] or None, self.force.get(), self.say)
+            self.session = Session(s['data'], s['out'], s['exe'] or None, s['ui'] or None, self.force.get(), self.say,
+                                   exe_output=s['exe_output'])
         except Exception as e:
             self.say('ERROR: %s' % e)
             return
@@ -878,6 +902,7 @@ def main():
     ap = argparse.ArgumentParser()
     for k in ('data', 'ui', 'exe', 'out'):
         ap.add_argument('--' + k)
+    ap.add_argument('--exe-output', dest='exe_output', help='rpx (default), aroma, cemu or all')
     ap.add_argument('--screenshot')
     ap.add_argument('--tab', default='fighters', help='fighters, extras, voices or stages')
     ap.add_argument('--fighter', help='with --screenshot: SOURCE:NAME to fill in')
@@ -919,6 +944,7 @@ def main():
             w, h = root.winfo_width(), root.winfo_height()
             ImageGrab.grab(bbox=(x, y, x + w, y + h), xdisplay=os.environ.get('DISPLAY')).save(a.screenshot)
             info = {'title': root.title(), 'fighters': app.f_count, 'fighter_icons': app.f_icon_count,
+                    'exe_output': list(app.session.exe_output) if app.session else None,
                     'css': {k: v for k, v in getattr(app, 'css_slots', {}).items() if k != 'slot'},
                     'limits': app.limits_label.cget('text'), 'plate': app.plate_info.cget('text'),
                     'voices': len(app.v_lines), 'languages': len(app.lang_tree.get_children())}

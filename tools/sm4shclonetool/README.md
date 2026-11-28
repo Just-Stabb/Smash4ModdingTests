@@ -26,7 +26,7 @@ your full UI every tile is its portrait. More in `screenshots/`: the stage tab, 
 
 ## Install
 
-1. Unzip `Sm4shCloneTool_v1_4.zip` anywhere.
+1. Unzip `Sm4shCloneTool_v1_5.zip` anywhere.
 2. Double-click **setup.bat** once (installs numpy and Pillow with pip).
 3. Double-click **run.bat** (the window) or use **run_cli.bat** (the command line).
 
@@ -41,6 +41,7 @@ your full UI every tile is its portrait. More in `screenshots/`: the stage tab, 
 | Current cross_f.rpx | the executable to patch; the label on the right says what it is (vanilla / patched by Sm4shCloneTool, with its clones / not vanilla) |
 | Output / project folder | where the package and `sm4shclonetool_project.json` go; use the same folder for every clone of one project |
 | Patch anyway | for an executable that is not vanilla because another mod uses the code space after the game's: the clone code then goes after that mod's code (see "The executable") |
+| Executable output (1.5) | what the executable patch is written as: **patched cross_f.rpx** (default), **Aroma plugin patch file** (a Wii U with Aroma runs the game's own executable; the plugin patches it in memory), **Cemu graphic pack** (Cemu patches the game's own executable in memory), or all three. See "Without a modified executable" |
 
 Press **Load / refresh** after changing a folder.
 
@@ -152,7 +153,9 @@ The output folder holds:
 
 ```
 INSTALL_TO_data/     every file the project's clones add or change, laid out like data/
-INSTALL_TO_code/     cross_f.rpx (when an executable was given)
+INSTALL_TO_code/     cross_f.rpx (output "patched cross_f.rpx", the default)
+INSTALL_TO_sd/       (1.5, output "Aroma") for the Wii U's SD card: the plugin and this project's patch file
+INSTALL_TO_cemu/     (1.5, output "Cemu") graphicPacks/Sm4shCloneTool_Clones/: rules.txt, patches.txt
 README.txt           what is in it and how to install it
 sm4shclonetool_project.json   the project (keep it to add more clones later)
 ```
@@ -161,7 +164,13 @@ sm4shclonetool_project.json   the project (keep it to add more clones later)
    Sm4shExplorer, set every packaged folder that gets a new file (`ui/replace/chr/chr_*`, `ui/replace/stage/stage_*`)
    to **Pack this folder** before rebuilding the patch, or the game reads past the pack and crashes on the select
    screen.
-2. Replace `code/cross_f.rpx` with `INSTALL_TO_code/cross_f.rpx`. Keep a copy of the old one.
+2. The executable, one of:
+   - **patched rpx**: replace `code/cross_f.rpx` with `INSTALL_TO_code/cross_f.rpx`. Keep a copy of the old one.
+   - **Aroma** (a Wii U running Aroma): copy the contents of `INSTALL_TO_sd/` to the root of the SD card
+     (`wiiu/environments/aroma/plugins/sm4shclonetool.wps` and `wiiu/sm4shclonetool/<title id>.patch`). Keep the
+     game's own cross_f.rpx.
+   - **Cemu**: copy `INSTALL_TO_cemu/graphicPacks/Sm4shCloneTool_Clones/` into Cemu's `graphicPacks` folder and enable it
+     (Options > Graphic packs > Super Smash Bros. for Wii U > Mods). Keep the game's own cross_f.rpx.
 
 The package is **cumulative**: each build of a project holds all of its clones and only files that differ from your
 data folder, so it installs over your current install whether or not you installed an earlier one. To add another
@@ -200,6 +209,46 @@ clone to the ones already there.
 - **Another mod's executable**: if one of the words the tool hooks was changed by another mod, the tool refuses (the
   two patches would collide). If only the code space after the game's code is in use, **Patch anyway** puts the
   clone code after that mod's code (and grows the code region): use it only if you know that mod.
+
+## Without a modified executable (1.5): the Aroma plugin and Cemu graphic packs
+
+The same patch the tool writes into cross_f.rpx can be given to a loader that patches the game **in memory** when it
+starts, so the game's own executable stays installed:
+
+- **Aroma plugin** (a Wii U with the Aroma environment): `sm4shclonetool.wps` (in the tool's `aroma/` folder, with its
+  source; one binary for every project) reads this project's patch file from `sd:/wiiu/sm4shclonetool/<title id>.patch`
+  at every start of Smash 4, checks that the game is v288 and that every word the patch changes holds the game's
+  original (one difference and it patches nothing: another mod, or the patched rpx installed as well), copies the code
+  into its own memory and writes the hooks through Aroma's kernel access. A notification says "clone patch applied"
+  or why not. `python cli.py patchinfo --patch FILE.patch --exe cross_f.rpx` says what a patch file holds and whether
+  that executable matches it. Details, the file format, building the plugin: `aroma/README.md`.
+- **Cemu graphic pack**: `patches.txt` (Cemu's Cemuhook-style patch format, which Cemu reads) and `rules.txt`;
+  `moduleMatches` is Cemu's checksum of the v288 executable as Nintendo ships it (`0x63FAA900`; also the given
+  executable's when it is another vanilla copy, e.g. decompressed). Cemu places the code cave; every word that depends
+  on where is written as an expression of the cave's symbol.
+
+How: the patch is made **relocatable**. The tool's code normally sits at `0x04B78000` after the game's code, where
+neither loader can put it (the console maps the code region the executable asked for, read-only to the game; the
+patched rpx asks for more). The tool generates the patch at its base and at probe bases and classifies every word that
+changes with the base (a cave address as data, the high / low half of one, a branch between the game and the cave):
+anything else, or a table that does not predict the generators' own output at another base, stops the export. The
+cave's calls and jumps back into the game go through small veneers whose scratch register is checked to be free at
+the target; the game's hooks into the cave become absolute branches (the plugin's and Cemu's caves are below
+`0x02000000`).
+
+What is verified (tests on the game's v288 executable): applied at the tool's own base, the patch set gives the patched
+rpx's memory image byte for byte; relocated where the plugin puts it and where Cemu would (any 256-byte-aligned
+address), the tool's emulations of the hooks (the results announcer call, the sound aliases, Kirby's copy, the random
+select, the online helper, the stage random, the custom moves) behave as on the patched rpx; the plugin's own C code,
+built for a PC, writes the same words and refuses a changed word, a damaged file, another title or update; the Cemu
+files pass a strict parser of the syntax Cemu's parser accepts. **Not confirmed on a console or in Cemu** (see "What
+is not confirmed in game").
+
+**The patched rpx on a console.** The tool's code space holds data the game writes while it runs (the character
+select's random pools, Kirby's copy table, the new characters' records). In the patched rpx that data is in the code
+region, which the Wii U maps read-only for the game (Cemu does not enforce it): on a console the patched rpx would
+likely fault at the first such write (e.g. the character select's random pick); not tested. The Aroma plugin keeps
+the whole code space in its own memory instead. Use the patched rpx with Cemu, the Aroma plugin on a console.
 
 ## What a clone owns, and what it shares
 
@@ -315,6 +364,8 @@ python cli.py css    --data DATA --out OUT [--ui UI] --fighter fox:wolf --png pr
 python cli.py build  --data DATA --out OUT --exe EXE --fighter "fox:wolf:title=Wolf,call=wolf.wav,music=own,title@us_fr=Loup"
 python cli.py voices --data DATA --out OUT --name wolf --replace snd_vc_Wolf_appeal01=howl.wav --import-folder wavs
 python cli.py plate  --text "Fox Clone" --set chrn_40 --png plate.png
+python cli.py build  --data DATA --out OUT --exe EXE --fighter fox:wolf --exe-output aroma      (or cemu, all, rpx,cemu)
+python cli.py patchinfo --patch OUT/INSTALL_TO_sd/wiiu/sm4shclonetool/0005000010144F00.patch --exe cross_f.rpx
 ```
 
 `python cli.py --help` lists every key.
@@ -345,6 +396,20 @@ The window shows the current counts and limits under the plan ("Fighter clones: 
   clone's banks), Kirby copying a clone (hat / motions / voices), the own fanfare BGM, region-folder names.
 - 1.4's not seen in a game: Kirby's own copy scripts (the script lookup hook, his grown `motion.mtable`), the clone's
   own Kirby-copy bank id, the online set without clones, the plates' new weight.
+- 1.5 (the executable outputs), not seen on a console or in Cemu:
+  - **the Aroma plugin** has been built (devkitPPC, wut, WUPS 0.9.1) but not run on a Wii U. Not confirmed: that
+    Aroma's application-start hook comes after the game's executable is loaded and before it runs; that the plugin's
+    memory (where the code cave goes) is below `0x02000000` (checked at run time: the plugin refuses otherwise),
+    executable and writable by the game (if it isn't writable, the game would fault at its first write there, e.g. the
+    character select's random pick); the update version read from the system (if it fails, the original words still
+    decide); the EUR / JPN v288 executables being the USA one (any difference: the plugin refuses);
+  - **the Cemu graphic pack**: parsed by a checker written from Cemu's parser (its syntax and expression rules) and
+    evaluated in the emulations, not loaded by Cemu; its `moduleMatches` checksum is computed as Cemu computes it,
+    not read from Cemu's log;
+  - **the patched rpx on a console** (any version): likely to fault where the game writes into the tool's code space
+    (see "Without a modified executable"); the patched rpx is for Cemu.
+- 1.5 changes nothing in the patched rpx itself: it is made by the same generators, byte for byte as 1.4 made it (the
+  marker names 1.5).
 - Many clones: 40 fighter and 8 stage clones were built and emulated; the enlarged code region (to about 0x04BD1000,
   356 KB, for 40 fighters and 8 stages), high kinds' resource ids (`kind * 0x11 + n`, map keys) and a select screen with 99 entries were not
   seen in a game.

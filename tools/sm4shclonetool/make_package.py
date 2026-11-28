@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build the standalone Sm4shCloneTool zip: the tool, its vendor/ modules (make_vendor.py), the launchers, the README,
-the licences and the screenshots. No game data.
+the licences, the screenshots and (1.5) the Aroma plugin (aroma/: source, Makefile, the built .wps). No game data.
 
   python3 make_package.py OUT.zip [--screenshots DIR] [--check-exe VANILLA.rpx]
 
@@ -20,6 +20,7 @@ TOP = 'Sm4shCloneTool'
 FILES = ['cli.py', 'gui.py', 'setup.bat', 'run.bat', 'run_cli.bat', 'requirements.txt', 'README.md', 'LICENSE.txt',
          'THIRD_PARTY.txt']
 FONTS = ['DF_Mincho_SU.ttf', 'DF_Gothic_SU.ttf']
+AROMA = ['README.md', 'Makefile', 'src/main.c', 'src/patch_core.c', 'src/patch_core.h', 'src/cave.S', 'sm4shclonetool.wps']
 
 
 def build(out, shots):
@@ -35,6 +36,12 @@ def build(out, shots):
                         z.write(p, os.path.join(TOP, os.path.relpath(p, HERE)))
         for f in FILES:
             z.write(os.path.join(HERE, f), os.path.join(TOP, f))
+        for rel in AROMA:                                   # (1.5) the Aroma plugin: its source and the built plugin
+            p = os.path.join(HERE, 'aroma', rel)
+            if os.path.exists(p):
+                z.write(p, os.path.join(TOP, 'aroma', rel))
+            elif rel.endswith('.wps'):
+                print('NOTE: aroma/%s is not built: the package has the plugin\'s source only' % rel)
         for f in FONTS + ['FONTS_NOTICE.txt']:              # the bundled fonts (fonts/FONTS_NOTICE.txt)
             z.write(os.path.join(HERE, 'fonts', f), os.path.join(TOP, 'fonts', f))
         for d in shots:

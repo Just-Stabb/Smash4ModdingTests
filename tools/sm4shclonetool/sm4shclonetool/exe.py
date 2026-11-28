@@ -287,22 +287,18 @@ def weapon_kinds(reg):
 
 
 # ---------------------------------------------------------------- build
-def build(in_path, out_path, reg, force=False, log=print, work=None):
-    """patch in_path for registry reg (every clone) into out_path; returns a summary dict"""
+def generate(view, base, reg):
+    """run the generators on the vanilla view file `view` with the tool's code space at `base`:
+    {'words': {address: word}, 'relocs': [...], 'parts': {name: count}, 'layout': ..., 'end': code space end}"""
     import kind_expand as K
     import weapon_expand as W
     import base_effects_cave as BE
     import base_customs_cave as BC
     import stage_slot_cave as SS
-    x, base, old_reg, notes = vanilla_view(in_path, force)
-    for n in notes:
-        log(n)
     lay = configure(base, reg)
     lo, hi = base, base + MAX_SPACE
-    work = work or os.path.dirname(os.path.abspath(out_path))
-    view = os.path.join(work, '.ce_vanilla_view.rpx')
-    x.save(view)
-    spec_path = os.path.join(work, '.ce_spec.json')
+    work = os.path.dirname(os.path.abspath(view))
+    spec_path = os.path.join(work, '.ce_spec_%x.json' % base)
     spec = kind_spec(reg)
     json.dump(spec, open(spec_path, 'w'), indent=1)
     words, relocs, parts = {}, [], {}
@@ -314,47 +310,64 @@ def build(in_path, out_path, reg, force=False, log=print, work=None):
             words[a] = v & 0xFFFFFFFF
         relocs.extend(rel)
         parts[name] = len(w)
+    te = K.Image.text_end
+    if base != DEFAULT_BASE:                         # patch anyway / a relocation probe: past the game's code
+        K.Image.text_end = lambda self: base
     try:
-        te = K.Image.text_end
-        if base != DEFAULT_BASE:                         # patch anyway: past another mod's code
-            K.Image.text_end = lambda self: base
-        try:
-            if reg['fighters']:
-                B, info = K.build(spec_path, view)
-                add('kind expansion', B.words, B.reloc_args())
-                if any(f.get('weapons') for f in reg['fighters']):
-                    WB, _wi = W.build(spec_path, view)
-                    add('weapons', WB.words, WB.reloc_args())
-                    for a, d in getattr(WB, 'extra_relocs', []):
-                        relocs.append((a, d))
-                E = BE.build(spec_path, view)
-                add('base effects', E['patch'], E['moved'])
-                if any(f.get('customs') for f in reg['fighters']):
-                    cspec = dict(spec, kinds=[k for k, f in zip(spec['kinds'], reg['fighters']) if f.get('customs')])
-                    json.dump(cspec, open(spec_path + '.c', 'w'))
-                    C = BC.build(spec_path + '.c', view)[0]
-                    add('custom moves', C)
-            if reg['fighters']:
-                from . import clone_extras as CE
-                from . import roster as R
-                rv = Rpx(view)
-                add('clone extras', CE.build(rv.r32, reg['fighters'], R.KINDS.index, *lay['extras'])[0])
-            if reg['fighters'] or reg['stages']:
-                from . import random_select as RS
-                rv = Rpx(view)
-                add('random select', RS.build(rv.r32, reg['fighters'], reg['stages'], *lay['random'])[0])
-            if reg['stages']:
-                new = [(s['name'], s['cosmetic']) for s in reg['stages']]
-                sw, sp, count = SS.build(new, view)
-                w = {SS.CAVE + 4 * i: v for i, v in enumerate(sw)}
-                w.update(dict(sp))
-                add('stage slots', w, [a for a in SS.TABLE_SITES])
-                for s, k in zip(reg['stages'], range(SS.KIND_COUNT, count, 2)):
-                    assert s['kind'] == k, 'stage %s: kind 0x%X, the slot cave gives 0x%X' % (s['name'], s['kind'], k)
-        finally:
-            K.Image.text_end = te
-        # the code space's end: the last word written (at least SIZE)
-        hi = max(base + SIZE, (max(a for a in words if lo <= a < hi) + 4 + 0xFFF) & ~0xFFF) if words else base + SIZE
+        if reg['fighters']:
+            B, info = K.build(spec_path, view)
+            add('kind expansion', B.words, B.reloc_args())
+            if any(f.get('weapons') for f in reg['fighters']):
+                WB, _wi = W.build(spec_path, view)
+                add('weapons', WB.words, WB.reloc_args())
+                for a, d in getattr(WB, 'extra_relocs', []):
+                    relocs.append((a, d))
+            E = BE.build(spec_path, view)
+            add('base effects', E['patch'], E['moved'])
+            if any(f.get('customs') for f in reg['fighters']):
+                cspec = dict(spec, kinds=[k for k, f in zip(spec['kinds'], reg['fighters']) if f.get('customs')])
+                json.dump(cspec, open(spec_path + '.c', 'w'))
+                C = BC.build(spec_path + '.c', view)[0]
+                add('custom moves', C)
+        if reg['fighters']:
+            from . import clone_extras as CE
+            from . import roster as R
+            rv = Rpx(view)
+            add('clone extras', CE.build(rv.r32, reg['fighters'], R.KINDS.index, *lay['extras'])[0])
+        if reg['fighters'] or reg['stages']:
+            from . import random_select as RS
+            rv = Rpx(view)
+            add('random select', RS.build(rv.r32, reg['fighters'], reg['stages'], *lay['random'])[0])
+        if reg['stages']:
+            new = [(s['name'], s['cosmetic']) for s in reg['stages']]
+            sw, sp, count = SS.build(new, view)
+            w = {SS.CAVE + 4 * i: v for i, v in enumerate(sw)}
+            w.update(dict(sp))
+            add('stage slots', w, [a for a in SS.TABLE_SITES])
+            for s, k in zip(reg['stages'], range(SS.KIND_COUNT, count, 2)):
+                assert s['kind'] == k, 'stage %s: kind 0x%X, the slot cave gives 0x%X' % (s['name'], s['kind'], k)
+    finally:
+        K.Image.text_end = te
+        for p in (spec_path, spec_path + '.c'):
+            if os.path.exists(p):
+                os.unlink(p)
+    # the code space's end: the last word written (at least SIZE)
+    hi = max(base + SIZE, (max(a for a in words if lo <= a < hi) + 4 + 0xFFF) & ~0xFFF) if words else base + SIZE
+    return {'words': words, 'relocs': relocs, 'parts': parts, 'layout': lay, 'base': base, 'end': hi}
+
+
+def build(in_path, out_path, reg, force=False, log=print, work=None):
+    """patch in_path for registry reg (every clone) into out_path; returns a summary dict"""
+    x, base, old_reg, notes = vanilla_view(in_path, force)
+    for n in notes:
+        log(n)
+    lo = base
+    work = work or os.path.dirname(os.path.abspath(out_path))
+    view = os.path.join(work, '.ce_vanilla_view.rpx')
+    x.save(view)
+    try:
+        g = generate(view, base, reg)
+        words, relocs, parts, lay, hi = g['words'], g['relocs'], g['parts'], g['layout'], g['end']
         # the originals of every word outside the tool's space, read from the vanilla view
         vx = Rpx(view)
         orig = {}
@@ -388,9 +401,8 @@ def build(in_path, out_path, reg, force=False, log=print, work=None):
             out.w32(base + i, struct.unpack('>I', mb[i:i + 4])[0])
         out.save(out_path)
     finally:
-        for p in (view, spec_path, spec_path + '.c'):
-            if os.path.exists(p):
-                os.unlink(p)
+        if os.path.exists(view):
+            os.unlink(view)
     summary = {'base': base, 'end': hi, 'layout': lay, 'parts': parts, 'in_place': len(orig), 'relocs_moved': len(moved),
                'words': len(words), 'notes': notes, 'sha1': sha1_file(out_path)}
     log('exe: %d words (%d in place, originals kept in the marker), %d relocations moved; code space '

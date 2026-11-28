@@ -75,6 +75,30 @@ def main():
           Rpx(e20b).image_digest(), Rpx(e40).image_digest())
     os.unlink(e20)
     os.unlink(e20b)
+    # (1.5) the patch as data with 40 + 8 clones (the code region past the game's text region): byte for byte at the
+    # tool's base, the plugin file, the Cemu file, a cave the plugin's default buffer holds
+    from sm4shclonetool import patchset as PS
+    import struct
+    ps = PS.export(standin, reg, log=lambda _s: None, work=work)
+    vm, pm = Rpx(standin).memory(), Rpx(e40).memory()
+    same = True
+    for a, blob in pm.items():
+        img = bytearray(vm.get(a, b''))
+        img += bytes(len(blob) - len(img))
+        for st in ps.sites:
+            if a <= st['addr'] < a + len(blob):
+                struct.pack_into('>I', img, st['addr'] - a, st['new'])
+        if a <= PS.LINK < a + len(blob):
+            o = PS.LINK - a
+            img[o:o + len(ps.blob_link)] = ps.blob_link
+            img[o:o + 0x4000] = blob[o:o + 0x4000]
+        same &= bytes(img) == blob
+    rp = PS.read_plugin(PS.plugin_bytes(ps))
+    text, multi = PS.cemu_patches(ps, [PS.V288_CEMU_HASH])
+    check('the patch as data (Aroma / Cemu): = the 40 + 8 executable byte for byte at 0x%08X; a %d KB cave (the '
+          'plugin\'s 1024 KB holds it), %d veneers; the plugin file reads back; Cemu\'s cave base-independent'
+          % (PS.LINK, ps.size >> 10, len(ps.veneers)),
+          (same, ps.size + 0x10000 <= 1024 * 1024 + 0x10000, rp.blob == ps.blob, multi), (True, True, True, False))
     for t in ('kind_expand_test', 'weapon_expand_test', 'base_effects_test', 'stage_slot_test', 'import_call_check'):
         o = os.path.join(work, t + '.txt')
         rc = run([sys.executable, os.path.join(HERE, 'repo_test.py'), t, e40, standin], o)

@@ -28,8 +28,32 @@ from .rpx import Rpx
 CSB_TABLE = 0x10340F8C           # commonsoundtable.csb names (62, the executable's)
 
 
+EXE_OUTPUTS = ('rpx', 'aroma', 'cemu')
+EXE_OUTPUT_NAMES = {'rpx': 'patched cross_f.rpx', 'aroma': 'Aroma plugin patch file (console)',
+                    'cemu': 'Cemu graphic pack'}
+AROMA_PLUGIN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'aroma', 'sm4shclonetool.wps')
+CEMU_PACK = 'Sm4shCloneTool_Clones'
+
+
+def exe_outputs(value):
+    """'rpx' / 'aroma' / 'cemu' / 'all' or a comma list -> a tuple of EXE_OUTPUTS (default the patched rpx)"""
+    if not value:
+        return ('rpx',)
+    if isinstance(value, str):
+        value = [v.strip().lower() for v in value.split(',') if v.strip()]
+    out = []
+    for v in value:
+        for x in (EXE_OUTPUTS if v == 'all' else [v]):
+            if x not in EXE_OUTPUTS:
+                raise ValueError('unknown executable output %r (rpx, aroma, cemu or all)' % x)
+            if x not in out:
+                out.append(x)
+    return tuple(out)
+
+
 class Session:
-    def __init__(self, data, out, exe=None, ui=None, force=False, log=print):
+    def __init__(self, data, out, exe=None, ui=None, force=False, log=print, exe_output=None):
+        self.exe_output = exe_outputs(exe_output)
         self.data = os.path.abspath(data)
         self.ui = os.path.abspath(ui) if ui else os.path.join(self.data, 'ui')
         self.exe = os.path.abspath(exe) if exe else None
@@ -53,6 +77,14 @@ class Session:
     @property
     def pkg_code(self):
         return os.path.join(self.out, 'INSTALL_TO_code')
+
+    @property
+    def pkg_sd(self):
+        return os.path.join(self.out, 'INSTALL_TO_sd')
+
+    @property
+    def pkg_cemu(self):
+        return os.path.join(self.out, 'INSTALL_TO_cemu')
 
     def param_dirs(self):
         return [os.path.join(self.pkg_data, 'param'), os.path.join(self.data, 'param')]
@@ -156,6 +188,11 @@ class Session:
                 notes += n
             except X.ExeError as e:
                 errors.append('executable: %s' % e)
+            exe_items.append('output: %s' % ', '.join(EXE_OUTPUT_NAMES[o] for o in self.exe_output))
+            if set(self.exe_output) - {'rpx'} and self.force and self.exe_info and \
+                    self.exe_info.get('state') == 'modified':
+                errors.append('executable: the Aroma / Cemu outputs patch the game\'s own v288 executable in memory; '
+                              'they can\'t carry another mod\'s code ("patch anyway"): use the patched rpx output')
         else:
             notes.append('no executable given: only the data files are built (the clones need the patched '
                          'cross_f.rpx to load)')
@@ -236,12 +273,7 @@ class Session:
                 S.build(rec, self.data, self.ui, self.pkg_data, reg, (icons or {}).get(rec['name']), self.log)
         summary = {'clones': [r['name'] for _w, r, _s in recs]}
         if self.exe:
-            os.makedirs(self.pkg_code, exist_ok=True)
-            dst = os.path.join(self.pkg_code, 'cross_f.rpx')
-            tmp = dst + '.new'
-            s = X.build(self.exe, tmp, reg, self.force, self.log, work=self.out)
-            os.replace(tmp, dst)
-            summary['exe'] = s
+            summary.update(self._build_exe(reg))
         removed = self._prune()
         if removed:
             self.log('left out %d file(s) equal to the data folder\'s' % removed)
@@ -258,6 +290,59 @@ class Session:
         for line in summary['checks']:
             self.log('check: ' + line)
         return summary
+
+    def _build_exe(self, reg):
+        """the executable outputs (exe_output): INSTALL_TO_code/cross_f.rpx, INSTALL_TO_sd/ (the Aroma plugin and its
+        patch file), INSTALL_TO_cemu/ (a graphic pack); an output not chosen is removed from the package"""
+        import shutil
+        from . import patchset as PS
+        out = {}
+        dst = os.path.join(self.pkg_code, 'cross_f.rpx')
+        if 'rpx' in self.exe_output:
+            os.makedirs(self.pkg_code, exist_ok=True)
+            tmp = dst + '.new'
+            out['exe'] = X.build(self.exe, tmp, reg, self.force, self.log, work=self.out)
+            os.replace(tmp, dst)
+        elif os.path.isdir(self.pkg_code):
+            shutil.rmtree(self.pkg_code)
+        for o, d in (('aroma', self.pkg_sd), ('cemu', self.pkg_cemu)):
+            if o not in self.exe_output and os.path.isdir(d):
+                shutil.rmtree(d)
+        if not set(self.exe_output) & {'aroma', 'cemu'}:
+            return out
+        ps = PS.export(self.exe, reg, self.log, work=self.out)
+        out['patchset'] = {'sites': len(ps.sites), 'cave': ps.size, 'veneers': len(ps.veneers)}
+        if 'aroma' in self.exe_output:
+            pd = os.path.join(self.pkg_sd, 'wiiu', 'sm4shclonetool')
+            if os.path.isdir(pd):
+                shutil.rmtree(pd)
+            os.makedirs(pd)
+            blob = PS.plugin_bytes(ps)
+            for t in PS.TITLE_IDS:
+                open(os.path.join(pd, '%016X.patch' % t), 'wb').write(blob)
+            plug = os.path.join(self.pkg_sd, 'wiiu', 'environments', 'aroma', 'plugins')
+            if os.path.exists(AROMA_PLUGIN):
+                os.makedirs(plug, exist_ok=True)
+                shutil.copyfile(AROMA_PLUGIN, os.path.join(plug, 'sm4shclonetool.wps'))
+            else:
+                self.log('NOTE: the Aroma plugin (aroma/sm4shclonetool.wps) is not in this copy of the tool: build it '
+                         'from aroma/ (README "The Aroma plugin")')
+            self.log('Aroma: %s/<title id>.patch (%d bytes; %d game words, a %d KB cave)'
+                     % (os.path.relpath(pd, self.out), len(blob), len(ps.sites), ps.size >> 10))
+        if 'cemu' in self.exe_output:
+            gd = os.path.join(self.pkg_cemu, 'graphicPacks', CEMU_PACK)
+            os.makedirs(gd, exist_ok=True)
+            hashes = [PS.V288_CEMU_HASH]
+            if reg is not None and X.inspect(self.exe)['state'] == 'vanilla':
+                h = PS.cemu_hash(self.exe)
+                if h not in hashes:
+                    hashes.append(h)
+            text, _multi = PS.cemu_patches(ps, hashes)
+            open(os.path.join(gd, 'patches.txt'), 'w', newline='\n').write(text)
+            open(os.path.join(gd, 'rules.txt'), 'w', newline='\n').write(PS.cemu_rules(ps, CEMU_PACK))
+            self.log('Cemu: %s (moduleMatches %s)' % (os.path.relpath(gd, self.out),
+                                                       ', '.join('0x%08X' % h for h in hashes)))
+        return out
 
     def _prune(self):
         from . import languages as L
@@ -316,11 +401,26 @@ class Session:
                 have = {p for p in ('model/body/c00', 'script/animcmd/body', 'effect/%s' % f['name'])
                         if os.path.isdir(os.path.join(d, p))}
                 out.append('fighter/%s/: %s' % (f['name'], ', '.join(sorted(have)) or 'no model / scripts / effects'))
-        if self.exe:
+        if self.exe and 'rpx' in self.exe_output:
             info = X.inspect(os.path.join(self.pkg_code, 'cross_f.rpx'))
             reg = info.get('registry') or {}
             out.append('executable: %s, %d fighter / %d stage clone(s) in its marker' % (
                 info['state'], len(reg.get('fighters', [])), len(reg.get('stages', []))))
+        if self.exe and 'aroma' in self.exe_output:
+            from . import patchset as PS
+            pd = os.path.join(self.pkg_sd, 'wiiu', 'sm4shclonetool')
+            got = []
+            for t in PS.TITLE_IDS:
+                ps = PS.read_plugin(open(os.path.join(pd, '%016X.patch' % t), 'rb').read())
+                got.append(t in ps.titles and ps.meta['fighters'] == [f['name'] for f in self.reg['fighters']])
+            out.append('Aroma patch files: %d of %d read back (CRC, title, clones)%s' % (
+                sum(got), len(got), '' if os.path.exists(os.path.join(self.pkg_sd, 'wiiu', 'environments', 'aroma',
+                                                                       'plugins', 'sm4shclonetool.wps'))
+                else '; the plugin itself is not in the package'))
+        if self.exe and 'cemu' in self.exe_output:
+            gd = os.path.join(self.pkg_cemu, 'graphicPacks', CEMU_PACK)
+            out.append('Cemu graphic pack: %s' % ', '.join(f for f in ('rules.txt', 'patches.txt')
+                                                          if os.path.exists(os.path.join(gd, f))))
         return out
 
     def write_readme(self):
@@ -333,9 +433,26 @@ class Session:
                  '   ui/replace/stage/stage_*) to "Pack this folder" before rebuilding, or the game reads past the pack.',
                  '   INSTALL_TO_data(<region>)/ folders (if any) go over the matching data(<region>)/ folders: the',
                  '   clones\' names in that region\'s language.']
+        n = 2
         if os.path.exists(os.path.join(self.pkg_code, 'cross_f.rpx')):
-            lines += ['2. Replace code/cross_f.rpx with INSTALL_TO_code/cross_f.rpx (keep a copy of your old one).',
-                      '   It is your executable with the clone patch; the clones do not load without it.']
+            lines += ['%d. Patched executable: replace code/cross_f.rpx with INSTALL_TO_code/cross_f.rpx (keep a copy of' % n,
+                      '   your old one). It is your executable with the clone patch; the clones do not load without it.',
+                      '   (Use ONE of the executable outputs: this, the Aroma plugin or the Cemu graphic pack.)']
+            n += 1
+        if os.path.isdir(os.path.join(self.pkg_sd, 'wiiu', 'sm4shclonetool')):
+            lines += ['%d. Wii U with Aroma (the game\'s own, unmodified cross_f.rpx): copy the contents of INSTALL_TO_sd/' % n,
+                      '   to the root of the SD card: wiiu/environments/aroma/plugins/sm4shclonetool.wps (the plugin)',
+                      '   and wiiu/sm4shclonetool/<title id>.patch (this project\'s patch, one copy per region). At',
+                      '   every start of Smash 4 v288 the plugin checks the game\'s words against the originals in the',
+                      '   patch file and patches the game in memory; anything else and it patches nothing. Keep the',
+                      '   game\'s own cross_f.rpx (do not also install a patched one). NOT YET TESTED ON A CONSOLE.']
+            n += 1
+        if os.path.isdir(os.path.join(self.pkg_cemu, 'graphicPacks')):
+            lines += ['%d. Cemu (the game\'s own, unmodified cross_f.rpx): copy INSTALL_TO_cemu/graphicPacks/%s/ into' % (n, CEMU_PACK),
+                      '   Cemu\'s graphicPacks folder, then enable it under Options > Graphic packs (Super Smash Bros.',
+                      '   for Wii U > Mods). It patches the game in memory when it starts (moduleMatches = the v288',
+                      '   executable\'s Cemu checksum). Not yet tested in Cemu: please report what you see.']
+            n += 1
         lines += ['', 'CLONES', '------']
         for f in self.reg['fighters']:
             lines.append('fighter %-14s kind 0x%X, character id %d, UI name %s, from %s' % (

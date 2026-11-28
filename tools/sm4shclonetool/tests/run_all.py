@@ -217,6 +217,7 @@ def main():
     check('portraits decode (%d chr_00 files)' % len(zp), all(d is not None for d in dec), True)
     own_checks(pkg, data, reg, e3)
     extras_checks(work, out, pkg, data, reg, e3, standin, fx)
+    outputs_checks(work, data, reg, e3, standin)
     st_icon = os.path.join(pkg, 'ui', 'replace', 'stage', 'stage_10', 'stage_10_CloneField.nut')
     check('stage icon stage_10_CloneField.nut: the imported PNG, a new texture id',
           [T.decode(st_icon) is not None, T.texture_ids(T.read_nut(st_icon))[0][1] != 0x28000999], [True, True])
@@ -473,6 +474,57 @@ def extras_checks(work, out, pkg, data, reg, e3, standin, fx):
           'others the title' % ', '.join(sorted(miss)), (miss, fr.text('MmelCharaN_01_Foxclone'),
                                                          fr.text('MmelCharaN_01_Zssclone')),
           ({k: [] for k in miss}, 'Renard Clone', 'Zero Clone'))
+
+
+def outputs_checks(work, data, reg, e3, standin):
+    """1.5: the executable outputs: the Aroma plugin's patch file and the Cemu graphic pack (patchset_test.py), and
+    their packaging (a build with --exe-output all, then aroma only)"""
+    from sm4shclonetool import patchset as PS
+    from sm4shclonetool import session as SE
+    o = os.path.join(work, 'patchset_test.txt')
+    rc = run([sys.executable, os.path.join(HERE, 'patchset_test.py'), e3, standin, os.path.join(work, 'patchset'),
+              '1000'], o)
+    text = open(o).read()
+    check('patchset_test (the patch as data: = the patched rpx byte for byte at its base; relocated as the Aroma plugin '
+          'and Cemu place it, in the extras / random / custom-move emulations; the plugin\'s C code; the Cemu syntax): '
+          '%d ok, 0 failed (exit %d)' % (text.count('\nok ') + text.startswith('ok '), rc),
+          [x for x in text.splitlines() if x.startswith('FAIL')] + ([] if rc == 0 else ['exit %d' % rc]), [])
+    out2 = os.path.join(work, 'project_outputs')
+    if os.path.exists(out2):
+        import shutil
+        shutil.rmtree(out2)
+    s = Session(data, out2, e3, None, log=lambda _s: None, exe_output='all')
+    s.build([])
+    sd, cm = os.path.join(out2, 'INSTALL_TO_sd'), os.path.join(out2, 'INSTALL_TO_cemu', 'graphicPacks', SE.CEMU_PACK)
+    pf = [os.path.join(sd, 'wiiu', 'sm4shclonetool', '%016X.patch' % t) for t in PS.TITLE_IDS]
+    blobs = [open(p, 'rb').read() for p in pf if os.path.exists(p)]
+    ps = PS.read_plugin(blobs[0]) if blobs else None
+    def unmarked(path):                          # the memory image, the marker block (it names the tool's version) out
+        mem = Rpx(path).memory()
+        base, _rec = X.find_marker(Rpx(path))
+        for a, b in mem.items():
+            if a <= base < a + len(b):
+                mem[a] = b[:base - a] + b[base - a + 0x4000:]
+        return mem
+    check('--exe-output all: INSTALL_TO_code/cross_f.rpx (= build 3\'s memory image), INSTALL_TO_sd/wiiu/sm4shclonetool/<title '
+          'id>.patch for the three regions (one patch, read back: %s), INSTALL_TO_cemu/graphicPacks/%s/ rules.txt + '
+          'patches.txt' % ('%d words, a %d byte cave' % (len(ps.sites), len(ps.blob)) if ps else '-', SE.CEMU_PACK),
+          (unmarked(os.path.join(out2, 'INSTALL_TO_code', 'cross_f.rpx')) == unmarked(e3), len(blobs),
+           len(set(blobs)), ps is not None and ps.meta['fighters'] == [f['name'] for f in reg['fighters']],
+           [os.path.exists(os.path.join(cm, f)) for f in ('rules.txt', 'patches.txt')]),
+          (True, 3, 1, True, [True, True]))
+    plug = os.path.join(sd, 'wiiu', 'environments', 'aroma', 'plugins', 'sm4shclonetool.wps')
+    check('the Aroma plugin is packaged (wiiu/environments/aroma/plugins/sm4shclonetool.wps = aroma/%s)'
+          % os.path.basename(SE.AROMA_PLUGIN), os.path.exists(SE.AROMA_PLUGIN) and
+          open(plug, 'rb').read() == open(SE.AROMA_PLUGIN, 'rb').read(), True)
+    readme = open(os.path.join(out2, 'README.txt')).read()
+    check('README.txt: install steps for the patched rpx, the Aroma plugin and the Cemu graphic pack',
+          ['INSTALL_TO_code/cross_f.rpx' in readme, 'INSTALL_TO_sd/' in readme, 'INSTALL_TO_cemu/graphicPacks' in readme],
+          [True, True, True])
+    s = Session(data, out2, e3, None, log=lambda _s: None, exe_output='aroma')
+    s.build([])
+    check('--exe-output aroma: the executable output is the Aroma files only (INSTALL_TO_code / INSTALL_TO_cemu removed)',
+          sorted(d for d in os.listdir(out2) if d.startswith('INSTALL_TO_')), ['INSTALL_TO_data', 'INSTALL_TO_sd'])
 
 
 def kirby_script_checks(pkg, fx, fs, out):
