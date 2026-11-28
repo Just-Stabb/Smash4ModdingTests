@@ -1,7 +1,7 @@
-"""The data side of a stage clone, built on tools/add_stage.py: the stage-select database entry and its song list
+"""The data side of a stage clone, built on vendor/add_stage.py: the stage-select database entry and its song list
 (at the clone's cosmetic id), the names (MmelStageN_ / MmelStageG_), the stage-select icons (the source's, new texture
 ids, or imported PNGs) and the renamed stage folders (stage/melee/<name>, stage/end/<name>). The executable side is
-tools/stage_slot_cave.py (exe.py): kinds 0x80 + 2i (normal) / 0x81 + 2i (Omega), the cosmetic id's name."""
+vendor/stage_slot_cave.py (exe.py): kinds 0x80 + 2i (normal) / 0x81 + 2i (Omega), the cosmetic id's name."""
 import copy
 import os
 import re

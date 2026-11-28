@@ -2,7 +2,7 @@
 
 CSS: the entries in the game's order (roster.css_entries: first sort key, DLC after), placed where the layout puts
 face_001 ... face_N for N entries: the UI folder's lumen/chara/chara.lm frame num_<N> (the game shows that frame,
-0x028BEE20, and binds the faces in list order, 0x028BE920), read with tools/chara_layout.py. Without a chara.lm the
+0x028BEE20, and binds the faces in list order, 0x028BE920), read with vendor/chara_layout.py. Without a chara.lm the
 grid is approximated (rows of 12). Each face is the character's grid icon (chr_10 by default; a UI profile can name
 another set), else a name tile.
 

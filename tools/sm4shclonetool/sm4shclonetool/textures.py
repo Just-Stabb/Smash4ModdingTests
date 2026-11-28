@@ -1,4 +1,4 @@
-"""UI textures (.nut): decode an icon to a PIL image (tools/nut.py), and put a PNG into a portrait file."""
+"""UI textures (.nut): decode an icon to a PIL image (vendor/nut.py), and put a PNG into a portrait file."""
 import os
 import struct
 import zlib

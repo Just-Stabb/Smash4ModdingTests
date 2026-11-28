@@ -1,7 +1,7 @@
 """The executable side: detect what cross_f.rpx is (vanilla, already patched by this tool, or something else), and
 build the clone patch from the whole clone registry.
 
-How a patch is made (docs/clone-engine.md):
+How a patch is made:
 1. The "vanilla view" of the input: for a vanilla executable the file itself; for one this tool patched before, the
    file with every word the tool changed outside its own code space put back to the original it recorded in its
    marker, the relocations it moved put back, its code space cut off and the text region size restored.
@@ -31,7 +31,7 @@ SIZE = 0x40000                       # the tool's code space: marker, stages, cu
 PARTS = [('marker', 0x0000, 0x4000), ('stage', 0x4000, 0x5000), ('customs', 0x5000, 0x6000),
          ('effects', 0x6000, 0x8000), ('kinds', 0x8000, 0x30000), ('weapons', 0x30000, 0x40000)]
 DUMMY_OFF = 0x3FF8                   # the marker block's last 8 bytes: never read or run (moved relocations land here)
-# SHA-1 of the cross_f.rpx the research (docs/native-notes.md) was done on; recorded, not required (see README)
+# SHA-1 of the cross_f.rpx the research was done on; reported, not required (see README)
 RESEARCH_SHA1 = '3b7e1b3f421f330e259a3200d391f47ee6b5931a'
 WEAPON_FIRST = 0x185
 FIRST_KIND, FIRST_ID = 0x41, 59

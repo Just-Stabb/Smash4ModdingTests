@@ -1,5 +1,5 @@
-"""The data side of a fighter clone, built on tools/add_fighter.py (rows, names, portraits, the renamed folder),
-tools/add_fighter_customs.py (custom-move labels / icons) and tools/fighter_extras.py's file formats (fanfare, KO
+"""The data side of a fighter clone, built on vendor/add_fighter.py (rows, names, portraits, the renamed folder),
+vendor/add_fighter_customs.py (custom-move labels / icons) and the sound config files' formats (fanfare, KO
 voices). Every file is read from the newest copy (the package being built, then the creator's data) and written
 into the package; add_fighter's checks run on each (with the new rows taken out, every file rebuilds byte for
 byte)."""
@@ -284,8 +284,7 @@ def customs(rec, data_dir, ui_dir, out_data, ui_dirs):
 
 def sound_config(rec, data_dir, out_data, reg, csb_names=None):
     """the victory fanfare (bgm_fighter.fbb record = kind) and the KO voices / chant (commonsoundtable.csb record
-    0x3E + kind - 0x41): copies of the source's records (tools/fighter_extras.py's formats)"""
-    import fighter_extras as FX
+    0x3E + kind - 0x41): copies of the source's records"""
     logs = []
     dirs = [out_data, data_dir]
     p = R.first(dirs, 'sound/config/bgm_fighter.fbb')
@@ -309,7 +308,7 @@ def sound_config(rec, data_dir, out_data, reg, csb_names=None):
     p = R.first(dirs, 'sound/config/commonsoundtable.csb')
     if p:
         d = open(p, 'rb').read()
-        nval, recs = FX.csb_parse(d)
+        nval, recs = csb_parse(d)
         i = 0x3E + rec['kind'] - 0x41
         if rec['source_kind'] >= 0x41:
             si = 0x3E + rec['source_kind'] - 0x41
@@ -318,10 +317,10 @@ def sound_config(rec, data_dir, out_data, reg, csb_names=None):
             si = csb_names.index(cap) if cap in (csb_names or []) else None
         if si is None or si >= len(recs):
             return logs + ['commonsoundtable.csb: no record of %s to copy (no KO voice record)' % rec['source']]
-        new, done = FX.csb_merge(recs, nval, {i: recs[si]})
+        new, done = csb_merge(recs, nval, {i: recs[si]})
         dst = os.path.join(out_data, 'sound', 'config', 'commonsoundtable.csb')
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        open(dst, 'wb').write(FX.csb_build(d, nval, new))
+        open(dst, 'wb').write(csb_build(d, nval, new))
         logs.append('sound/config/commonsoundtable.csb: record 0x%X = record 0x%X\'s (%s); %d -> %d records'
                     % (i, si, done[0][1] if done else 'none', len(recs), len(new)))
     else:
@@ -330,3 +329,33 @@ def sound_config(rec, data_dir, out_data, reg, csb_names=None):
 
 
 A.used_texture_ids_orig = A.used_texture_ids
+
+
+# commonsoundtable.csb: 'CSB\0', u32 1, u16 values a record, u16 count, then count records of a 16-byte name and
+# u32 values (LE); a record the tool pads with: no name, no voices (-1), no chant (0)
+def csb_parse(d):
+    assert d[:4] == b'CSB\0'
+    nval, n = struct.unpack_from('<HH', d, 8)
+    size = 0x10 + 4 * nval
+    assert len(d) == 0xC + size * n, 'commonsoundtable.csb: %d bytes for %d records' % (len(d), n)
+    return nval, [bytearray(d[0xC + size * i:0xC + size * (i + 1)]) for i in range(n)]
+
+
+def csb_build(head, nval, recs):
+    return head[:8] + struct.pack('<HH', nval, len(recs)) + b''.join(bytes(x) for x in recs)
+
+
+def csb_merge(recs, nval, want):
+    """recs with {index: record} added (records the file already has for those indices are kept)"""
+    recs = [bytearray(x) for x in recs]
+    none = bytearray(b'\0' * 16 + b'\xff' * (4 * (nval - 1)) + b'\0' * 4)
+    while len(recs) < max(want, default=-1) + 1:
+        recs.append(bytearray(none))
+    done = []
+    for i, rec in sorted(want.items()):
+        if recs[i] == none:
+            recs[i] = bytearray(rec)
+            done.append((i, 'added'))
+        else:
+            done.append((i, 'kept (the file\'s own)'))
+    return recs, done

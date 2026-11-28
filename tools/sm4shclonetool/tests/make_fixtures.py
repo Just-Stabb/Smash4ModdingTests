@@ -132,8 +132,11 @@ def main():
         cui = os.path.join(out, 'custom_ui')
         link(sys.argv[6], os.path.join(cui, 'replace', 'chr'))
         link(os.path.join(vui, 'message'), os.path.join(cui, 'message'))
-        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(HERE))))
-        import chara_layout as cl
+        import importlib.util                 # the research repository's chara_layout (its honeycomb styles)
+        spec = importlib.util.spec_from_file_location(
+            'research_chara_layout', os.path.join(os.path.dirname(os.path.dirname(HERE)), 'chara_layout.py'))
+        cl = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cl)
         synth_chara_lm(os.path.join(cui, 'lumen', 'chara', 'chara.lm'), list(range(13, 71)), cl.user5)
     print('fixtures in', out)
 

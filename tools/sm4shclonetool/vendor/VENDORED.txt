@@ -1,0 +1,6 @@
+Sm4shCloneTool's own copies of the Smash 4 research tools it runs on (the executable research: the kind,
+weapon, effect-bank, custom-move and stage-slot patches; the data-file, text, texture, ACMD and layout
+readers). Adapted: comments and unused parts taken out, the defaults set to the tool's code space
+(0x04B78000-0x04BB8000). acmd_info.json: the game's ACMD commands (SALT, Sammi Husky, MIT).
+kind_expand_ram.json: the game's per-kind array sites (static analysis of the game's cross_f.rpx).
+Credits and licences: ../THIRD_PARTY.txt.

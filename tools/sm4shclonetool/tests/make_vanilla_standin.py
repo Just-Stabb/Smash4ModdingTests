@@ -23,6 +23,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 from sm4shclonetool import _paths  # noqa: E402,F401
+sys.path.append(os.path.dirname(os.path.dirname(HERE)))   # the research tools (kind_expand_incremental)
 from sm4shclonetool.rpx import Rpx  # noqa: E402
 from sm4shclonetool import exe as E  # noqa: E402
 import kind_expand as K  # noqa: E402
@@ -38,13 +39,14 @@ def generator_originals(path):
     """{address: original} the generators state, read through kind_expand_incremental's overlay"""
     import kind_expand_incremental as KI
     import weapon_expand as W
+    spec = os.path.join(os.path.dirname(os.path.abspath(sys.argv[2])), '.standin_spec.json')
+    json.dump({'capacity': '0x60', 'kinds': [{'kind': '0x41', 'name': 'cecheck', 'cap': 'Cecheck', 'base': 'mario',
+                                              'ui': {'id': 59, 'name': 'Cecheck', 'base_id': 4},
+                                              'weapons': {'fireball': '0x185'}}]}, open(spec, 'w'))
+    K.SPEC = spec                    # (the tool's kind_expand has no default spec)
     KI._install(path)
     over = dict(KI.OVER)
     # the weapon tables' generator: record its stated originals the same way (iterated: each pass reads more)
-    spec = os.path.join(os.path.dirname(os.path.abspath(sys.argv[2])), '.standin_spec.json')
-    json.dump({'capacity': '0x60', 'kinds': [{'kind': '0x41', 'name': 'cecheck', 'cap': 'Cecheck', 'base': 'mario',
-                                              'ui': {'id': 59, 'name': 'Cecheck'},
-                                              'weapons': {'fireball': '0x185'}}]}, open(spec, 'w'))
     seen = {}
 
     def put(self, addr, word, what, orig=None):

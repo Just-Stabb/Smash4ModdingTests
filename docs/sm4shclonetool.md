@@ -11,7 +11,7 @@ executable patches or fighters: it starts from the creator's own cross_f.rpx and
 tools/sm4shclonetool/
   cli.py, gui.py                 command line, Tkinter window (PNG -> tk.PhotoImage: no ImageTk needed)
   sm4shclonetool/
-    _paths.py                    imports: ./vendor (the standalone package) else tools/ (this repository)
+    _paths.py                    imports from ../vendor (in the repository too)
     rpx.py                       an RPX in memory: words by address, resize .text, relocations, save (rpx_patch / rpx_compact)
     exe.py                       detection, the marker, the vanilla view, running the generators, the patch
     roster.py                    fighters / stages from the databases, the CSS order, the project file
@@ -21,14 +21,37 @@ tools/sm4shclonetool/
     preview.py                   CSS (chara.lm via chara_layout.py, or a grid) and SSS previews
     session.py                   folders, registry, plan (Check), build (the package), post-build checks
   tests/                         repository-only: fixtures, the vanilla stand-in, run_all.py, repo_test.py
-  make_package.py                the standalone zip (vendor/ = the tools/ modules below, unchanged)
+  make_vendor.py                 regenerates vendor/ (the tool's adapted copies of the research modules)
+  make_package.py                the standalone zip
 ```
 
-Vendored (copied unchanged by `make_package.py`): `rpx_patch`, `rpx_compact`, `ppcasm`, `kind_expand` (+
-`kind_expand_ram.json`), `weapon_expand`, `base_effects_cave`, `base_customs_cave`, `stage_slot_cave`, `s4param`,
-`msbt`, `add_fighter`, `add_stage`, `add_fighter_customs`, `fighter_extras`, `fighter_param`, `acmd` (+ `acmd_info.json`
-with only the game's commands: `acmd_ext_cave.NEW_CMDS` filtered out), `nut`, `chara_layout`. Dependencies: Python 3,
-numpy (nut.py), Pillow, Tkinter.
+`vendor/` holds the tool's own copies of the research modules it runs on, made by `make_vendor.py` from `tools/`:
+`rpx_patch`, `rpx_compact`, `ppcasm`, `kind_expand` (+ `kind_expand_ram.json`), `weapon_expand`, `base_effects_cave`,
+`base_customs_cave`, `stage_slot_cave`, `s4param`, `msbt`, `add_fighter`, `add_stage`, `add_fighter_customs`, `acmd`
+(+ `acmd_info.json`), `nut`, `chara_layout`. Adapted, not verbatim: comments and docstrings taken out (they described
+this repository's builds and fighters; the tool's docs describe what it uses), a header of their own, the defaults
+pointed at the tool's code space instead of `tools/extra_kinds.json` / `build/` and the research's dummy word, and the
+parts written for this repository's own fighters taken out (below). `make_vendor.py` refuses a copy that still names
+them. The repository's tool imports these copies too (`_paths.py`), so it runs the code it ships. Dependencies:
+Python 3.9+, numpy (nut.py), Pillow, Tkinter.
+
+What was specific to this repository's own mod in the code, and what the copies do instead:
+
+| module | what | in the tool |
+|---|---|---|
+| `weapon_expand` | `kirby_copy()`: a brand-new article added to Kirby's copy-article lists (`KIRBY_COPY_TABLE`, `KIRBY_RESERVE`, `KIRBY_COPY_RES`, `extra_relocs`), written for one fighter's custom Kirby copy | removed with its spec key; Kirby's copy lists are untouched |
+| `kind_expand`, `weapon_expand`, `base_effects_cave`, `base_customs_cave`, `stage_slot_cave` | defaults: `SPEC` = `tools/extra_kinds.json` (the repository's seven fighters), `RPX` = `build/...`, caves in the repository's layout (`0x04BA0000`, `0x04BB0000`, `0x04B88000`, `0x04B8A000`, `0x04B7C000`), relocation dummy `0x037EE73C` (a word of a function the repository's own caves reuse) | no default spec / RPX (the tool always passes them), caves = the tool's parts, the dummy = the tool's marker block |
+| `acmd` | `_new_commands()` merged the repository's own new ACMD commands (`acmd_ext_cave.NEW_CMDS`, `New_Var`) into the table | removed; `acmd_info.json` without those 33 commands (602, the game's) |
+| `chara_layout` | `user4` / `user5` / `relayout` / `sheet`: one creator's honeycomb select layout and its rewriting | removed (the tool only reads layouts) |
+| `add_fighter` | `KINDS` from `fighter_param.py`, `load_records()` reading `extra_kinds.json` | removed (the tool builds the records) |
+| `nut` | `np.pad(mode='edge')` | `mode='symmetric'` (the padding is outside the picture) |
+| `kind_expand_ram.json` | its `about` named the repository's scanner | reworded; the 164 sites are the game's |
+
+Nothing else in the code was specific to those fighters: kind_expand's `tail_vector` / `motions` / `motion_group2`
+record keys and weapon_expand's brand-new-article keys (`on_hit`, `nop`, `modules`, `spawn_from`, `flags_set`) are
+generic features the tool doesn't use (its records never set them). `tests/package_clean_test.py` fails the package if
+any name of this repository's fighters (every name in `tools/extra_kinds.json`), its executable builds or caves, its
+paths or its authors appears in it.
 
 ## The executable
 
