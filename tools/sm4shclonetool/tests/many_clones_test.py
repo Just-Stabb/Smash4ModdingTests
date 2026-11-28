@@ -136,7 +136,8 @@ def main():
     reg = X.inspect(os.path.join(out, 'INSTALL_TO_code', 'cross_f.rpx'))['registry']
     check('the package\'s executable lists the 40 fighter / 8 stage clones', (len(reg['fighters']), len(reg['stages'])),
           (40, 8))
-    shutil.rmtree(os.path.join(out, 'INSTALL_TO_data', 'fighter'))      # 40 x 1.8 MB: disk
+    shutil.rmtree(out)                                                   # disk: the 40-clone project is large
+    os.unlink(e40)
     open(os.path.join(work, 'many_results.txt'), 'w').write('\n'.join(RES) + '\n\n%d checks, %d failed\n' % (
         len(RES), len(FAILS)))
     print('%d checks, %d failed' % (len(RES), len(FAILS)))
