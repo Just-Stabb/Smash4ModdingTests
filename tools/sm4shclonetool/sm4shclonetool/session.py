@@ -103,7 +103,12 @@ class Session:
                     if names(reg) != names(ereg):
                         self.log('NOTE: the executable\'s clones %s differ from the project\'s %s: using the '
                                  'executable\'s' % (names(ereg), names(reg)))
-                return copy.deepcopy(ereg)
+                out = copy.deepcopy(ereg)
+                # (2.0) the data-only imports (effects, sounds) are the project file's (not in the marker)
+                for k in X.DATA_IMPORTS:
+                    if (reg.get('imports') or {}).get(k):
+                        out.setdefault('imports', {})[k] = copy.deepcopy(reg['imports'][k])
+                return out
         return reg
 
     # ------------------------------------------------------------ planning
@@ -135,9 +140,10 @@ class Session:
         spec.update(opt)
         return spec
 
-    def plan(self, fighters=(), stages=()):
+    def plan(self, fighters=(), stages=(), imports=()):
         """(registry with the new clones, records, errors, notes, file list, exe items) without writing"""
         reg = copy.deepcopy(self.reg)
+        reg.setdefault('imports', {})
         errors, notes, files, recs = [], [], [], []
         for spec in fighters:
             e = F.validate(spec, self.param_dirs(), self.ui_dirs(), reg)
@@ -174,6 +180,13 @@ class Session:
                 errors.append('the character select would show %d entries; its layout has places for %d (%s). '
                               'Use a UI whose lumen/chara/chara.lm has arrangements up to num_%03d'
                               % (lim['css_entries'], lim['css_capacity'], lim['css_source'], lim['css_entries']))
+        exe_reg = reg
+        if imports:
+            from . import importer as I
+            e, f = I.plan(imports, reg, self.pkg_data, self.data, self.exe)
+            errors += e
+            files += f
+            exe_reg = I.preview(imports, reg, self.pkg_data, self.data)
         for p in (1, 2):
             if stages and len(R.sss_pages(self.param_dirs(), reg)[p]) > S.PAGE_SLOTS:
                 errors.append('stage select page %d would have %d stages; it has %d slots' % (
@@ -184,7 +197,7 @@ class Session:
         exe_items = []
         if self.exe:
             try:
-                n, exe_items = X.plan(self.exe, reg, self.force)
+                n, exe_items = X.plan(self.exe, exe_reg, self.force)
                 notes += n
             except X.ExeError as e:
                 errors.append('executable: %s' % e)
@@ -250,9 +263,10 @@ class Session:
                    m['page_slots']))
 
     # ------------------------------------------------------------ build
-    def build(self, fighters=(), stages=(), portraits=None, icons=None):
-        """portraits: {fighter name: {(set, NN): png}}; icons: {stage name: {set: png}}. Returns a summary."""
-        reg, recs, errors, notes, files, exe_items = self.plan(fighters, stages)
+    def build(self, fighters=(), stages=(), portraits=None, icons=None, imports=()):
+        """portraits: {fighter name: {(set, NN): png}}; icons: {stage name: {set: png}}; imports: the importer's
+        items (importer.run). Returns a summary."""
+        reg, recs, errors, notes, files, exe_items = self.plan(fighters, stages, imports)
         if errors:
             raise X.ExeError('\n'.join(errors))
         for n in notes:
@@ -272,6 +286,12 @@ class Session:
             else:
                 S.build(rec, self.data, self.ui, self.pkg_data, reg, (icons or {}).get(rec['name']), self.log)
         summary = {'clones': [r['name'] for _w, r, _s in recs]}
+        if imports:
+            from . import importer as I
+            summary['imported'] = I.run(imports, reg, self.pkg_data, self.data, self.out, self.log, self.exe)
+            if not self.exe and any(i['what'] in ('motion', 'article') for i in imports):
+                self.log('NOTE: no executable given: imported motions / articles need the patched executable '
+                         '(their tables are in it) to play / spawn')
         if self.exe:
             summary.update(self._build_exe(reg))
         removed = self._prune()
@@ -460,6 +480,23 @@ class Session:
         for s in self.reg['stages']:
             lines.append('stage   %-14s cosmetic 0x%X, kinds 0x%X / 0x%X, page %d, from %s' % (
                 s['name'], s['cosmetic'], s['kind'], s['kind'] + 1, s['page'], s['source']))
+        imp = self.reg.get('imports') or {}
+        if any(imp.get(k) for k in ('motions', 'effects', 'sounds', 'articles')):
+            lines += ['', 'IMPORTED (2.0)', '-------------']
+            for f, recs in sorted((imp.get('motions') or {}).items()):
+                for r in recs:
+                    lines.append('motion  %-14s %-24s motion kind 0x%X (%d), animation %s.omo' % (
+                        f, r['name'], r['index'], r['index'], r['anim']))
+            for f, recs in sorted((imp.get('effects') or {}).items()):
+                for r in recs:
+                    lines.append('effect  %-14s %-24s effect id 0x%08X' % (f, r['name'], r['id']))
+            for f, recs in sorted((imp.get('sounds') or {}).items()):
+                for r in recs:
+                    lines.append('sound   %-14s %-24s sound id 0x%08X (%s)' % (f, r['name'], r['id'], r['bank']))
+            for a in imp.get('articles') or []:
+                lines.append('article %-14s %-24s article id %d, weapon kind 0x%X (from %s/%s)' % (
+                    a['owner'], a['name'], a['article_id'], a['kind'], a['source_owner'], a['source']))
+            lines += ['Script names for Sm4shCommand: Sm4shCommand_names.txt; sound aliases: Sm4shCommand/Aliases/sounds/.']
         lines += ['', 'The package holds every clone of this project (it is cumulative), only files that differ',
                   'from your data folder. Keep sm4shclonetool_project.json with it to add more clones later.']
         open(os.path.join(self.out, 'README.txt'), 'w').write('\n'.join(lines) + '\n')

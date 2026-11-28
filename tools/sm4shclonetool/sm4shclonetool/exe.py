@@ -51,7 +51,8 @@ class ExeError(Exception):
 
 
 def n_weapons(reg):
-    return sum(len(f.get('weapons') or []) for f in (reg or {}).get('fighters', []))
+    from . import articles as A
+    return sum(len(f.get('weapons') or []) for f in (reg or {}).get('fighters', [])) + len(A.records(reg))
 
 
 def layout(base, reg=None):
@@ -61,7 +62,16 @@ def layout(base, reg=None):
     from . import clone_extras as CE
     esize = CE.size_for(len((reg or {}).get('fighters', [])))
     out['extras'] = (base + WEAPONS_AT + wsize, base + WEAPONS_AT + wsize + esize)
-    out['kinds'] = (base + WEAPONS_AT + wsize + esize, base + MAX_SPACE)
+    # (2.0) the importer's part: the grown motion tables (motion_exe.py); empty without imports, so a registry
+    # without them lays out (and patches) exactly as 1.5 did
+    from . import motion_exe as ME
+    at = base + WEAPONS_AT + wsize + esize
+    isize = ME.size_for(reg)
+    out['imports'] = (at, at + isize)
+    from . import articles as A
+    asize = A.size_for(reg)
+    out['article_hooks'] = (at + isize, at + isize + asize)
+    out['kinds'] = (at + isize + asize, base + MAX_SPACE)
     return out
 
 
@@ -104,6 +114,20 @@ def find_marker(x):
             rec['format'] = fmt
             return base, rec
     return None
+
+
+DATA_IMPORTS = ('effects', 'sounds')       # (2.0) imports with no executable part: kept in the project file only
+
+
+def marker_registry(reg):
+    """the registry as the marker keeps it: without the data-only imports (effects, sounds), which the project file
+    keeps (the marker block is 16 KB; Session._registry merges them back)"""
+    out = dict(reg)
+    if reg.get('imports'):
+        out['imports'] = {k: v for k, v in reg['imports'].items() if k not in DATA_IMPORTS and v}
+        if not out['imports']:
+            del out['imports']
+    return out
 
 
 def marker_bytes(rec):
@@ -244,10 +268,20 @@ def kind_spec(reg):
                 r['weapons'][art] = '0x%X' % weapon
                 weapon += 1
         kinds.append(r)
+    # (2.0) imported articles / article clones: brand-new articles of a clone (its record's weapons) or of a vanilla
+    # fighter (the spec's owners), numbered after every clone's own articles
+    from . import articles as A
+    cl, van, weapon = A.spec_entries(reg, weapon)
+    for r in kinds:
+        if r['name'] in cl:
+            r.setdefault('weapons', {}).update(cl[r['name']])
     n = len(kinds)
     cap = max(0x60, (FIRST_KIND + n + 0xF) & ~0xF)
     wcap = max(0x1C0, (WEAPON_FIRST + n_weapons(reg) + 0xF) & ~0xF)
-    return {'capacity': '0x%X' % cap, 'weapon_capacity': '0x%X' % wcap, 'kinds': kinds}
+    out = {'capacity': '0x%X' % cap, 'weapon_capacity': '0x%X' % wcap, 'kinds': kinds}
+    if van:
+        out['owners'] = [{'name': o, 'weapons': w} for o, w in sorted(van.items())]
+    return out
 
 
 def base_articles(path, base):
@@ -278,11 +312,13 @@ def base_articles(path, base):
     return out
 
 
-def weapon_kinds(reg):
-    """{fighter name: {article: weapon kind}} as kind_spec numbers them"""
+def weapon_kinds(reg, imported=False):
+    """{fighter name: {article: weapon kind}} as kind_spec numbers them (imported: the imported articles too)"""
     out = {}
-    for r in kind_spec(reg)['kinds']:
-        out[r['name']] = {a: int(k, 16) for a, k in (r.get('weapons') or {}).items()}
+    spec = kind_spec(reg)
+    for r in spec['kinds'] + (spec.get('owners', []) if imported else []):
+        out[r['name']] = {a: int(k['kind'] if isinstance(k, dict) else k, 16) for a, k in (r.get('weapons') or {}).items()
+                          if imported or not isinstance(k, dict)}
     return out
 
 
@@ -303,9 +339,9 @@ def generate(view, base, reg):
     json.dump(spec, open(spec_path, 'w'), indent=1)
     words, relocs, parts = {}, [], {}
 
-    def add(name, w, rel=()):
+    def add(name, w, rel=(), override=()):
         for a, v in w.items():
-            if a in words and words[a] != v:
+            if a in words and words[a] != v and a not in override:
                 raise ExeError('%s and another part both patch 0x%08X' % (name, a))
             words[a] = v & 0xFFFFFFFF
         relocs.extend(rel)
@@ -313,15 +349,22 @@ def generate(view, base, reg):
     te = K.Image.text_end
     if base != DEFAULT_BASE:                         # patch anyway / a relocation probe: past the game's code
         K.Image.text_end = lambda self: base
+    kinfo = {}
     try:
         if reg['fighters']:
             B, info = K.build(spec_path, view)
             add('kind expansion', B.words, B.reloc_args())
-            if any(f.get('weapons') for f in reg['fighters']):
-                WB, _wi = W.build(spec_path, view)
-                add('weapons', WB.words, WB.reloc_args())
-                for a, d in getattr(WB, 'extra_relocs', []):
-                    relocs.append((a, d))
+            kinfo = {r['kind']: (r['minfo'], r['base_desc']) for r in info['kinds']}
+        from . import articles as A
+        if any(f.get('weapons') for f in reg['fighters']) or A.records(reg):
+            WB, _wi = W.build(spec_path, view)
+            add('weapons', WB.words, WB.reloc_args())
+            for a, d in getattr(WB, 'extra_relocs', []):
+                relocs.append((a, d))
+        if A.cross_sources(reg):
+            rv = Rpx(view)
+            add('article hooks', A.build_exe(rv.r32, reg, *lay['article_hooks'])[0])
+        if reg['fighters']:
             E = BE.build(spec_path, view)
             add('base effects', E['patch'], E['moved'])
             if any(f.get('customs') for f in reg['fighters']):
@@ -334,6 +377,12 @@ def generate(view, base, reg):
             from . import roster as R
             rv = Rpx(view)
             add('clone extras', CE.build(rv.r32, reg['fighters'], R.KINDS.index, *lay['extras'])[0])
+        from . import motion_exe as ME
+        if ME.motion_records(reg):
+            rv = Rpx(view)
+            mw, mrel, mov, _minfo = ME.build(rv.r32, reg, _kind_of(reg), kinfo, *lay['imports'],
+                                             has_reloc=lambda a: bool(rv.relocs_at(a, a + 4)))
+            add('imported motions', mw, mrel, override=mov)
         if reg['fighters'] or reg['stages']:
             from . import random_select as RS
             rv = Rpx(view)
@@ -394,7 +443,7 @@ def build(in_path, out_path, reg, force=False, log=print, work=None):
         if clashes:
             raise ExeError('patched words a relocation would still rewrite:\n  ' + '\n  '.join(clashes[:10]))
         from . import VERSION
-        rec = {'tool': VERSION, 'registry': reg, 'orig': orig, 'relocs': [list(m) for m in moved],
+        rec = {'tool': VERSION, 'registry': marker_registry(reg), 'orig': orig, 'relocs': [list(m) for m in moved],
                'text_end': text_end_orig, 'text_region': region_orig, 'base': base, 'end': hi}
         mb = marker_bytes(rec)
         for i in range(0, len(mb), 4):
@@ -409,6 +458,13 @@ def build(in_path, out_path, reg, force=False, log=print, work=None):
         '0x%08X-0x%08X; parts: %s' % (len(words), len(orig), len(moved), lo, hi,
                                         ', '.join('%s %d' % kv for kv in parts.items())))
     return summary
+
+
+def _kind_of(reg):
+    """fighter name -> kind (a vanilla fighter's, or a clone's)"""
+    from . import roster as R
+    clones = {f['name']: f['kind'] for f in reg['fighters']}
+    return lambda name: clones[name] if name in clones else R.KINDS.index(name)
 
 
 def plan(in_path, reg, force=False):
@@ -427,6 +483,17 @@ def plan(in_path, reg, force=False):
                                                        for n, w in weapon_kinds(reg).items() if w))
         if any(f.get('customs') for f in reg['fighters']):
             items.append('custom moves: the clones own their base\'s custom moves')
+    from . import articles as A
+    wk = weapon_kinds(reg, imported=True)
+    for a in A.records(reg):
+        items.append('article %s of %s: weapon kind 0x%X (a copy of %s\'s %s; %s\'s article list)' % (
+            a['name'], a['owner'], wk[a['owner']][a['name']], a['source_owner'], a['source'], a['owner']))
+    for o, s_ in A.cross_sources(reg):
+        items.append('fighter_param_vl load / unload hooks: kind 0x%X also loads kind 0x%X\'s params' % (o, s_))
+    from . import motion_exe as ME
+    for name, recs in sorted(ME.motion_records(reg).items()):
+        items.append('motion table of %s: %d imported motion(s) 0x%X-0x%X (its motion info -> a grown table)'
+                     % (name, len(recs), recs[0]['index'], recs[-1]['index']))
     if reg['stages']:
         items.append('stage slots: %d new stage(s), kinds 0x80-0x%X' % (len(reg['stages']),
                                                                        0x80 + 2 * len(reg['stages']) - 1))

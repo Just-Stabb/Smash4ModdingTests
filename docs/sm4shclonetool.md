@@ -1,7 +1,8 @@
 # Sm4shCloneTool: internals
 
 The tool for other creators (`tools/sm4shclonetool/`, user guide in its `README.md`): clones fighters and stages into
-new slots on a **vanilla** game, BrawlEx-Clone-Engine style. It is built on the research generators in `tools/`
+new slots on a **vanilla** game, BrawlEx-Clone-Engine style, and (2.0) imports animations, effects, sounds and articles
+into any fighter (article cloning included: "2.0" at the end). It is built on the research generators in `tools/`
 (kind expansion, weapon kinds, effect banks, custom moves, stage slots) but carries none of this repository's own
 executable patches or fighters: it starts from the creator's own cross_f.rpx and data.
 
@@ -25,6 +26,10 @@ tools/sm4shclonetool/
     plates.py, languages.py      (1.3) name plates in the game's style (fonts/), names in every region's melee.msbt
     kirby_copy.py                (1.4) Kirby's own copy scripts for a clone (motion.mtable entries, script copies, names file)
     patchset.py, ppcflow.py      (1.5) the patch as data: relocatable export, the Aroma patch file, the Cemu graphic pack
+    importer.py, pac.py          (2.0) the importer's data side: motions (KCAP packs, motion.mtable, scripts, vl group 1),
+                                 effects (emitter sets, .efc entries), sounds (the Sound Adder's rules), names / aliases
+    motion_exe.py                (2.0) the grown motion tables (the executable side of imported motions)
+    articles.py                  (2.0) new articles / article clones: the files, the weapon_expand spec, the vl hooks
     session.py                   folders, registry, plan (Check), build (the package), post-build checks
   aroma/                         (1.5) the Aroma plugin: source, Makefile, the built sm4shclonetool.wps
   tests/                         repository-only: fixtures, the vanilla stand-in, run_all.py, repo_test.py
@@ -35,7 +40,7 @@ tools/sm4shclonetool/
 `vendor/` holds the tool's own copies of the research modules it runs on, made by `make_vendor.py` from `tools/`:
 `rpx_patch`, `rpx_compact`, `ppcasm`, `kind_expand` (+ `kind_expand_ram.json`), `weapon_expand`, `base_effects_cave`,
 `base_customs_cave`, `stage_slot_cave`, `s4param`, `msbt`, `add_fighter`, `add_stage`, `add_fighter_customs`, `acmd`
-(+ `acmd_info.json`), `nut`, `chara_layout`. Adapted, not verbatim: comments and docstrings taken out (they described
+(+ `acmd_info.json`), `nut`, `chara_layout`, and (2.0) `ptcl`, `efc`. Adapted, not verbatim: comments and docstrings taken out (they described
 this repository's builds and fighters; the tool's docs describe what it uses), a header of their own, the defaults
 pointed at the tool's code space instead of `tools/extra_kinds.json` / `build/` and the research's dummy word, and the
 parts written for this repository's own fighters taken out (below). `make_vendor.py` refuses a copy that still names
@@ -698,3 +703,176 @@ at `0x04B78000` (a fixed address outside the module's sections is refused), henc
 Not covered: the research tests (`kind_expand_test`, `weapon_expand_test`, `base_effects_test`, `stage_slot_test`) on
 a relocated image (they read the patched rpx's file; their parts are relocated by the same checked table), and of
 course the console and Cemu themselves.
+
+## 2.0: the importer, article cloning
+
+The importer adds animations (motion kinds), effects, sounds and articles to a fighter, vanilla or a clone; article
+cloning is the article part with any owner. Everything is data in the package plus (motions, articles) the executable
+patch, through the same generate / patchset path as the clones (rpx, Aroma, Cemu). The registry gets
+`imports = {motions: {fighter: [..]}, effects: {fighter: [..]}, sounds: {fighter: [..]}, articles: [..]}` (in the
+project and the marker): a rebuild finds every item by name (same motion number, effect id, sound id, article id) and
+`exe.generate` makes the tables from it. Without imports the layout and every generator's output are 1.5's.
+
+### Files
+
+```
+sm4shclonetool/importer.py   Target (a vanilla fighter or a clone: folder, Cap name, kind), import_motions, copy_set /
+                             import_effects, import_sounds (Sm4shCommand's SoundAdder ported: _template, make_entry,
+                             bank_build), write_names (Sm4shCommand_names.txt sections), write_aliases, plan / preview /
+                             run (the session's entry points)
+sm4shclonetool/pac.py        KCAP packs: read / build (the game's packs byte for byte), anim_hash
+sm4shclonetool/motion_exe.py the grown motion tables (part "imports")
+sm4shclonetool/articles.py   the article records -> weapon_expand spec entries, the files, the vl load / unload hooks
+                             (part "article_hooks")
+vendor/ptcl.py, vendor/efc.py  (make_vendor.py) the research's ptcl / efc readers and writers
+tools/weapon_expand.py       (and its vendored copy) two generic options: a brand-new article's "base" as
+                             "<fighter>/<article>" (another fighter's), and the spec's "owners" (vanilla fighters with
+                             brand-new articles); without them its output is unchanged
+tests/import_test.py, import_exe_test.py, sm4shcommand_test.cs   (below)
+```
+
+### Motions: what bounds a motion number (traced on v288)
+
+- Per kind a static descriptor (switch `0x02E43148`, getter `0x02E4313C`) `+4` -> motion info `{main table, count,
+  part list, part count, ...}` (Fox `0x1037083C`: 0x2A9 motions, 5 parts; Zero Suit Samus `0x103FDFA4`: 0x25F, 6). The
+  main table: `{animation hash, flags}` a motion (hash = `zlib.crc32(.omo name, 0xFFFFFFFF)`, the pack loader's key);
+  a part table: a hash a motion (3 rhand, 4 lhand, 5 face, 6 `<name>pt1`, 7 `<name>sw1` / `pt2`; 0 = none).
+- **The count is read twice**: `0x02EA9008` (from `0x02EA9064`, the run-time table getter, called once per kind from
+  `0x02E12C74` at fighter creation) stores the table at descriptor `+0x1C` and copies vl group 1 (6 bytes a motion:
+  byte 1 -> the entry's byte `+4`, byte 0 -> flag `0x80` in `+6`) into the table **in place** for `count` motions; and
+  `0x0275BAB0` (the AI's attack_data check, `0x02DFC8C4`) returns it. Those are the only readers of descriptor `+4`
+  among the getter's 16 callers.
+- **Nothing bounds the number where it is used**: the 28 MotionModule accesses in `0x02C5B000-0x02C66000` read
+  `[module + 0x1C] + 8 x motion` and check only `motion == -1` (then a static default entry `0x1049314C`); the script
+  lookup `0x02E42518` reads `motion.mtable[motion]` unbounded; MSC / ACMD pass any int. The AI's attack index
+  (`0x02DFC8CC`) has 0x611 slots. So a fighter can't play a new motion without the executable: a number past the count
+  reads the `.data` after its table (Fox's main table is followed by his first part table). With no executable change
+  the only option is to replace an existing motion's animation (its `.omo` under the same name) or its scripts.
+- **The patch** (`motion_exe.build`): per fighter with imported motions, in part "imports" (after "extras", sized
+  from the registry: 0 without imports): the main table copied (the game's entries; for a clone the base's, as
+  kind_expand copies them) plus one entry per motion `{hash, flags}` (flags: the copied motion's static low 24 bits
+  without 0x80, else 0: the high byte and 0x80 come from vl group 1 at run time), the part list and each part table
+  copied and extended (the imported part's hash or 0), and the motion info's `+0` / `+4` / `+8` changed: in place for a
+  vanilla fighter (`.data`; its ADDR32 relocations at `+0` / `+8` moved to dead `.data` words: the old main table's
+  first hash and the old part list's first part id, which nothing reads once the motion info moves; an ADDR32 of
+  `.rela.data` can't name a word of `.text` like the code-space dummy, the same rule weapon_expand's Kirby header
+  follows), in kind_expand's own motion info copy for a clone (`exe.generate`'s `add(..., override=...)`: those three
+  words only). The tables are written at run time (`0x02EA9008`, in place): the cave must be writable (as for the
+  clones' own tables). In the patchset these are ADDR32 game sites (the plugin and Cemu handle them as the cave's).
+- **The files** (`import_motions`): the `.omo` into `main.pac` (sorted by name as the game's packs; `pac.Pac`
+  rebuilds the game's 26 packs of the test data byte for byte), part animations into their packs (`<prefix><Tag><code>
+  <Name>.omo`, the tag read from the pack's own names), `motion.mtable` + the four scripts (empty or a deep copy of a
+  motion's), vl group 1 grown (the vl file's first vector, `0x20` + count + 6 x `{type, byte}` a motion: the rest of the
+  file untouched); `index = count + i`, checked against `motion.mtable` on a rebuild.
+
+### Effects
+
+`copy_set` (not ptcl.py's `import_set`, which drops key animations and leaves a child's shaders / textures pointing
+into the source file): every emitter with all its shader slots (`Ptcl.shader_slots`: its own and its child's, each
+source shader imported once), its shader-parameter range, its key animations (`key_anims` -> `set_key_anims`), its
+texture slots and its child's (`CHILD_TEXRES`; each source texture copied once, at its format's alignment), its
+primitive mesh; then `new_set`. The `.efc` entry copies the source's flags, model (its folder `model/<name>/` copied
+when the target has none) and mesh-switch records. Id = `3 << 24 | kind << 16 | entry`. `Ptcl.validate()` must pass
+before writing. A rebuild finds an item by (source file, entry).
+
+### Sounds
+
+`import_sounds` ports SoundAdder.cs: row = the bank's BINF id's soundlabeltable row (none: refused); labels =
+row count + k, tone index = the largest tone count of the bank and its costume banks on the row (`snd_<se|vc>_<Cap>
+[_common|_ouen]_cNN`) + k, padded with the bank's 12-byte stub; the TONE entry from `_template` (IDSP one-shots, the
+tail's loop flag 0; `_Special_L01` first; stereo for stereo) through `make_entry` (MakeEntry: head, name, the 4 bytes
+before the block, PACK offset / size, volume, the tail); PACK appended at 0x10; `bank_build` sizes JUNK as
+Nus3Bank.Build(alignPack). Audio: `audio.read_wav` (resampled to 48 kHz), trimmed at -45 dBFS, peak -0.5 dBFS,
+`audio.idsp_encode` (vendor/dspadpcm.py); an IDSP file as it is. A rebuild re-uses a tone (by bank and name) and leaves
+it untouched when its audio, volume and loop flag are the same. Aliases: Sm4shCommand's `Aliases/sounds/<fighter>.txt`
+(its WriteFile header, `0x%08X = name`), merged.
+
+### Articles: weapon kinds and their limits (vanilla v288)
+
+- **Weapon kinds**: 0x185 (389, `0x000`-`0x184`): four 389-pointer name tables (root `0x104189DC`, owner `0x10418FF0`,
+  name `0x10419604`, folder `0x10419C18`, contiguous, so they move), three static tables (u32 `0x1018A1D4`, u8
+  `0x1018A7E8`, u16 flags `0x1018A970`), the u32 / u8 accessors' bound `0x0320E5AC` (`addic r0, r4, -0x185`), 13
+  switches `cmplwi k, 0x184` (descriptor getter `0x0320D934`, singleton getter `0x03210C30`, 11 weapon methods), the
+  module rows (`0x103464A8`, 0x70 a row, 389 rows, read unbounded at `0x02BCB5C0`). weapon_expand moves / bounds all of
+  them to its capacity (`max(0x1C0, 0x185 + every own / imported article, rounded to 0x10)`, at most 0x7FFF).
+- **A fighter's article list** (its descriptor `+8` -> `{entries, count}`, 16 bytes an entry `{kind | bit 31 special,
+  max count, spawner callback, extra}`): the article id is the position. The ArticleModule (`0x02C02614`) counts the
+  entries before the first special one into its holder's `+0x110` and stores one pointer per instance (their max
+  counts) from `+0x10` with no bound: **64 instances a fighter** (more overwrite `+0x110` / `+0x114`: a crash at the next
+  lookup by id, native-notes "Article instance cap"). The game's lists: at most 34 entries (Kirby), 28 instances
+  (Villager); Fox 5 entries / 10 instances, Zero Suit Samus 6 / 7. The tool refuses an import past 64.
+- **An imported article** = a brand-new article of weapon_expand (`{"kind", "base", "max"}`): a copy of the source kind
+  (descriptor copy: its motion info with the source's entries, `+0x14` sub-articles, `+0x1C`; every switch sends it to
+  the source kind's case; its module row is the source's), its own name / folder strings, owner = the owner fighter,
+  its list entry = the source's entry (spawner) with its own max. Numbered after every clone's own articles in registry
+  order (`articles.spec_entries`): a kind may change when a clone with articles is added later; the article id does not
+  (ids are positions, the imported ones after the owner's normal entries in registry order).
+  - Owner a clone: in its record's `weapons` (weapon_expand builds its list, kind_expand points its descriptor copy at
+    it). Source = an article of the clone's base: the param getters (`+0x18` / `+0x24`) are copied to read the clone's
+    own vl slot (kind_expand's array): own params. Source of another fighter: `"base": "<fighter>/<article>"`; its getters
+    are not copied (they read that fighter's slot).
+  - Owner a vanilla fighter: the spec's `owners` (weapon_expand: a record of the fighter's own kind, `vanilla_owner`);
+    its list copied to the cave with the new entries and its descriptor `+8` (`.data`) pointed at it, the ADDR32
+    relocation moved to the old list's count; its getters are the source's (the owner's own vl when it is the source).
+  - **The vl hooks** (`articles.build_exe`, part "article_hooks", only for an article of another fighter): the first
+    word of `fighter_param_vl` load `0x02EA6BC4` (`stwu r1, -0x90(r1)`, only caller `0x02E11C8C`, fighter creation) and
+    unload `0x02EA5D64` (`stwu r1, -0x28(r1)`, callers `0x02E1482C`, `0x02EA6B98`) become branches to wrappers that look
+    the kind up in a `{owner kind, source kind}` table: load runs the function body (the replayed `stwu`, then the
+    function from its second word) for each source, then for the owner (its return value returned); unload for the owner
+    first (its value kept), then the sources. The game's reference count (`mgr + 0x1220`) keeps each file loaded once.
+    kind_expand's clone load case calls `vl_load(mgr, base)` through the same entry, so a clone owner works the same.
+- **The files** (`import_articles`): `model/`, `motion/`, `script/animcmd/weapon/`, `script/msc/` folders of the source
+  (each from the package if it has it, else the data folder) copied under the new name (`<name>.mscsb` renamed); the
+  scripts' effect ids moved: same bank -> nothing; the owner's bank a copy of the source's (a clone of it with its own
+  effects) -> KK only; else `import_effects` of the referenced entries and their new ids. Sound ids: rows the same ->
+  nothing; the owner's bank of that kind on rows with the same labels (a clone's copy) -> the row; else the tones
+  (`bank.data_of`) copied into the owner's se bank with `import_sounds` (`<tone>_<Cap>_<article>`) and the new ids. An
+  owner without an se bank in your files keeps the source's sound ids (logged).
+- Sub-articles: an article that makes another (a weapon descriptor's `+0x14` list) keeps the source's kinds for those.
+  In the vanilla lists, a fighter's projectiles are their own list entries made by the fighter's code (Zero Suit
+  Samus's paralyzer and paralyzer_bullet are articles 0 and 1; no weapon of hers has a `+0x14` list), so copy each one
+  you need.
+
+### Sm4shCommand
+
+How it opens a fighter (read for this): File > Open fighter = a folder, normally `fighter/<name>/script/animcmd/body`:
+every `.bin` in it is an ACMD file (SALT `ACMDFile`) and `motion.mtable` beside them (SALT `MTable`), one tree node per
+mtable entry then the unlisted scripts (`MainForm.OpenFighter` / `PopulateFighterScripts`); names from `ModAnimNames.txt`
+then `AnimNames.txt` next to the exe (`Runtime.LoadAnimNameFile`: a name a line, `0xHASH = label`, `Name ->
+folder/File.omo [+ held@Bone]`); the Hitbox Viewer (`FighterAssets.Load`) finds the fighter folder above the scripts,
+`model/body/c00` and `motion/body/*.pac`, and maps a script to an animation by the file name's tail after
+`[A-Z]NN` (and by the names files' viewer lines); the Sound Effect Viewer (`FighterSounds.Load`) lists the fighter's
+banks through `sound/config/soundlabeltable.bin` above it; the effect library (`EffectLibrary`) reads
+`effect/<folder>/<folder>.010d0000.efc / .ptcl` (a bank number past its kind list falls back to the fighter's own
+folder, as for a clone). The importer's names: the tail of an imported animation's file name is its script name, so the
+viewer plays it even without the names file.
+
+### Tests
+
+- `import_exe_test.py PATCHED VANILLA [WORK]` (unicorn, the game's own functions; with WORK also on the patch set applied
+  at the Aroma plugin's base and evaluated from the Cemu patches.txt at a Cemu cave base): `0x02EA9064` builds the grown
+  table (the old motions as the unpatched game gives them with the same vl group 1, the new ones' hashes / flags / vl
+  bytes; only the table, `+0x1C` and the stack written), every other vanilla kind the game's table, `0x0275BAB0`'s count,
+  the part tables; each owner's article list (the game's with the new entries at their ids and the source's spawners),
+  the weapon descriptor getter (a copy of the source's; game kinds unchanged), the file-name lists `0x030BC8E4` (its own
+  name / folder; game kinds unchanged), the vl hooks (the body run for the source(s) and the owner in order, once each,
+  the return value, the stack and r14-r31 kept; other kinds only their own).
+- `import_test.py WORK PROJECT DATA PATCHED VANILLA [SM4SHCOMMAND_RUN]` (run_all runs it on its project after the other
+  checks): a fourth build with 12 imports (motions into vanilla Zero Suit Samus with a hand part animation and into
+  zssclone, effects into vanilla Fox and foxclone, a mono WAV, a stereo WAV and an IDSP, articles for vanilla Fox (another
+  fighter's: the vl hooks, its effects imported), zssclone (its base's) and vanilla Zero Suit Samus (her own)); the plan
+  and its refusals; every round trip and old entry; the new data against the inputs (the .omo bytes, the copied scripts,
+  key animations / textures / shaders / names, the decoded audio > 25 dB SNR, the IDSP as given); ids unique; nothing
+  else in the package changed; a rebuild changes no byte; the executable valid, `import_exe_test` (patched rpx, Aroma,
+  Cemu) and `weapon_expand_test` (repo_test); Sm4shCommand's loaders (`sm4shcommand_test.cs`, compiled against its built
+  `SM4SHCommand.exe` / `SALT.dll` with the .NET SDK's csc, run with mono under xvfb-run because its Runtime makes the
+  main window) on an installed view (data + package) of each fighter: SALT opens the four files (every script: the
+  tool's count) and motion.mtable; each imported motion's mtable entry, scripts, its label and viewer line
+  from the names file through `Runtime.LoadAnimNameFile`, the animation `FighterAssets` plays for it and its OMO;
+  each imported sound in the Sound Effect Viewer's list by its id, decoded (`Idsp.Decode`) with its samples / channels;
+  the aliases file; each imported effect through `EffectLibrary.AssetsFor` (its set name and emitter count). run_all
+  finds a built Sm4shCommand in `$SM4SHCOMMAND_RUN` or `WORK/../../sm/run`; without one that part is reported skipped.
+- `gui_test.py`: the import tab (a fighter's effect bank listed, the imported items shown).
+
+Not covered: the game itself (nothing here ran in Cemu or on a console), a cross-fighter article's native behaviour for
+its new owner, the effect memory of a match with imported effects, imported sounds through the game's sound engine.

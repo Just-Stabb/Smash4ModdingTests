@@ -62,6 +62,11 @@ HEADERS = {
                     'target and the win poses\' frames), keyed by the fighter\'s model (folder) name: read and add entries.',
     'chara_layout': 'Lumen (.lm) files: read the character select\'s face-layout sprite (frames num_NNN, places '
                     'face_NNN) and simulate its display list.',
+    'ptcl': 'Particle files (.ptcl, EFTF v0x42, NintendoWare for Cafe eft): read and rebuild byte for byte; emitter sets, '
+            'emitters, textures, shaders, key animations and primitives; copy an emitter set from another file (its '
+            'textures, shader, shader parameters and mesh with it).',
+    'efc': 'Effect control files (.efc, EFCF): the effect list of a bank (an ACMD effect id 0xBBBBnnnn is entry nnnn): '
+           'read, rebuild byte for byte, add entries.',
 }
 
 # functions / classes taken out (with the statements that call them); UPPERCASE names: module constants taken out
@@ -75,6 +80,7 @@ DROP = {
     'add_fighter': {'main', 'load_records', 'KINDS'}, 'add_stage': {'main'},
     'nut': {'main'},
     'result_param': {'main'},
+    'ptcl': {'main'}, 'efc': {'main'},
 }
 
 # source edits before parsing: (module, old, new); old must be found

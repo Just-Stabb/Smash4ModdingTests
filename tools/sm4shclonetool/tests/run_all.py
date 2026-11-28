@@ -9,6 +9,9 @@ WORK gets the fixtures (make_fixtures.py), three builds into one
 project (1: Fox -> foxclone with its own article, custom moves, PNG portraits, placed after Fox, + stage
 BattleField_f -> CloneField; 2: on build 1's executable, Zero Suit Samus -> zssclone with her portraits re-ID'd;
 3: on build 2's executable, foxclone -> foxtwo, a clone of a clone), and results.txt. Repository only.
+(2.0) Then import_test.py: a fourth build with imports (motions, effects, sounds, articles) into vanilla fighters and
+the clones, its checks, import_exe_test.py and, when a built Sm4shCommand is found ($SM4SHCOMMAND_RUN, or WORK/../../sm/run
+beside the work folder), Sm4shCommand's own loaders on the imported fighters.
 """
 import copy
 import json
@@ -267,6 +270,13 @@ def main():
     text = open(o).read()
     check('media_test (DSP-ADPCM encoder = the C one, IDSP / WAV, name plates vs the game\'s, fonts): %d ok (exit %d)'
           % (text.count('\nok ') + text.startswith('ok '), rc), [x for x in text.splitlines() if x.startswith('FAIL')], [])
+    # ---------------------------------------------------------------- (2.0) the importer, article cloning
+    import import_test as IT
+    s4c = next((d for d in (os.environ.get('SM4SHCOMMAND_RUN'), os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(work))), 'sm', 'run')) if d and os.path.exists(os.path.join(d, 'SM4SHCommand.exe'))), None)
+    IT.run(work, out, data, e3, standin, s4c)
+    RES.extend(IT.RES)
+    FAILS.extend(IT.FAILS)
     open(os.path.join(work, 'results.txt'), 'w').write('\n'.join(RES) + '\n\n%d checks, %d failed\n' % (
         len(RES), len(FAILS)))
     print('%d checks, %d failed' % (len(RES), len(FAILS)))

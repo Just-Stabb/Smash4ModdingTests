@@ -6,6 +6,11 @@ stage select, and build a package to install. A fighter clone is a real new figh
 own character id, folder, parameters, names and portraits; a stage clone is a new stage kind with its own stage-select
 slot, folder, icons and names. Nothing of the game is replaced.
 
+**2.0: the importer.** New animations (motion kinds with their script slots), effects, sounds and articles for any
+fighter, a vanilla one or a clone the tool made, written so Sm4shCommand opens the result; and **article cloning**: a
+copy of any fighter's article as a weapon kind of its own (its own model, motions, scripts, effects, sounds), owned
+by a fighter you choose, spawned by a new article id. See "The importer (2.0)".
+
 ![Fighters tab](screenshots/gui_fighters_vanilla_ui.png)
 
 (Screenshots from a test setup whose UI folder has only a few portraits: the others are drawn as name tiles. With
@@ -26,7 +31,7 @@ your full UI every tile is its portrait. More in `screenshots/`: the stage tab, 
 
 ## Install
 
-1. Unzip `Sm4shCloneTool_v1_5.zip` anywhere.
+1. Unzip `Sm4shCloneTool_v2_0.zip` anywhere.
 2. Double-click **setup.bat** once (installs numpy and Pillow with pip).
 3. Double-click **run.bat** (the window) or use **run_cli.bat** (the command line).
 
@@ -137,6 +142,22 @@ Click a **base stage**, then:
 `append/stage/stage_13`) with new texture ids, or **Import PNG...** per set. The song list (My Music) is the base's.
 
 **Stage select preview**: pages 1 and 2 in stage-select order with the icons you have, the clone highlighted.
+
+### Import tab (2.0)
+
+![Import tab](screenshots/gui_import.png)
+
+Pick the **fighter to import into** (a vanilla fighter by its folder name, or a clone of the project), then add items
+to the import list; **Check** / **Build** (below) build them with the clones (the package and the executable patch):
+
+| section | what you give | what it makes |
+|---|---|---|
+| Animation | a name (its script name), an `.omo`, optionally a motion to copy the scripts from (its number `0x50` or its script name `Attack11`), "loops", a part animation (`lhand`, `rhand`, `<name>pt1` ...) | a new motion kind (printed: the fighter's motion count + n): the animation in its `motion/body/main.pac`, an entry in `motion.mtable`, a script in game / effect / sound / expression.bin (empty, or the copied motion's), its vl group 1 entry, its names for Sm4shCommand; the executable's motion table grows |
+| Effects | a source fighter (**List** shows its bank's entries) or any `.efc` file, the entries to copy, a new name | the emitter sets (with their textures, shaders, key animations, meshes, effect models) in the fighter's bank, one `.efc` entry each: new effect ids `0x3KK0nnnn` (printed) |
+| Sounds | a WAV (or an IDSP), the bank (`se` / `vc` / a bank file), a tone name, an alias, the volume, "loops" | a new tone of the bank (and its costume banks), a new label of its soundlabeltable row: a new sound id (printed), the alias in Sm4shCommand's aliases file |
+| Article | a new name, the article it copies (any fighter's: pick the fighter, then its article), its max instances | a new weapon kind owned by the fighter, its files copied under the new name, its effects / sounds moved to the fighter's banks: a new article id (printed) |
+
+The right side lists what is waiting to be built and what was imported into that fighter so far (with the ids).
 
 ### Plan, Check, Build
 
@@ -352,6 +373,91 @@ Point **Custom UI folder** at your UI (the folder with `message/`, `replace/`, `
 
 Without a `chara.lm` the preview approximates the grid (the game's own layout file isn't shipped with the tool).
 
+## The importer (2.0)
+
+Everything is written into the package, never into your data folder, and recorded in the project (and the patched
+executable's marker), so a rebuild finds each imported item again (same slot, same id) and the package stays
+cumulative. A fighter you import into can be a vanilla one (its changed files go into the package: install them like
+the clones' files) or a clone of the project.
+
+### Animations: new motion kinds
+
+A fighter's motions are numbered (Zero Suit Samus: 0x000-0x25E; the first 0x211 are every fighter's common ones). Each
+motion kind has **an animation** (the executable's motion table for that fighter: the hash of an `.omo` name in
+`motion/body/main.pac`), **scripts** (`motion.mtable`: the hash of a script name in game / effect / sound /
+expression.bin) and **a vl group 1 entry** (`fighter_param_vl_<name>.bin`, 6 bytes a motion: flags, the cancel frame,
+the intangible window). An imported animation gets all three:
+
+- its `.omo` goes into `main.pac` as `<the pack's prefix>Main<code><Name>.omo` (`FitSZerosuitBodyMainZ00NewSpin.omo`:
+  the code is the file's own `[A-Z]NN` when its name has one, else `Z00`), a part animation into its pack
+  (`FitSZerosuitBodyLhandZ00NewSpin.omo` in `lhand.pac`);
+- its motion kind is the next number (printed, and in README.txt); `motion.mtable` gets the hash of `Name`, each of the
+  four script files a script `Name`: empty (`Script_End`), or a copy of the motion you named (its hitboxes, effects,
+  sounds: a starting point to edit in Sm4shCommand);
+- its vl group 1 entry is the copied motion's (or zeros; "loops" sets byte 1 to 6, the looping motions' flags byte);
+- **the executable**: a new motion can't play without it. The game never checks a motion number against the
+  fighter's count (MotionModule reads `table + 8 x motion` for any number but -1; `motion.mtable` is read the same way),
+  so a number past the count would read whatever follows the fighter's table: the tool gives the fighter a grown copy
+  of its motion table (and of each hand / prop part table) in its code space and points the fighter's motion info at
+  it. Through the patched rpx, the Aroma plugin and the Cemu graphic pack alike.
+
+**Playing it**: the game plays a motion when something asks for it by its number: the fighter's MSC (`MotionModule`
+change motion, your MSC edit) or a status the base's native code runs (which only knows the game's own numbers). The
+CPU's attack table (`script/ai/attack_data.bin`) has room for motions below 0x611.
+
+**In Sm4shCommand**: open `fighter/<name>/script/animcmd/body` as usual: the new motions are listed by their number
+with their scripts. Paste `Sm4shCommand_names.txt` (output folder; a section per fighter) at the end of Sm4shCommand's
+`AnimNames.txt` to see their names and let its Hitbox Viewer play their animation (`Name -> body/<file>.omo`; the viewer
+also finds it by the file name itself).
+
+### Effects
+
+Copied from another bank: any fighter's (`effects --source <fighter>` lists the entries: number, emitter set, model) or
+any `.efc` / `.ptcl` pair you have. Each entry's emitter set is copied whole (every emitter, its shaders and its child's,
+shader parameters, key animations, its textures and its child's, its mesh), its effect model folder (`model/<name>/`)
+too, and gets a new `.efc` entry: its effect id is `0x3KK0nnnn` (KK the fighter's kind in hex, nnnn the entry), for
+ACMD's effect commands (`External_Graphic_Effect` ...). The bank's own entries keep their numbers. No executable change
+(the game reads a bank's entries from its files).
+
+### Sounds
+
+Added as Sm4shCommand's **Sound Adder** adds them (its rules, ported to the tool): the WAV is read (8 / 16 / 24 / 32-bit,
+float, mono or stereo), resampled to 48 kHz, leading / trailing silence under -45 dBFS trimmed, the peak set to -0.5
+dBFS (both can be turned off), encoded to DSP-ADPCM; the tone's TONE entry is a copy of a one-shot of the same bank (its
+`_Special_L01` if it has one; a stereo sound copies a stereo one), its audio appended to PACK at a 0x10 boundary, JUNK
+sized so PACK starts at one. The tone gets the next label of its bank's soundlabeltable row: **sound id = row << 16 |
+label**, an id no other sound has; the fighter's costume banks on that row (`snd_se_<Cap>_cNN`) get the same tone at the
+same index (padded with empty slots when they have fewer). An IDSP file is added as it is. Aliases go to
+`Sm4shCommand/Aliases/sounds/<fighter>.txt` in the output folder (Sm4shCommand's Sound Effect Viewer format: copy it
+into Sm4shCommand's `Aliases/sounds/`). A clone with its own banks gets the sounds on its own rows. No executable change.
+
+### Articles and article cloning
+
+A new article is a copy of an existing article of **any** fighter (its weapon kind: its native code), owned by the
+fighter you import into, under a name of its own:
+
+- **its own weapon kind** (0x185 and up, after the clones' own articles): the weapon tables, the 13 weapon-kind switches
+  and the module rows grow to it (the same patch as a clone's own articles); its name and folder are the new name, its
+  owner the fighter, so its files load from `fighter/<owner>/model/<name>/`, `motion/<name>/`,
+  `script/animcmd/weapon/<name>/` and `script/msc/<name>/<name>.mscsb`: the source's folders, copied there;
+- **its article id**: the owner's article list gets it after its normal articles, before its special entries (the game
+  makes instances only for the entries before those): printed, e.g. Fox's list has 5 articles, so his first new article
+  is id 5. The owner's MSC (`ArticleModule` generate) makes it by that id, and its ACMD article commands
+  (`Set_Anchored_Article_Action`, `Remove_Article` ...) name it by that id; its max count is how many can exist at once
+  (a fighter pools 64 instances in all);
+- **its params**: an article reads its params from its owner's `fighter_param_vl` file (the article's block in it):
+  for an article copied from the owner itself, or from the base of a clone that owns it, its own copy of the getter
+  reads the owner's file (a clone: its own vl file, so params of its own); for **another fighter's** article it reads
+  that fighter's params, which the tool's two vl hooks load and release with the owner (the game's reference count
+  keeps each loaded once);
+- **its effects**: its scripts' effect ids are moved to the owner's bank (the same entries when the owner's bank is a
+  copy of the source's, e.g. a clone of the source fighter; otherwise those effects are imported into the owner's bank
+  as above and the new ids used). **Its sounds**: to the owner's rows (the same labels when the owner's banks are copies
+  of the source's; otherwise the tones are copied into the owner's se bank as new sounds and the new ids used).
+
+So **cloning an article** for the fighter itself (a second blaster with its own model and scripts) or for another fighter
+(Zero Suit Samus's whip on a Fox clone) is the same thing: pick the article, name the copy, choose the owner.
+
 ## Command line
 
 ```
@@ -366,6 +472,11 @@ python cli.py voices --data DATA --out OUT --name wolf --replace snd_vc_Wolf_app
 python cli.py plate  --text "Fox Clone" --set chrn_40 --png plate.png
 python cli.py build  --data DATA --out OUT --exe EXE --fighter fox:wolf --exe-output aroma      (or cemu, all, rpx,cemu)
 python cli.py patchinfo --patch OUT/INSTALL_TO_sd/wiiu/sm4shclonetool/0005000010144F00.patch --exe cross_f.rpx
+python cli.py import --data DATA --out OUT --exe EXE --motion szerosuit:NewSpin=spin.omo,copy=Attack11,part=lhand@spin_lhand.omo
+python cli.py import --data DATA --out OUT --exe EXE --effect fox:szerosuit:5 --effect-file wolf:other.010d0000.efc:3,name=PtcWolfBurst
+python cli.py import --data DATA --out OUT --exe EXE --sound wolf:howl.wav,alias=Howl,bank=vc --sound fox:click.idsp
+python cli.py import --data DATA --out OUT --exe EXE --article fox:blaster2=fox/blaster --article wolf:whip=szerosuit/whip,max=1
+python cli.py effects --data DATA --source szerosuit
 ```
 
 `python cli.py --help` lists every key.
@@ -385,6 +496,10 @@ The window shows the current counts and limits under the plan ("Fighter clones: 
 | stage-select ids | 0x38-0xC7 | ids up to 0xC7 are found by position |
 | code space | grows with the clones (about 6.5 KB a fighter, more with articles) | from `0x04B78000`; past `0x04BB8000` the executable's code region is enlarged (as other code mods do; tested on Cemu by such mods, not on a console) |
 | effect banks in one match | 8 | the game's bank slot table; a clone whose base isn't in the match uses two. A per-match limit, not a clone count |
+| (2.0) imported motions | up to 0x610 for the CPU to use them; the motion number is otherwise unbounded | the AI's attack table index has 0x611 slots (`0x02DFC8CC`); the grown tables take the code space (8 + 4 a part bytes a motion) |
+| (2.0) imported effects | 65535 entries a bank | `.efc` entry counts are 16-bit; the game's effect memory for a match is fixed (not measured with imported effects) |
+| (2.0) imported sounds | 65536 labels a soundlabeltable row | a sound id's label is its low 16 bits (`0x0311EDC4` checks label < the row's count) |
+| (2.0) new articles / article clones | weapon kinds up to 0x7FFF in all | weapon_expand's tables (the game: 389 kinds, 0x000-0x184, 13 switches bounded at 0x184); a fighter pools at most **64 article instances** (the max counts of its list's normal entries: the ArticleModule's holder has 64 places and stores them with no bound check, `0x02C02614`): the tool refuses an article that would pass it (the game's largest: Villager 28, Mega Man 19; Fox 10) |
 
 ## What is not confirmed in game
 
@@ -410,6 +525,26 @@ The window shows the current counts and limits under the plan ("Fighter clones: 
     (see "Without a modified executable"); the patched rpx is for Cemu.
 - 1.5 changes nothing in the patched rpx itself: it is made by the same generators, byte for byte as 1.4 made it (the
   marker names 1.5).
+- **2.0 (the importer, article cloning), not seen in a game.** Verified by the tests (on the game's v288 executable and
+  vanilla files): every file round-trips and keeps its old entries byte for byte, the new ids are unique; the
+  executable's new motion tables, article lists, weapon descriptors, file names and vl hooks run in emulation (the
+  game's own functions) on the patched rpx and relocated as the Aroma plugin and Cemu place them; Sm4shCommand's own
+  loaders open the imported fighters (scripts, motion.mtable, names, Hitbox Viewer animations, sounds and aliases,
+  effects). Not confirmed:
+  - an imported motion playing in game: its animation found by the pack loader (the `.omo` hash), its scripts run, its
+    vl flags; the motion tables are written by the game at run time (0x02EA9008), so they must be writable where the
+    loader puts them (as the clones' tables already are);
+  - imported effects drawing in game (each emitter's data is the source's, its shaders / textures copied with it; the
+    game's effect memory per match was not measured with added emitters);
+  - imported sounds in game (the encoder is tested against the reference encoder, the bank layout against
+    Sm4shCommand's rules);
+  - articles: a copied article runs its source kind's native code for its new owner. Code that reads its owner as the
+    source fighter (its specializer, its statuses, bones by number, an owner's article by id) may misbehave on another
+    fighter: an article from another fighter is the least certain case. Its spawner (callback / extra of the article
+    list entry) is the source's, which may place it on a bone of the source's skeleton. The vl hooks (another
+    fighter's params loaded with the owner) were emulated, not run;
+  - a clone made from a fighter after motions were imported into it inherits the files but not the motion table
+    entries (import into the clone too).
 - Many clones: 40 fighter and 8 stage clones were built and emulated; the enlarged code region (to about 0x04BD1000,
   356 KB, for 40 fighters and 8 stages), high kinds' resource ids (`kind * 0x11 + n`, map keys) and a select screen with 99 entries were not
   seen in a game.

@@ -39,6 +39,18 @@ CLONES:
               and the patch file it reads (wiiu/sm4shclonetool/<title id>.patch); the game's own cross_f.rpx stays;
        cemu: INSTALL_TO_cemu/graphicPacks/Sm4shCloneTool_Clones/ (rules.txt, patches.txt), a Cemu graphic pack
   python cli.py patchinfo --patch FILE.patch   what an Aroma patch file holds (and its checks)
+
+IMPORTER (2.0): `import` adds animations, effects, sounds and articles to a fighter (a vanilla one by its folder name,
+or a clone of the project) and rebuilds the package and the executable patch (check / build take the same options):
+  --motion TARGET:NAME=FILE.omo[,copy=MOTION][,loop=0|1][,part=STEM@FILE.omo...]
+       a new motion kind NAME playing FILE.omo (its index is printed); copy: a motion (its index 0x.., or its script
+       name) whose four scripts, vl group 1 entry and flags the new one starts with (default: empty scripts)
+  --effect TARGET:SOURCE:ENTRY[,name=SETNAME]      entry ENTRY of fighter SOURCE's effect bank (`effects --source`)
+  --effect-file TARGET:FILE.efc:ENTRY[,name=..]    ... of any bank (its .ptcl beside it, model/ for its models)
+  --sound TARGET:FILE.wav|FILE.idsp[,name=TONE][,alias=TEXT][,bank=se|vc|FILE][,volume=DB][,loop=1][,trim=0][,normalize=0]
+  --article OWNER:NAME=SRC_OWNER/ARTICLE[,max=N]   a new article NAME of OWNER: a copy of SRC_OWNER's ARTICLE (its own
+       weapon kind, files, effects, sounds), spawnable by its new article id (printed)
+  python cli.py effects --data DATA --source FIGHTER   the entries of a fighter's effect bank (what --effect takes)
 """
 import argparse
 import json
@@ -139,11 +151,74 @@ def parse_clones(a, s):
     return fighters, stages, portraits, icons
 
 
+def _opts(text):
+    out = {}
+    for part in filter(None, (text or '').split(',')):
+        k, _, v = part.partition('=')
+        out[k.strip()] = v
+    return out
+
+
+def parse_imports(a):
+    """the importer's options into importer.run items"""
+    out = []
+    for m in a.motion or []:
+        tgt, rest = m.split(':', 1)
+        head, _, opt = rest.partition(',')
+        name, _, omo = head.partition('=')
+        it = {'what': 'motion', 'target': tgt, 'name': name, 'omo': omo, 'parts': {}}
+        for k, v in [kv.partition('=')[::2] for kv in filter(None, opt.split(','))]:
+            if k == 'copy':
+                it['copy'] = int(v, 0) if v[:1].isdigit() else v
+            elif k == 'loop':
+                it['loop'] = bool(int(v))
+            elif k == 'part':
+                stem, _, f = v.partition('@')
+                it['parts'][stem] = f
+        out.append(it)
+    for e in a.effect or []:
+        tgt, src, rest = e.split(':', 2)
+        entry, _, opt = rest.partition(',')
+        out.append(dict({'what': 'effect', 'target': tgt, 'source': src, 'entry': int(entry, 0)}, **_opts(opt)))
+    for e in a.effect_file or []:
+        tgt, rest = e.split(':', 1)
+        path, _, rest = rest.rpartition(':')
+        entry, _, opt = rest.partition(',')
+        out.append(dict({'what': 'effect', 'target': tgt, 'efc': path, 'entry': int(entry, 0)}, **_opts(opt)))
+    for e in a.sound or []:
+        tgt, rest = e.split(':', 1)
+        path, _, opt = rest.partition(',')
+        it = dict({'what': 'sound', 'target': tgt, 'file': path}, **_opts(opt))
+        for k in ('loop', 'trim', 'normalize'):
+            if k in it:
+                it[k] = bool(int(it[k]))
+        if 'volume' in it:
+            it['volume'] = float(it['volume'])
+        out.append(it)
+    for e in a.article or []:
+        owner, rest = e.split(':', 1)
+        head, _, opt = rest.partition(',')
+        name, _, src = head.partition('=')
+        so, _, sa = src.partition('/')
+        it = dict({'what': 'article', 'owner': owner, 'target': owner, 'name': name, 'source_owner': so,
+                   'source': sa}, **_opts(opt))
+        if 'max' in it:
+            it['max'] = int(it['max'])
+        out.append(it)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description='Sm4shCloneTool %s' % VERSION, epilog=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('command', choices=['info', 'roster', 'check', 'build', 'css', 'sss', 'voices', 'plate',
-                                        'patchinfo'])
+                                        'patchinfo', 'import', 'effects'])
+    ap.add_argument('--motion', action='append')
+    ap.add_argument('--effect', action='append')
+    ap.add_argument('--effect-file', action='append')
+    ap.add_argument('--sound', action='append')
+    ap.add_argument('--article', action='append')
+    ap.add_argument('--source')
     ap.add_argument('--exe-output', default='rpx')
     ap.add_argument('--patch')
     ap.add_argument('--name')
@@ -233,9 +308,16 @@ def main():
             print('stage 0x%02X %-16s kind 0x%02X page %d order %d%s' % (st['id'], st['name'], st['kind'], st['page'],
                                                                      st['order'], ' (clone)' if st['clone'] else ''))
         return
+    if a.command == 'effects':
+        from sm4shclonetool import importer as I
+        efc, ptcl = I.effect_source({'source': a.source}, s.pkg_data, s.data)
+        for i, st, model, fl in I.list_effects(efc, ptcl):
+            print('%3d  %-40s %-34s flags 0x%X' % (i, st or '-', ('model ' + model) if model else '', fl))
+        return
     fighters, stages, portraits, icons = parse_clones(a, s)
+    imports = parse_imports(a)
     if a.command == 'check':
-        reg, recs, errors, notes, files, items = s.plan(fighters, stages)
+        reg, recs, errors, notes, files, items = s.plan(fighters, stages, imports)
         for n in notes:
             print('note: ' + n)
         for e in errors:
@@ -248,14 +330,25 @@ def main():
             print('  ' + i)
         print(s.limits_text(reg))
         sys.exit(1 if errors else 0)
+    if a.command == 'import' and not (imports or fighters or stages):
+        sys.exit('import: give --motion / --effect / --effect-file / --sound / --article')
     if a.command in ('css', 'sss'):
         reg = s.plan(fighters, stages)[0]
         new = [f['ui_id'] for f in reg['fighters']] if a.command == 'css' else [x['cosmetic'] for x in reg['stages']]
         _img, info = (s.css if a.command == 'css' else s.sss)(reg, new, a.png or a.command + '.png')
         print(json.dumps({k: v for k, v in info.items() if k != 'slot'}, default=str)[:2000])
         return
-    summary = s.build(fighters, stages, portraits, icons)
-    print('built: %s -> %s' % (', '.join(summary['clones']), s.out))
+    summary = s.build(fighters, stages, portraits, icons, imports)
+    print('built: %s -> %s' % (', '.join(summary['clones']) or '(no new clone)', s.out))
+    imp = summary.get('imported') or {}
+    for t, n, i in imp.get('motions', []):
+        print('motion  %s %s: motion kind 0x%X (%d)' % (t, n, i, i))
+    for t, n, i in imp.get('effects', []):
+        print('effect  %s %s: effect id 0x%08X' % (t, n, i))
+    for t, n, i in imp.get('sounds', []):
+        print('sound   %s %s: sound id 0x%08X' % (t, n, i))
+    for x in imp.get('articles', []):
+        print('article %s %s: article id %d, weapon kind 0x%X' % (x['owner'], x['name'], x['article_id'], x['kind']))
 
 
 if __name__ == '__main__':

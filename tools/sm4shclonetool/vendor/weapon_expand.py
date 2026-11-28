@@ -38,10 +38,18 @@ ARTICLE = 16
 def load_weapons(path, img):
     raw = json.load(open(path))
     cap = K.num(raw.get('weapon_capacity', DEFAULT_CAPACITY))
-    _fcap, kinds = K.load_spec(path)
-    rawk = {K.num(r['kind']): r for r in raw['kinds']}
+    _fcap, kinds = K.load_spec(path) if raw.get('kinds') else (None, [])
+    rawk = {K.num(r['kind']): r for r in raw.get('kinds', [])}
     owner = [img.cstr(img.w(272732144 + 4 * k)) for k in range(OLD_N)]
     name = [img.cstr(img.w(272733700 + 4 * k)) for k in range(OLD_N)]
+    if raw.get('owners'):
+        fnames = [img.cstr(img.w(K.TABLES['lower'][0] + 4 * k)) for k in range(K.OLD_N)]
+        for o in raw['owners']:
+            k = K.kind_index(fnames, o['name'])
+            assert k not in rawk, 'owner %s twice' % o['name']
+            assert all((isinstance(v, dict) for v in (o.get('weapons') or {}).values())), 'a vanilla owner\'s weapons are brand-new articles ({"kind", "base", "max"})'
+            kinds.append({'kind': k, 'name': o['name'], 'base': o['name'], 'desc_from': o['name'], 'vanilla_owner': True})
+            rawk[k] = o
     out, nxt = ([], OLD_N)
     for r in kinds:
         ws = rawk[r['kind']].get('weapons') or {}
@@ -71,8 +79,13 @@ def load_weapons(path, img):
                 art_base = spec['base']
             else:
                 art_base = art
-            base = [k for k in range(OLD_N) if owner[k] == r['base'] and name[k] == art_base]
-            assert len(base) == 1, '%s has no article %s' % (r['base'], art_base)
+            src_owner, sep, src_name = art_base.partition('/')
+            if not sep:
+                src_owner, src_name = (r['base'], art_base)
+            elif spec:
+                r.setdefault('src_owner', {})[nk] = src_owner
+            base = [k for k in range(OLD_N) if owner[k] == src_owner and name[k] == src_name]
+            assert len(base) == 1, '%s has no article %s' % (src_owner, src_name)
             lst.append((nk, base[0], art))
         for key in ('modules', 'spawn_from'):
             for nk, v in list(r.get(key, {}).items()):
@@ -306,10 +319,14 @@ def article_layout(img, recs):
         added = []
         for nk, (_name, mx) in sorted(r.get('new_articles', {}).items()):
             bk = [b for n, b, _a in lst if n == nk][0]
-            found = [i for i in range(count) if img.w(entries + ARTICLE * i) & 1073741823 == bk]
+            sents, scount = (entries, count)
+            if nk in r.get('src_owner', {}):
+                sl = img.w(fighter_descriptor(img, {'desc_from': r['src_owner'][nk]}) + 8)
+                sents, scount = (img.w(sl), img.w(sl + 4))
+            found = [i for i in range(scount) if img.w(sents + ARTICLE * i) & 1073741823 == bk]
             assert found, 'the base fighter has no article of kind 0x%X' % bk
             i = found[0]
-            e = [img.w(entries + ARTICLE * i + 4 * j) for j in range(4)]
+            e = [img.w(sents + ARTICLE * i + 4 * j) for j in range(4)]
             e[0] = e[0] & 3221225472 | nk
             e[1] = mx
             sk = r.get('spawn_from', {}).get(nk)
@@ -343,7 +360,7 @@ def build(spec_path=SPEC, rpx=RPX):
     B = Build(img)
     recs, cap = load_weapons(spec_path, img)
     fnames = [img.cstr(img.w(K.TABLES['lower'][0] + 4 * k)) for k in range(K.OLD_N)]
-    fcap, _kinds = K.load_spec(spec_path)
+    fcap = K.load_spec(spec_path)[0] if json.load(open(spec_path)).get('kinds') else K.DEFAULT_CAPACITY
     vl_new = K.mgr_layout(fcap)[0]['vl'][1]
     new = {}
     for r, lst in recs:
@@ -357,6 +374,16 @@ def build(spec_path=SPEC, rpx=RPX):
         blob = struct.pack('>II', at + 8, len(rows)) + b''.join((struct.pack('>4I', *e) for e in rows))
         B.data(at, blob, 'article list 0x%X' % fk)
     info['article_lists'] = {k: a for k, (a, _r) in lay.items()}
+    B.extra_relocs = []
+    for r, _lst in recs:
+        if r.get('vanilla_owner'):
+            fdesc = fighter_descriptor(img, r)
+            old = img.w(fdesc + 8)
+            B.put(fdesc + 8, lay[r['kind']][0], 'article list of %s' % r['name'], old)
+            if fdesc + 8 in img.relocs():
+                assert old + 4 not in img.relocs()
+                B.inplace.remove(fdesc + 8)
+                B.extra_relocs.append((fdesc + 8, old + 4))
     sblob, sptr = (bytearray(), {})
     for r, _lst in recs:
         sptr[r['name']] = len(sblob)
@@ -455,7 +482,7 @@ def build(spec_path=SPEC, rpx=RPX):
             B.data(s_at2, struct.pack('>II', s_at2 + 8, cnt) + b''.join((struct.pack('>4I', *e) for e in rows)), 'weapon 0x%X sub-articles' % nk)
             struct.pack_into('>I', blob, 20, s_at2)
         own = vl_new + 4 * r['kind']
-        for off in (24, 36):
+        for off in (24, 36) if not r.get('vanilla_owner') else ():
             src = struct.unpack_from('>I', blob, off)[0] if off + 4 <= size else 0
             if not src or not 33554432 <= src < 268435456:
                 continue

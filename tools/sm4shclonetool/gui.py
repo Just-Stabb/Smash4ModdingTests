@@ -80,14 +80,18 @@ class App:
         nb.pack(fill='both', expand=True, padx=6, pady=4)
         self.nb = nb
         self.ftab, self.stab, self.xtab, self.vtab = ttk.Frame(nb), ttk.Frame(nb), ttk.Frame(nb), ttk.Frame(nb)
+        self.itab = ttk.Frame(nb)
+        self.pending_i = []
         nb.add(self.ftab, text='Fighters')
         nb.add(self.xtab, text='Fighter extras (call, fanfare, Kirby, plates, languages)')
         nb.add(self.vtab, text='Voices (a built clone)')
         nb.add(self.stab, text='Stages')
+        nb.add(self.itab, text='Import (animations, effects, sounds, articles)')
         self._fighter_tab()
         self._extras_tab()
         self._voices_tab()
         self._stage_tab()
+        self._import_tab()
         self._bottom()
         root.after(100, self._poll)
         if all(self.vars[k].get() for k in ('data', 'out')):
@@ -515,6 +519,200 @@ class App:
                 self.say('voice %s (%s) <- %s' % (n, f, w))
             self._fill_voices()
 
+    # ------------------------------------------------------------ (2.0) the importer
+    def _import_tab(self):
+        t = self.itab
+        top = ttk.Frame(t)
+        top.pack(fill='x', padx=6, pady=4)
+        ttk.Label(top, text='Fighter to import into (a vanilla fighter or a clone of this project):').pack(side='left')
+        self.i_target = ttk.Combobox(top, width=20)
+        self.i_target.pack(side='left', padx=4)
+        self.i_target.bind('<<ComboboxSelected>>', lambda e: self._fill_imported())
+        ttk.Label(t, text='Everything goes into the package (the data folder is never written) and the executable patch '
+                  'is rebuilt with it (imported motions and articles need it). Add items, then Check / Build below; the '
+                  'new motion kinds, effect ids, sound ids and article ids are printed in the log and README.txt. '
+                  'Sm4shCommand: Sm4shCommand_names.txt and Sm4shCommand/Aliases/sounds/ in the output folder.',
+                  wraplength=1400).pack(fill='x', padx=6)
+        body = ttk.Frame(t)
+        body.pack(fill='both', expand=True, padx=6)
+        left = ttk.Frame(body)
+        left.pack(side='left', fill='y')
+        self.iv = {k: tk.StringVar() for k in ('m_name', 'm_omo', 'm_copy', 'm_part', 'm_part_omo', 'e_source', 'e_efc',
+                                                'e_name', 's_file', 's_name', 's_alias', 's_volume', 's_bank', 'a_name',
+                                                'a_source_owner', 'a_source', 'a_max')}
+        self.iv['s_bank'].set('se')
+        self.iv['a_max'].set('1')
+        self.iv['s_volume'].set('0')
+        self.i_loop, self.i_sloop = tk.BooleanVar(value=False), tk.BooleanVar(value=False)
+
+        def row(parent, label, key, browse=None, width=30):
+            r = ttk.Frame(parent)
+            r.pack(fill='x', pady=1)
+            ttk.Label(r, text=label, width=22).pack(side='left')
+            ttk.Entry(r, textvariable=self.iv[key], width=width).pack(side='left')
+            if browse:
+                ttk.Button(r, text='...', width=3, command=lambda: self._i_browse(key, browse)).pack(side='left')
+        m = ttk.LabelFrame(left, text='Animation: a new motion kind (an .omo file)')
+        m.pack(fill='x', pady=3)
+        row(m, 'Name (its script name)', 'm_name')
+        row(m, 'Animation (.omo)', 'm_omo', [('OMO', '*.omo')])
+        row(m, 'Copy scripts from', 'm_copy')
+        ttk.Checkbutton(m, text='Loops (vl group 1 byte 1 = 6)', variable=self.i_loop).pack(anchor='w')
+        row(m, 'Part (lhand, rhand ...)', 'm_part', width=12)
+        row(m, 'Part animation (.omo)', 'm_part_omo', [('OMO', '*.omo')])
+        ttk.Button(m, text='Add motion', command=self._i_add_motion).pack(anchor='e')
+        e = ttk.LabelFrame(left, text='Effects: emitter sets from another bank')
+        e.pack(fill='x', pady=3)
+        r = ttk.Frame(e)
+        r.pack(fill='x')
+        ttk.Label(r, text='Source fighter', width=22).pack(side='left')
+        self.i_esrc = ttk.Combobox(r, textvariable=self.iv['e_source'], width=20)
+        self.i_esrc.pack(side='left')
+        ttk.Button(r, text='List', command=self._i_list_effects).pack(side='left')
+        row(e, 'or a .efc file', 'e_efc', [('EFC', '*.efc')])
+        row(e, 'New set name (optional)', 'e_name')
+        self.i_elist = tk.Listbox(e, height=6, width=60, selectmode='extended')
+        self.i_elist.pack(fill='x')
+        ttk.Button(e, text='Add selected effects', command=self._i_add_effects).pack(anchor='e')
+        so = ttk.LabelFrame(left, text='Sounds: WAV / IDSP as new tones (Sm4shCommand\'s Sound Adder rules)')
+        so.pack(fill='x', pady=3)
+        row(so, 'File (WAV / IDSP)', 's_file', [('WAV / IDSP', '*.wav *.idsp'), ('all', '*.*')])
+        row(so, 'Bank (se / vc / a file)', 's_bank', width=12)
+        row(so, 'Tone name (optional)', 's_name')
+        row(so, 'Alias (Sm4shCommand)', 's_alias')
+        row(so, 'Volume (dB)', 's_volume', width=8)
+        ttk.Checkbutton(so, text='Loops', variable=self.i_sloop).pack(anchor='w')
+        ttk.Button(so, text='Add sound', command=self._i_add_sound).pack(anchor='e')
+        right = ttk.Frame(body)
+        right.pack(side='left', fill='both', expand=True, padx=8)
+        a = ttk.LabelFrame(right, text='Article: a copy of any fighter\'s article, its own weapon kind')
+        a.pack(fill='x', pady=3)
+        row(a, 'New article name', 'a_name')
+        r = ttk.Frame(a)
+        r.pack(fill='x')
+        ttk.Label(r, text='Copy of: fighter', width=22).pack(side='left')
+        self.i_asrc = ttk.Combobox(r, textvariable=self.iv['a_source_owner'], width=16)
+        self.i_asrc.pack(side='left')
+        self.i_asrc.bind('<<ComboboxSelected>>', lambda e: self._i_articles())
+        self.i_aart = ttk.Combobox(r, textvariable=self.iv['a_source'], width=16)
+        self.i_aart.pack(side='left')
+        row(a, 'Max instances', 'a_max', width=6)
+        ttk.Button(a, text='Add article', command=self._i_add_article).pack(anchor='e')
+        ttk.Label(right, text='To import (built with Check / Build below):').pack(anchor='w')
+        self.i_pending = tk.Listbox(right, height=7)
+        self.i_pending.pack(fill='x')
+        ttk.Button(right, text='Remove selected', command=self._i_remove).pack(anchor='w')
+        ttk.Label(right, text='Imported into this fighter so far (the registry):').pack(anchor='w', pady=(8, 0))
+        self.i_done = ttk.Treeview(right, columns=('name', 'id'), height=18)
+        for c, w, h in (('#0', 90, 'what'), ('name', 380, 'name'), ('id', 260, 'id')):
+            self.i_done.heading(c, text=h)
+            self.i_done.column(c, width=w)
+        self.i_done.pack(fill='both', expand=True)
+
+    def _i_browse(self, key, types):
+        p = filedialog.askopenfilename(filetypes=types)
+        if p:
+            self.iv[key].set(p)
+
+    def _i_targets(self):
+        if not self.session:
+            return
+        names = [f['name'] for f in self.session.reg['fighters']] + [n for n in R.KINDS[3:0x3A]]
+        self.i_target.configure(values=names)
+        self.i_esrc.configure(values=names)
+        self.i_asrc.configure(values=names)
+        if not self.i_target.get() and names:
+            self.i_target.set(names[0])
+        self._fill_imported()
+
+    def _i_articles(self):
+        if self.session:
+            self.i_aart.configure(values=self.session.articles(self.iv['a_source_owner'].get()))
+
+    def _i_push(self, item, text):
+        item['target'] = item.get('target') or self.i_target.get()
+        self.pending_i.append(item)
+        self.i_pending.insert('end', '%s -> %s: %s' % (item['what'], item['target'], text))
+
+    def _i_add_motion(self):
+        v = self.iv
+        if not v['m_name'].get() or not v['m_omo'].get():
+            return messagebox.showinfo(TITLE, 'A motion needs a name and an .omo file.')
+        it = {'what': 'motion', 'name': v['m_name'].get(), 'omo': v['m_omo'].get(), 'loop': self.i_loop.get() or None,
+              'parts': {}}
+        c = v['m_copy'].get().strip()
+        if c:
+            it['copy'] = int(c, 0) if c[:1].isdigit() else c
+        if v['m_part'].get() and v['m_part_omo'].get():
+            it['parts'][v['m_part'].get()] = v['m_part_omo'].get()
+        self._i_push(it, '%s (%s)' % (it['name'], os.path.basename(it['omo'])))
+
+    def _i_list_effects(self):
+        from sm4shclonetool import importer as I
+        self.i_elist.delete(0, 'end')
+        self.i_effects = []
+        try:
+            item = {'efc': self.iv['e_efc'].get()} if self.iv['e_efc'].get() else {'source': self.iv['e_source'].get()}
+            efc, ptcl = I.effect_source(item, self.session.pkg_data, self.session.data)
+            for i, st, model, fl in I.list_effects(efc, ptcl):
+                self.i_effects.append((efc, ptcl, i))
+                self.i_elist.insert('end', '%3d  %s%s' % (i, st or '-', ('  (model %s)' % model) if model else ''))
+        except Exception as e:
+            self.say('effects: %s' % e)
+
+    def _i_add_effects(self):
+        for i in self.i_elist.curselection():
+            efc, ptcl, entry = self.i_effects[i]
+            it = {'what': 'effect', 'efc': efc, 'ptcl': ptcl, 'entry': entry}
+            if self.iv['e_name'].get() and len(self.i_elist.curselection()) == 1:
+                it['name'] = self.iv['e_name'].get()
+            self._i_push(it, 'entry %d of %s' % (entry, os.path.basename(efc)))
+
+    def _i_add_sound(self):
+        v = self.iv
+        if not v['s_file'].get():
+            return
+        it = {'what': 'sound', 'file': v['s_file'].get(), 'bank': v['s_bank'].get() or 'se', 'loop': self.i_sloop.get()}
+        for k in ('name', 'alias'):
+            if v['s_' + k].get():
+                it[k] = v['s_' + k].get()
+        try:
+            it['volume'] = float(v['s_volume'].get() or 0)
+        except ValueError:
+            pass
+        self._i_push(it, os.path.basename(it['file']))
+
+    def _i_add_article(self):
+        v = self.iv
+        if not (v['a_name'].get() and v['a_source_owner'].get() and v['a_source'].get()):
+            return messagebox.showinfo(TITLE, 'An article needs a name and the article it copies.')
+        it = {'what': 'article', 'owner': self.i_target.get(), 'name': v['a_name'].get(),
+              'source_owner': v['a_source_owner'].get(), 'source': v['a_source'].get(),
+              'max': int(v['a_max'].get() or 1)}
+        self._i_push(it, '%s (a copy of %s/%s)' % (it['name'], it['source_owner'], it['source']))
+
+    def _i_remove(self):
+        for i in reversed(self.i_pending.curselection()):
+            self.i_pending.delete(i)
+            del self.pending_i[i]
+
+    def _fill_imported(self):
+        self.i_done.delete(*self.i_done.get_children())
+        if not self.session:
+            return
+        t = self.i_target.get()
+        imp = self.session.reg.get('imports') or {}
+        for r in (imp.get('motions') or {}).get(t, []):
+            self.i_done.insert('', 'end', text='motion', values=(r['name'], 'motion kind 0x%X (%d)' % (r['index'], r['index'])))
+        for r in (imp.get('effects') or {}).get(t, []):
+            self.i_done.insert('', 'end', text='effect', values=(r['name'], 'effect id 0x%08X' % r['id']))
+        for r in (imp.get('sounds') or {}).get(t, []):
+            self.i_done.insert('', 'end', text='sound', values=(r['name'], 'sound id 0x%08X' % r['id']))
+        for a in imp.get('articles') or []:
+            if a['owner'] == t:
+                self.i_done.insert('', 'end', text='article', values=(
+                    '%s (%s/%s)' % (a['name'], a['source_owner'], a['source']), 'article id %s' % a.get('article_id')))
+
     def _stage_tab(self):
         t = self.stab
         lf, self.s_grid = self._roster_panel(t, 'Base stage (click one)')
@@ -611,6 +809,7 @@ class App:
         self._fill_stages()
         self._fill_languages()
         self._fill_voices()
+        self._i_targets()
         self._schedule_preview()
         self._schedule_plate()
 
@@ -852,8 +1051,8 @@ class App:
         if not self.session:
             return self.reload()
         fs, ss = self._all()
-        reg, recs, errors, notes, files, items = self.session.plan(fs, ss)
-        self.say('=== Check: %d fighter / %d stage clone(s)' % (len(fs), len(ss)))
+        reg, recs, errors, notes, files, items = self.session.plan(fs, ss, self.pending_i)
+        self.say('=== Check: %d fighter / %d stage clone(s), %d import(s)' % (len(fs), len(ss), len(self.pending_i)))
         for n in notes:
             self.say('note: ' + n)
         for e in errors:
@@ -874,12 +1073,25 @@ class App:
         portraits = {f['name']: self.portraits.get(f['name'], {}) for f in fs}
         icons = {s['name']: self.icons.get(s['name'], {}) for s in ss}
 
+        imports = list(self.pending_i)
+
         def run():
             try:
-                self.session.build(fs, ss, portraits, icons)
+                summary = self.session.build(fs, ss, portraits, icons, imports)
                 self.say('=== Built into %s' % self.session.out)
-                self.pending_f, self.pending_s = [], []
-                self.root.after(0, lambda: (self.plan_list.delete(0, 'end'), self.reload()))
+                imp = summary.get('imported') or {}
+                for t_, n, i in imp.get('motions', []):
+                    self.say('imported motion %s %s: motion kind 0x%X (%d)' % (t_, n, i, i))
+                for t_, n, i in imp.get('effects', []):
+                    self.say('imported effect %s %s: effect id 0x%08X' % (t_, n, i))
+                for t_, n, i in imp.get('sounds', []):
+                    self.say('imported sound %s %s: sound id 0x%08X' % (t_, n, i))
+                for x in imp.get('articles', []):
+                    self.say('new article %s %s: article id %s, weapon kind 0x%X' % (x['owner'], x['name'],
+                                                                                    x['article_id'], x['kind']))
+                self.pending_f, self.pending_s, self.pending_i = [], [], []
+                self.root.after(0, lambda: (self.plan_list.delete(0, 'end'), self.i_pending.delete(0, 'end'),
+                                            self.reload()))
             except Exception as e:
                 self.say('BUILD FAILED: %s' % e)
                 self.say(traceback.format_exc())
@@ -904,7 +1116,8 @@ def main():
         ap.add_argument('--' + k)
     ap.add_argument('--exe-output', dest='exe_output', help='rpx (default), aroma, cemu or all')
     ap.add_argument('--screenshot')
-    ap.add_argument('--tab', default='fighters', help='fighters, extras, voices or stages')
+    ap.add_argument('--tab', default='fighters', help='fighters, extras, voices, stages or import')
+    ap.add_argument('--import-target', help='with --screenshot --tab import: the fighter to show')
     ap.add_argument('--fighter', help='with --screenshot: SOURCE:NAME to fill in')
     ap.add_argument('--stage', help='with --screenshot: SOURCE:NAME to fill in')
     a = ap.parse_args()
@@ -924,7 +1137,13 @@ def main():
                 app.sv['name'].set(name)
                 app.sv['page'].set(pg[0] if pg else '1')
                 app.sv['cosmetic'].set('0x%X' % (0x38 + len(app.session.reg['stages'])))
-            tabs = {'fighters': 0, 'extras': 1, 'voices': 2, 'stages': 3}
+            tabs = {'fighters': 0, 'extras': 1, 'voices': 2, 'stages': 3, 'import': 4}
+            if a.tab == 'import' and app.session:
+                if a.import_target:
+                    app.i_target.set(a.import_target)
+                app._fill_imported()
+                app.iv['e_source'].set('szerosuit')
+                app._i_list_effects()
             app.nb.select(tabs.get(a.tab, 0))
             if a.tab == 'voices' and app.session:
                 for f in reversed(app.session.reg['fighters']):      # the last clone that has sound banks
@@ -947,7 +1166,8 @@ def main():
                     'exe_output': list(app.session.exe_output) if app.session else None,
                     'css': {k: v for k, v in getattr(app, 'css_slots', {}).items() if k != 'slot'},
                     'limits': app.limits_label.cget('text'), 'plate': app.plate_info.cget('text'),
-                    'voices': len(app.v_lines), 'languages': len(app.lang_tree.get_children())}
+                    'voices': len(app.v_lines), 'languages': len(app.lang_tree.get_children()),
+                    'imported': len(app.i_done.get_children()), 'effect_entries': app.i_elist.size()}
             print(json.dumps(info))
             root.destroy()
         root.after(500, shoot)

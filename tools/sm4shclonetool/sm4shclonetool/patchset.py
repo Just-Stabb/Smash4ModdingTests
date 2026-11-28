@@ -126,6 +126,10 @@ def export(in_path, reg, log=print, work=None):
     ps.meta = {'tool': _version(), 'fighters': [f['name'] for f in reg['fighters']],
                'stages': [s['name'] for s in reg['stages']], 'source_sha1': sha1_file(in_path),
                'image': x.image_digest()}
+    imp = reg.get('imports') or {}
+    if imp.get('motions') or imp.get('articles'):          # (2.0) what the importer put in the executable
+        ps.meta['imports'] = {'motions': {k: len(v) for k, v in (imp.get('motions') or {}).items() if v},
+                              'articles': ['%s/%s' % (a['owner'], a['name']) for a in imp.get('articles') or []]}
     log('patch set: %d words in the game (%s), cave %d bytes (%d relocated words, %d veneers)'
         % (len(ps.sites), ', '.join('%s %d' % (KIND_NAMES[k], sum(1 for s in ps.sites if s['kind'] == k))
                                     for k in sorted(KIND_NAMES)), ps.size, len(ps.cave_relocs), len(ps.veneers)))
@@ -527,9 +531,13 @@ def cemu_patches(ps, hashes, group='Sm4shCloneTool_v288'):
 
 
 def cemu_rules(ps, name):
-    desc = ('Sm4shCloneTool %s: new fighter / stage slots (%s) without a modified cross_f.rpx. Needs the game\'s '
+    imp = ps.meta.get('imports') or {}
+    extra = ['motions of %s' % ', '.join(sorted(imp.get('motions') or {}))] if imp.get('motions') else []
+    extra += ['articles %s' % ', '.join(imp['articles'])] if imp.get('articles') else []
+    desc = ('Sm4shCloneTool %s: new fighter / stage slots (%s)%s without a modified cross_f.rpx. Needs the game\'s '
             'v288 update and the clones\' data files.' % (ps.meta['tool'], ', '.join(ps.meta['fighters'] +
-                                                                                   ps.meta['stages'])))
+                                                                                   ps.meta['stages']) or '-',
+                                                       (', imported ' + ', '.join(extra)) if extra else ''))
     return '\n'.join(['[Definition]', 'titleIds = ' + ','.join('%016X' % t for t in TITLE_IDS),
                       'name = %s' % name, 'path = "Super Smash Bros. for Wii U/Mods/%s"' % name,
                       'description = %s' % desc.replace('\n', ' '), 'version = 6', '']) + '\n'

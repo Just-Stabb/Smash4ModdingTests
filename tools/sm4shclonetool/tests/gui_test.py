@@ -4,8 +4,9 @@ screenshots for the README.
 
   python3 tools/sm4shclonetool/tests/gui_test.py PYTHON_WITH_TK DATA CUSTOM_UI EXE OUT SHOTS_DIR
 
-Runs `xvfb-run PYTHON gui.py --screenshot` twice (Fighters tab on the custom UI with a Fox clone planned, Stages tab
-with a page-2 stage clone planned), HOME pointed at a temporary folder (the remembered settings go there).
+Runs `xvfb-run PYTHON gui.py --screenshot` per tab (Fighters tab on the custom UI with a Fox clone planned, Stages tab
+with a page-2 stage clone planned, the extras, voices and (2.0) import tabs), HOME pointed at a temporary folder (the
+remembered settings go there).
 """
 import json
 import os
@@ -52,6 +53,11 @@ def main():
     d = shot(py, ['--tab', 'voices'], os.path.join(shots, 'gui_voices.png'), home)
     ok = d.get('voices', 0) > 0
     print('%s voices tab: %d lines of the project\'s last clone with banks listed' % ('ok  ' if ok else 'FAIL', d.get('voices', 0)))
+    fails += not ok
+    e = shot(py, ['--tab', 'import', '--import-target', 'szerosuit'], os.path.join(shots, 'gui_import.png'), home)
+    ok = e.get('effect_entries', 0) > 0 and 'error' not in e
+    print('%s import tab (2.0): szerosuit\'s effect bank listed (%d entries), %d item(s) imported into it so far'
+          % ('ok  ' if ok else 'FAIL', e.get('effect_entries', 0), e.get('imported', 0)))
     fails += not ok
     sys.exit(1 if fails else 0)
 

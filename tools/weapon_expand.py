@@ -33,6 +33,13 @@ it; Sephiroth's snake / snaketip take dein's 5 and 7). "spawn_from": "<article>"
 spawner (its list entry's callback / extra: the light arrow's makes it on the hand, joint 0x19, mode 4; dein's free).
 "flags_set": B ORs B into its u16 flags (0x1018A970: 0x40 the kind has a model, read by the model set-up 0x02B62F50
 and the file loader 0x030C3C7C; Sephiroth's snake / snaketip are dein's, which has none, with 0x40).
+A brand-new article's "base" may name another fighter's article as "<fighter>/<article>": its kind is copied, its
+article-list entry (spawner) taken from that fighter's list. The spec's top-level "owners": [{"name": "<vanilla
+fighter>", "weapons": {<brand-new articles>}}] gives a vanilla fighter brand-new articles: its article list is
+copied to the cave with them (before its first special entry, as for a new fighter) and its descriptor's +8 (in
+.data) pointed at it, the word's ADDR32 relocation moved to the old list's count (unread once +8 moves); its
+articles' param getters are the base's (they read the base fighter's vl slot). With only "owners" (no "kinds") the
+weapon tables are expanded without kind_expand.py.
 
 Research: docs/weapon-expansion*.md. Weapon kinds 0x000-0x184 (389); per kind:
 - 4 name tables (root / owner / name / folder, 389 pointers, contiguous: can't grow) read by the path
@@ -120,10 +127,20 @@ def load_weapons(path, img):
     record also gets r['new_articles'] = {new kind: (name, max count)}"""
     raw = json.load(open(path))
     cap = K.num(raw.get('weapon_capacity', DEFAULT_CAPACITY))
-    _fcap, kinds = K.load_spec(path)
-    rawk = {K.num(r['kind']): r for r in raw['kinds']}
+    _fcap, kinds = K.load_spec(path) if raw.get('kinds') else (None, [])
+    rawk = {K.num(r['kind']): r for r in raw.get('kinds', [])}
     owner = [img.cstr(img.w(0x10418FF0 + 4 * k)) for k in range(OLD_N)]
     name = [img.cstr(img.w(0x10419604 + 4 * k)) for k in range(OLD_N)]
+    if raw.get('owners'):                   # vanilla fighters with brand-new articles: records of their own
+        fnames = [img.cstr(img.w(K.TABLES['lower'][0] + 4 * k)) for k in range(K.OLD_N)]
+        for o in raw['owners']:
+            k = K.kind_index(fnames, o['name'])
+            assert k not in rawk, 'owner %s twice' % o['name']
+            assert all(isinstance(v, dict) for v in (o.get('weapons') or {}).values()), \
+                'a vanilla owner\'s weapons are brand-new articles ({"kind", "base", "max"})'
+            kinds.append({'kind': k, 'name': o['name'], 'base': o['name'], 'desc_from': o['name'],
+                          'vanilla_owner': True})
+            rawk[k] = o
     out, nxt = [], OLD_N
     for r in kinds:
         ws = rawk[r['kind']].get('weapons') or {}
@@ -156,8 +173,13 @@ def load_weapons(path, img):
                 art_base = spec['base']
             else:
                 art_base = art
-            base = [k for k in range(OLD_N) if owner[k] == r['base'] and name[k] == art_base]
-            assert len(base) == 1, '%s has no article %s' % (r['base'], art_base)
+            src_owner, sep, src_name = art_base.partition('/')
+            if not sep:
+                src_owner, src_name = r['base'], art_base
+            elif spec:
+                r.setdefault('src_owner', {})[nk] = src_owner
+            base = [k for k in range(OLD_N) if owner[k] == src_owner and name[k] == src_name]
+            assert len(base) == 1, '%s has no article %s' % (src_owner, src_name)
             lst.append((nk, base[0], art))
         # "modules" / "spawn_from" name another article of the base fighter: its kind
         for key in ('modules', 'spawn_from'):
@@ -451,10 +473,14 @@ def article_layout(img, recs):
         added = []
         for nk, (_name, mx) in sorted(r.get('new_articles', {}).items()):
             bk = [b for n, b, _a in lst if n == nk][0]
-            found = [i for i in range(count) if (img.w(entries + ARTICLE * i) & 0x3FFFFFFF) == bk]
+            sents, scount = entries, count
+            if nk in r.get('src_owner', {}):        # another fighter's article: its entry (spawner) from its list
+                sl = img.w(fighter_descriptor(img, {'desc_from': r['src_owner'][nk]}) + 8)
+                sents, scount = img.w(sl), img.w(sl + 4)
+            found = [i for i in range(scount) if (img.w(sents + ARTICLE * i) & 0x3FFFFFFF) == bk]
             assert found, 'the base fighter has no article of kind 0x%X' % bk
             i = found[0]
-            e = [img.w(entries + ARTICLE * i + 4 * j) for j in range(4)]
+            e = [img.w(sents + ARTICLE * i + 4 * j) for j in range(4)]
             e[0] = (e[0] & 0xC0000000) | nk
             e[1] = mx
             sk = r.get('spawn_from', {}).get(nk)
@@ -493,7 +519,7 @@ def build(spec_path=SPEC, rpx=RPX):
     B = Build(img)
     recs, cap = load_weapons(spec_path, img)
     fnames = [img.cstr(img.w(K.TABLES['lower'][0] + 4 * k)) for k in range(K.OLD_N)]
-    fcap, _kinds = K.load_spec(spec_path)
+    fcap = K.load_spec(spec_path)[0] if json.load(open(spec_path)).get('kinds') else K.DEFAULT_CAPACITY
     vl_new = K.mgr_layout(fcap)[0]['vl'][1]
     new = {}                                   # new weapon kind -> (base kind, fighter record, name)
     for r, lst in recs:
@@ -509,6 +535,18 @@ def build(spec_path=SPEC, rpx=RPX):
         blob = struct.pack('>II', at + 8, len(rows)) + b''.join(struct.pack('>4I', *e) for e in rows)
         B.data(at, blob, 'article list 0x%X' % fk)
     info['article_lists'] = {k: a for k, (a, _r) in lay.items()}
+    # a vanilla owner's descriptor (.data) names its new list; the word's ADDR32 relocation stays in .data, on the
+    # old list's count (nothing reads the old list once the descriptor moves)
+    B.extra_relocs = []
+    for r, _lst in recs:
+        if r.get('vanilla_owner'):
+            fdesc = fighter_descriptor(img, r)
+            old = img.w(fdesc + 8)
+            B.put(fdesc + 8, lay[r['kind']][0], 'article list of %s' % r['name'], old)
+            if fdesc + 8 in img.relocs():
+                assert old + 4 not in img.relocs()
+                B.inplace.remove(fdesc + 8)
+                B.extra_relocs.append((fdesc + 8, old + 4))
 
     # ---- strings (the owners, and brand-new articles' names)
     sblob, sptr = bytearray(), {}
@@ -618,7 +656,7 @@ def build(spec_path=SPEC, rpx=RPX):
                    'weapon 0x%X sub-articles' % nk)
             struct.pack_into('>I', blob, 0x14, s_at2)
         own = vl_new + 4 * r['kind']
-        for off in (0x18, 0x24):
+        for off in (0x18, 0x24) if not r.get('vanilla_owner') else ():
             src = struct.unpack_from('>I', blob, off)[0] if off + 4 <= size else 0
             if not src or not 0x02000000 <= src < 0x10000000:
                 continue
@@ -874,7 +912,7 @@ def kirby_copy(B, img, new, info):
         if c is not None:
             adds.setdefault(c, []).append(nk)
     info['kirby_copy'] = {}
-    B.extra_relocs = []
+    B.extra_relocs = getattr(B, 'extra_relocs', [])
     reserve = 20
     for c, kinds in sorted(adds.items()):
         hdr = img.w(KIRBY_COPY_TABLE + 4 * c)
