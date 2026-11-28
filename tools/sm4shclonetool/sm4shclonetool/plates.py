@@ -33,6 +33,8 @@ GEOMETRY = {
     'chrn_40': {'size': (1024, 512), 'cx': 318, 'width': 612, 'one': (111, 231), 'two': ((62, 170), (176, 281)),
                 'outline': 9, 'shadow': (8, 14)},
 }
+NARROW = '-'                # signs drawn with the narrow form (the wide hyphen is a long dash)
+SMALL_SIGNS = '&'           # signs drawn at the small capitals' height (the game's '& Watch')
 SMALL_CAPS = 0.68           # a small capital's height / a capital's
 GAP = 0.035                 # space between letters / cap height
 SPACE = 0.30                # a word space / cap height
@@ -83,6 +85,8 @@ def resolve_font(choice=None, kind='plate', data_dirs=()):
 def _wide(ch):
     """the full-width form of an ASCII letter / sign (the Japanese fonts' wide Latin, the game's letter shapes)"""
     o = ord(ch)
+    if ch in NARROW:
+        return ch
     return chr(o - 0x21 + 0xFF01) if 0x21 <= o <= 0x7E else ch
 
 
@@ -109,7 +113,7 @@ def line_mask(text, font_path, cap, scale=4, small_caps=True):
         if ch == ' ':
             parts.append(None)
             continue
-        small = ch.islower() and small_caps
+        small = (ch.islower() or ch in SMALL_SIGNS) and small_caps
         h = big * SMALL_CAPS if small else big
         im, base = _glyph(font_path, ch.upper(), h)
         a = np.array(im)
@@ -164,17 +168,17 @@ def text_mask(text, font_path, set_name, size=None, lines=None):
     lines = split_lines(text, lines)
     boxes = [geo['one']] if len(lines) == 1 else list(geo['two'])
     canvas = Image.new('L', (w * scale, h * scale), 0)
+    bold = int(round(BOLD * (geo['one'][1] - geo['one'][0]) * sy * scale)) | 1
+    pad = (min(bold, 15) - 1) / 2                      # the dilation grows each letter by this (drawn pixels)
     for line, (top, bot) in zip(lines, boxes):
-        cap = (bot - top + 1) * sy
-        m, base, _t = line_mask(line, font_path, cap * 0.97, scale, geo.get('small_caps', True))
+        hh = (bot - top + 1) * sy * scale - 2 * pad
+        m, base, _t = line_mask(line, font_path, hh / scale, scale, geo.get('small_caps', True))
         ys = np.nonzero(m.max(1) > 0)[0]
         m = m[ys.min():ys.max() + 1]
-        lw = min(m.shape[1], geo['width'] * sx * scale)
-        im = Image.fromarray(m).resize((max(1, int(lw)), max(1, int(round((bot - top + 1) * sy * scale)))),
-                                       Image.LANCZOS)
+        lw = min(m.shape[1] * hh / max(1, m.shape[0]), geo['width'] * sx * scale - 2 * pad)
+        im = Image.fromarray(m).resize((max(1, int(lw)), max(1, int(round(hh)))), Image.LANCZOS)
         x = int(geo['cx'] * sx * scale - im.size[0] / 2)
-        canvas.paste(im, (x, int(top * sy * scale)), im)
-    bold = int(round(BOLD * (geo['one'][1] - geo['one'][0]) * sy * scale)) | 1
+        canvas.paste(im, (x, int(top * sy * scale + pad)), im)
     if bold > 1:
         canvas = canvas.filter(ImageFilter.MaxFilter(min(bold, 15)))
     canvas = canvas.resize((w, h), Image.LANCZOS)

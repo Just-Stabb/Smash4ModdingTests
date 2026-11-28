@@ -136,7 +136,8 @@ def record(spec, reg):
             'weapons': list(spec.get('weapons') or []), 'customs': bool(spec.get('customs')),
             'fanfare': bool(spec.get('fanfare', True)), 'random': bool(spec.get('random', True)),
             'own_sound': bool(spec.get('own_sound', True)), 'own_effects': bool(spec.get('own_effects', True)),
-            'plates': bool(spec.get('plates', True))}
+            'plates': bool(spec.get('plates', True)), 'plate_text': spec.get('plate_text'),
+            'plate_lines': spec.get('plate_lines'), 'fonts': dict(spec.get('fonts') or {})}
 
 
 def sort_keys(param_dirs, reg, after=None, value=None):
@@ -194,7 +195,7 @@ def build(rec, data_dir, ui_dir, out_data, reg, portraits=None, log=print, renum
     else:
         A.copy_portraits([r], a, logs)
     if rec.get('plates', True):
-        out += name_plates(rec, a.out, portraits or {}, logs)
+        out += name_plates(rec, a.out, portraits or {}, logs, [data_dir, ui_dir])
     out += _portraits(r, rec, a, ui_dirs, portraits or {}, logs)
     # the fighter folder
     src = R.first([os.path.join(out_data, 'fighter'), os.path.join(data_dir, 'fighter')], rec['source'])
@@ -398,13 +399,16 @@ def result_panel(rec, data_dir, out_data):
 PLATE_SETS = ('chrn_11', 'chrn_12', 'chrn_40', 'chrn_41')     # the name plates (pictures of the name)
 
 
-def name_plates(rec, out_root, portraits, logs):
+def name_plates(rec, out_root, portraits, logs, data_dirs=()):
     """the clone's name plates: its copies of the base's plates (the base's name as a picture) redrawn with the clone's
-    title: capitals with an outline, in the game's plate channels (letters red + green, outline green), as large as the plate
-    allows, in each plate's own size and format (an imported PNG for a plate set wins)"""
+    plate text (its title, or "plate_text") in the game's plate style (plates.py: small capitals in the bundled
+    DFMincho-SU, the game's line split, outline and drop shadow, the base plate's colours), in each plate's own size and
+    format. rec["fonts"]["plate"] picks another font; an imported PNG for a plate set wins."""
     import tempfile
-    from PIL import Image, ImageDraw, ImageFont
+    from . import plates as PL
     done = []
+    font = PL.resolve_font((rec.get('fonts') or {}).get('plate'), 'plate', data_dirs)
+    text = rec.get('plate_text') or rec.get('title') or rec['ui_name']
     d = os.path.join(out_root, 'ui', 'replace', 'chr')
     for st in PLATE_SETS:
         sd = os.path.join(d, st)
@@ -417,30 +421,7 @@ def name_plates(rec, out_root, portraits, logs):
             img = T.decode(p)
             if img is None:
                 continue
-            w, h = img.size
-            text = (rec.get('title') or rec['ui_name']).upper()
-            pic = Image.new('RGBA', (w, h), (0, 0, 0, 0))
-            dr = ImageDraw.Draw(pic)
-            size, font = max(8, int(h * 0.7)), None
-            while size >= 8:
-                for name in ('DejaVuSans-Bold.ttf', 'arialbd.ttf', 'Arial Bold.ttf', 'DejaVuSans.ttf', 'arial.ttf'):
-                    try:
-                        font = ImageFont.truetype(name, size)
-                        break
-                    except Exception:
-                        font = None
-                font = font or ImageFont.load_default()
-                box = dr.textbbox((0, 0), text, font=font, stroke_width=max(1, size // 12))
-                if box[2] - box[0] <= w * 0.94 and box[3] - box[1] <= h * 0.9:
-                    break
-                size -= 2
-            box = dr.textbbox((0, 0), text, font=font, stroke_width=max(1, size // 12))
-            x = (w - (box[2] - box[0])) / 2 - box[0]
-            y = (h - (box[3] - box[1])) / 2 - box[1]
-            # the game's plates keep the letters in red + green and their outline in green alone (the plate's colours
-            # are the screen's): the same channels here
-            dr.text((x, y), text, font=font, fill=(255, 255, 0, 255), stroke_width=max(2, size // 10),
-                    stroke_fill=(0, 255, 0, 255))
+            pic, lines = PL.render(text, st, font, img.size, PL.plate_style(img), rec.get('plate_lines'))
             tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
             tmp.close()
             pic.save(tmp.name)
@@ -450,6 +431,7 @@ def name_plates(rec, out_root, portraits, logs):
             T._cache.pop(p, None)
             os.unlink(tmp.name)
             done.append('%s/%s' % (st, f))
-    logs.append('name plates redrawn with %r: %s' % ((rec.get('title') or rec['ui_name']).upper(),
-                                                       ', '.join(done) or 'none (the base has no plate files)'))
+    logs.append('name plates drawn with %r (%s, %s): %s' % (
+        text, os.path.basename(font or 'no font'), ' / '.join(PL.split_lines(text, rec.get('plate_lines'))),
+        ', '.join(done) or 'none (the base has no plate files)'))
     return [os.path.join(d, x) for x in done]
