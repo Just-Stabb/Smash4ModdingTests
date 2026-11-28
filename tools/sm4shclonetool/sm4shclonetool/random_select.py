@@ -126,7 +126,8 @@ def count_bits(src, n, out, tag):
 %(t)s: srwi r10, r9, 5
         slwi r10, r10, 2
         lwzx r11, %(s)s, r10
-        srw r11, r11, r9
+        clrlwi r10, r9, 27
+        srw r11, r11, r10
         andi. r11, r11, 1
         add %(o)s, %(o)s, r11
         addi r9, r9, 1
@@ -351,7 +352,8 @@ pk_pick:
 pk_s:   srwi r10, r9, 5
         slwi r10, r10, 2
         lwzx r11, r31, r10
-        srw r11, r11, r9
+        clrlwi r10, r9, 27
+        srw r11, r11, r10
         andi. r11, r11, 1
         beq pk_sn
         cmplw r8, r7

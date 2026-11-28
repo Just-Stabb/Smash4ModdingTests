@@ -189,6 +189,7 @@ def main():
           [len([f for f in zp if '_%s_' % n in f]) for n in ('Foxclone', 'Zssclone', 'Foxtwo')], [2, 8, 2])
     dec = [T.decode(os.path.join(pkg, 'ui', 'replace', 'chr', 'chr_00', f)) for f in zp]
     check('portraits decode (%d chr_00 files)' % len(zp), all(d is not None for d in dec), True)
+    own_checks(pkg, data, reg, e3)
     st_icon = os.path.join(pkg, 'ui', 'replace', 'stage', 'stage_10', 'stage_10_CloneField.nut')
     check('stage icon stage_10_CloneField.nut: the imported PNG, a new texture id',
           [T.decode(st_icon) is not None, T.texture_ids(T.read_nut(st_icon))[0][1] != 0x28000999], [True, True])
@@ -240,6 +241,66 @@ def main():
 def _copy(a, b):
     import shutil
     shutil.copyfile(a, b)
+
+
+def own_checks(pkg, data, reg, exe_path):
+    """zssclone (the default "fully independent" preset): own sound banks / rows, sound ids, effect bank, articles,
+    results panel; the base's files untouched"""
+    from sm4shclonetool import sound as SND
+    import result_param as RP
+    z = [f for f in reg['fighters'] if f['name'] == 'zssclone'][0]
+    check('zssclone record: own sound, own effects, own articles %s' % z['weapons'],
+          (z.get('own_sound'), z.get('own_effects'), len(z['weapons']) > 0), (True, True, True))
+    sd, bd = os.path.join(pkg, 'fighter', 'zssclone', 'sound'), os.path.join(data, 'fighter', 'szerosuit', 'sound')
+    t0 = SND.Table(open(os.path.join(data, 'sound', 'config', 'soundlabeltable.bin'), 'rb').read())
+    t1 = SND.Table(open(os.path.join(pkg, 'sound', 'config', 'soundlabeltable.bin'), 'rb').read())
+    old_ids = {r[0] for r in t0.rows}
+    banks, rowmap, same = [], {}, True
+    for f in sorted(os.listdir(sd)):
+        if not f.endswith('.nus3bank'):
+            continue
+        new = open(os.path.join(sd, f), 'rb').read()
+        old = open(os.path.join(bd, f.replace('Zssclone', 'SZerosuit')), 'rb').read()
+        nm, bid = SND.binf(new)
+        onm, oid = SND.binf(old)
+        banks.append((f, nm, bid))
+        same &= [s for s in SND.sections(new) if s[0] != b'BINF'] == [s for s in SND.sections(old) if s[0] != b'BINF']
+        if t0.row_of(oid) is not None:
+            rowmap[t0.row_of(oid)] = t1.row_of(bid)
+            same &= t1.tones(t1.row_of(bid)) == t0.tones(t0.row_of(oid))
+    check('its banks: BINF names = their files, ids new and unique (%s)' % ', '.join('%s %d' % (n, i) for _f, n, i in banks),
+          all(nm == f[:-9] and bid not in old_ids for f, nm, bid in banks) and len({b for _f, _n, b in banks}) == len(banks),
+          True)
+    check('its banks\' tones / packs are the base\'s byte for byte, its rows the base\'s label lists (%s)'
+          % ', '.join('%d -> %s' % kv for kv in sorted(rowmap.items())), same and None not in rowmap.values(), True)
+    import acmd
+    ids, base_ids = [], []
+    for root, _ds, fs in os.walk(os.path.join(pkg, 'fighter', 'zssclone', 'script', 'animcmd')):
+        for f in fs:
+            if f == 'sound.bin':
+                a = acmd.ACMDFile.load(os.path.join(root, f))
+                for cmds in a.scripts.values():
+                    for c in cmds:
+                        for i, v in enumerate(c.params):
+                            if c.kind(i) != 1 and isinstance(v, int) and v >> 16 in set(rowmap.values()):
+                                ids.append(v)
+                            if c.kind(i) != 1 and isinstance(v, int) and v >> 16 in rowmap and (v & 0xFFFF) < len(t0.tones(v >> 16)):
+                                base_ids.append(v)
+    check('its sound.bin files: %d sound ids on its own rows, none left on the base\'s' % len(ids),
+          (len(ids) > 0, base_ids[:3]), (True, []))
+    spec = X.kind_spec(reg)
+    zk = [k for k in spec['kinds'] if k['name'] == 'zssclone'][0]
+    check('own effect bank: the generators don\'t load the base\'s banks for it (effects_base false)',
+          zk.get('effects_base'), False)
+    arts = [a for a in z['weapons'] if os.path.isdir(os.path.join(data, 'fighter', 'szerosuit', 'model', a))]
+    check('its own articles\' model folders are under fighter/zssclone/ (%s)' % ', '.join(arts),
+          all(os.path.isdir(os.path.join(pkg, 'fighter', 'zssclone', 'model', a)) for a in arts), True)
+    rp = open(os.path.join(pkg, 'param', 'ui', 'result_param.bin'), 'rb').read()
+    names = [e[0] for e in RP.entries(rp)[1]]
+    check('result_param.bin: the clones\' results-panel entries', [n for n in ('foxclone', 'zssclone', 'foxtwo')
+                                                                    if n in names], ['foxclone', 'zssclone', 'foxtwo'])
+    check('the base\'s files are untouched (no fighter/szerosuit/ in the package)',
+          os.path.exists(os.path.join(pkg, 'fighter', 'szerosuit')), False)
 
 
 def customs_check(patched, original):

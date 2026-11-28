@@ -119,6 +119,9 @@ def main():
     nval = struct.unpack_from('<H', c, 8)[0]
     size = 0x10 + 4 * nval
     open(os.path.join(sd, 'commonsoundtable.csb'), 'wb').write(c[:10] + struct.pack('<H', 62) + c[0xC:0xC + size * 62])
+    stb = os.environ.get('S4CT_SOUNDLABELTABLE') or os.path.join(sconf, 'soundlabeltable.bin')
+    if os.path.exists(stb):
+        link(stb, os.path.join(sd, 'soundlabeltable.bin'))
     # test portraits
     for st, size in (('chr_00', (128, 128)), ('chr_10', (128, 128)), ('chr_11', (256, 256)), ('chr_13', (128, 64)),
                      ('stock_90', (64, 64))):

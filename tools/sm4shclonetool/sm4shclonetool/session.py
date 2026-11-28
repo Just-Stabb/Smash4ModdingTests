@@ -198,8 +198,7 @@ class Session:
         pages = R.sss_pages(self.param_dirs(), reg)
         return {'fighters': n, 'fighters_max': min(F.MAX_CLONES, cap - vanilla_entries),
                 'ids_max': F.MAX_CLONES, 'css_entries': entries, 'css_capacity': cap, 'css_source': src,
-                'random_max': 96 - 59,
-                'random': sum(1 for f in reg['fighters'] if f['ui_id'] < 96 and f.get('random', True)),
+                'random': sum(1 for f in reg['fighters'] if f.get('random', True)),
                 'stages': len(reg['stages']), 'page1': len(pages[1]), 'page2': len(pages[2]),
                 'page_slots': S.PAGE_SLOTS,
                 'stages_max': min(S.MAX_CLONES, 2 * S.PAGE_SLOTS - len([s for p in (1, 2) for s in pages[p]
@@ -207,10 +206,10 @@ class Session:
 
     def limits_text(self, reg=None):
         m = self.limits(reg)
-        return ('Fighter clones: %d of %d (character select: %d of %d places, %s; random select: the first %d '
-                'clones) | Stage clones: %d of %d (page 1: %d / %d, page 2: %d / %d)'
+        return ('Fighter clones: %d of %d (character select: %d of %d places, %s; %d in the random select) | '
+                'Stage clones: %d of %d (page 1: %d / %d, page 2: %d / %d)'
                 % (m['fighters'], m['fighters_max'], m['css_entries'], m['css_capacity'], m['css_source'],
-                   m['random_max'], m['stages'], m['stages_max'], m['page1'], m['page_slots'], m['page2'],
+                   m['random'], m['stages'], m['stages_max'], m['page1'], m['page_slots'], m['page2'],
                    m['page_slots']))
 
     # ------------------------------------------------------------ build

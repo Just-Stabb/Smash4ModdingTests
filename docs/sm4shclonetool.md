@@ -201,11 +201,11 @@ Every cap on the number of clones found, and what the tool does about it:
 |---|---|---|---|
 | character ids looked up by position | `ui_character_db` accessors `0x0309FB94`-`0x030A0C58` (ids `<= 0xC7`; `>= 200` searched) | - | stays: 141 clones (ids 59-199) |
 | kind tables / per-kind arrays | kind_expand's capacity (names, sizes, sound class, switches, the parameter manager's arrays `0x25B0 + cap * 0x48`, the equipment object `0x320 + 4 cap`, the bounds) | 0x60 (31 kinds) | sized to the clones; kind_expand's own bound 0x13F |
-| random select pool | refill `0x02FFB610` (scan `li r23` at `0x02FFB644`), count of picks left `0x02FFC4A8` (`li r11, 0x51` at `0x02FFC4BC`), remove `0x02FFC5BC` (`cmplwi r4, 0x51` at `0x02FFC5C4`); the set is 12 bytes at `+0x98` of the pool object, `+0xA4` / `+0xB4` are the stage pools | v1: 15 clones (`n_sel <= 96` asserted); the count / remove bounds stayed 0x51 (clones with ids 0x51-0x5F, past v1's cap, would never have been removed) | scan `min(96, 0x51 + n)`, both other bounds the same; a stub on the refill's store (`0x02FFB6C4`) masks out clones with `"random": false`; ids >= 96 are never scanned (out of the random select). Not enlarged: the set is inside the object (the stage pools follow it) and the getter `0x02FFC5B4` hands its address to callers not traced |
+| random select pool | see "Random pools (1.2)" | v1: 15 clones; 1.1 said "the first 37" but the pick (`0x028E21B4`) still scanned 0x51 bits: only clones with ids below 81 (the first 22) were ever picked | 1.2: a 224-bit pool (ids 0-223) in the tool's space, every access replaced: every clone |
 | character select places | `chara.lm` arrangements `num_%03d` (`0x028BEE20`) and faces bound in order (`0x028BE920`); the list builder `0x028BF6AC` uses a growable list | 96 (the game's file: `num_013`-`num_096`) | the UI's highest `num_NNN` (`preview.css_capacity`); a plan past it is refused |
 | stage select | `0x0298D068` fills `img_01`-`img_48` of each of the 2 pages (`lumen/stage/stage.lm`) | page 1: 48 (47 used) | 48 a page checked; 41 clones (1 + 40). More pages: not researched |
 | stage-select ids | positional `<= 0xC7` | | stays: 144 |
-| random stage pools | `+0xA4` / `+0xB4` (16 bytes each), bound `cmplwi r4, 0x63` at `0x02FFC620` | | stays: the first 43 stage clones (ids < 0x63) |
+| random stage pools | `+0xA4` / `+0xB4` (refill `0x02FFB76C`) and `+0xC4` / `+0xD4` (refill `0x02FFB8CC`), 128 bits each, bound 0x63 (`0x02FFC5C4`-style removes `0x02FFC604` / `0x02FFC6D0`), getters `0x02FFC5EC` / `0x02FFC6B8` | | stays: every stage clone is below 0x63 (at most 41: 0x38-0x60); 1.2 adds the per-clone choice (a mask on each refill's store) and clamps the stage helper `0x0301CCB4` (16-byte local, one bit per stage database entry) to 128 entries |
 | weapon kinds | weapon_expand's capacity | 0x1C0 (59 articles) | sized to the articles |
 | effect banks | the 8-slot bank table (`0x030C1278`), per match | | stays (a clone without its base uses 2 slots) |
 | effect ids | `0x3KK....` (8-bit kind) | | kinds up to 0xFF: not reached (0xCD) |
@@ -214,7 +214,48 @@ Every cap on the number of clones found, and what the tool does about it:
 | save records | `0x02A53C54` | | the new ids' records in the code space (RAM only), one per clone |
 | code space | `0x04B78000`-`0x04BB8000` | v1 fixed 256 KB (kinds part 160 KB: ~27 fighters) | grows with the clones (text region raised), up to 3 MB |
 
+## Random pools (1.2)
+
+Every access to the character select's random-fighter pool found (static: every `bl` to the pool object's
+functions, every `+0x98` / `+0x9C` / `+0xA0` access in the object's code and every reference to them as data; the
+getter has one caller):
+
+| address | what | 1.2 |
+|---|---|---|
+| `0x02FFB610` refill (from the set-up `0x02FFBB0C` and the count) | positions 0-0x50, available / not masked / not a Mii -> bit; random's id cleared; a 12-byte stack local copied to `+0x98` | replaced (`b`): the 224-bit pool of this object, positions 0 .. max(0x51, 59 + clones) - 1, the allow mask; `+0x98` gets ids 0-95 as a mirror |
+| `0x02FFC4A8` count (from `0x03017BCC`, `0x03017E20`) | bits 0-0x50 of `+0x98`; under 8 -> refill; then the four stage pools | its loop (`0x02FFC4BC`) replaced: bits of the new pool |
+| `0x02FFC5BC` remove (from `0x03017CFC`) | clears bit id (< 0x51) | replaced: the new pool and the mirror |
+| `0x02FFC5B4` getter (from the pick only) | `+0x98` | kept (the mirror) |
+| `0x028E21B4` pick (from `0x0290A454`, `0x0290A824`, `0x0290C5F0`) | copies the 12 bytes to the stack, counts 0x51 bits; for a player, a second copy without the other 7 players' ids (used with 7 or more left); xorshift (`0x105759D0`) % count, the n-th set bit -> id (a byte); none: `0x030A0F1C` (4) | replaced (a far jump: out of a `b`'s reach): the same with 7-word copies in a bigger frame, 224 bits |
+| `0x0301CAE8` available-fighters helper (also `0x0290D960`, `0x029E6CE0`) | a bit per database entry in a 12-byte stack local: past 96 entries it writes over its frame (ids 128+ reach the saved registers: 1.1 with 70+ clones) | its count (`0x0301CB40`) clamped to 96 |
+
+The new pool: 4 slots `{object, 7 words}` (an object not seen yet starts from its `+0x98` words), the allow mask
+(7 words) and the stage allow mask (4 words), then the code, in the `random` part. Stage pools: the stores of the two
+stage refills (`0x02FFB814`, `0x02FFB964`) ANDed with the stage mask.
+
+`tests/random_select_test.py PATCHED [PICKS]` runs it in unicorn (database / availability / player calls stubbed):
+the pool after a refill, a pick + remove cycle (every enabled id once), the count's refill, PICKS picks from the full
+pool (every enabled id, none disabled, a chi-square test of uniformity), a player's pick without the other players' ids,
+remove for ids 0-0xFF, the helper's loop with 200 entries, the stage refill with the mask; no write outside the pool,
+its mirror, the random state, the lazy-init guard and the stack.
+
+## Own sound banks and effects (1.2)
+
+- Sound: `sm4shclonetool/sound.py`. The game loads a fighter's banks by file name with its Capitalised name (the
+  clone's own: `snd_se_<Cap>.nus3bank` ...), each bank's id from its BINF; a sound id is `row << 16 | label` with
+  the soundlabeltable row naming the bank id. The clone's banks get BINF names / ids of their own (the next free id
+  in 2000-2999), rows of their own (the base's label lists, the last free row or a new one), and its ACMD sound ids
+  (`sound.bin`: every int parameter; other scripts: SE / Sound commands) move to its rows. No executable change.
+  MSC sound ids are not remapped.
+- Effects: `"effects_base": false` in the generators' spec for a clone with its own effects: base_effects_cave then
+  doesn't register the base's banks for it. Its effect ids are already its own (`0x3KK` / `0x4KK`, the folder copy).
+- Results panel: `param/ui/result_param.bin` gets the clone's entry (the source's, by model name; vendor/result_param.py).
+
 ## Not done / open
+
+- The announcer call and the fanfare's own music (the records point at the base's), Kirby copying clones, an own
+  custom-move save bitfield, MSC sound-id remapping, and a mode-by-mode check (All-Star, Stadium, Smash Tour, Events,
+  online, replays) with new kinds: not done in 1.2.
 
 - In-game confirmation (nothing here ran in Cemu or on a console).
 - Own sound banks (soundlabeltable rows), the announcer call, Kirby's copy: not offered (vanilla Kirby refuses new

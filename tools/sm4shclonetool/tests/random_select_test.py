@@ -11,7 +11,7 @@ Checks:
   tool's other data);
 - a cycle: pick, then remove the picked id, until 7 are left: every enabled id exactly once, none disabled; then the
   count function refills (under 8 left) and the pool is full again;
-- PICKS picks from the full pool: every enabled id picked, none other, counts within 30 % of the mean;
+- PICKS picks from the full pool: every enabled id picked, none other, a chi-square test of uniformity;
 - a player's pick leaves out the ids the other players have (7 or more left);
 - remove(id) for every id 0-0xFF: exactly that bit for ids below the scan count (and its mirror bit), else nothing;
 - the fighter helper 0x0301CAE8's loop with a 200-entry database writes only its 12 bytes (the 96 clamp);
@@ -160,14 +160,14 @@ def main():
     got = []
     m.watch(False)
     m.watch(True)
-    while len(ids_of(m.words(tab + 32 * k + 4, 7))) > 7:
+    while len(ids_of(m.words(tab + 32 * k + 4, 7))) > 7 and len(got) < 300:
         i = m.call(RS.PICK, 0xFFFFFFFF)
         got.append(i)
         m.call(RS.REMOVE, OBJ, i)
     check('a cycle: pick + remove until 7 left: %d picks, every enabled id once, none disabled' % len(got),
           (len(got) == len(set(got)), set(got) <= enabled, len(got)), (True, True, len(enabled) - 7))
     stray = [(a, s) for a, s in m.writes if not (STACK - 0x1000 <= a < STACK + 8 or data_lo <= a < data_hi or
-                                               OBJ + 0x98 <= a < OBJ + 0xA4 or 0x105759C0 <= a < 0x105759E0)]
+                                               OBJ + 0x98 <= a < OBJ + 0xA4 or 0x105759C0 <= a < 0x105759E0 or a == 0x10492894)]
     check('picks and removes write only the stack, the pool, its mirror and the random number state', stray[:4], [])
     m.watch(False)
     m.call(0x02FFC4A8, OBJ)
@@ -179,8 +179,10 @@ def main():
     check('%d picks from the full pool: only enabled ids, every one picked' % picks,
           (set(hist) <= enabled, set(hist) == enabled), (True, True))
     lo, hi = min(hist.values()), max(hist.values())
-    check('counts within 30 %% of the mean %.1f (min %d, max %d)' % (mean, lo, hi),
-          lo >= 0.7 * mean and hi <= 1.3 * mean, True)
+    chi2 = sum((hist.get(i, 0) - mean) ** 2 / mean for i in enabled)
+    df = len(enabled) - 1
+    check('uniform: chi-square %.1f for %d degrees of freedom (bound %.1f; counts %d-%d, mean %.1f)'
+          % (chi2, df, df + 5 * (2 * df) ** 0.5, lo, hi, mean), chi2 < df + 5 * (2 * df) ** 0.5, True)
     # a player's pick leaves out the others' ids
     others = [5, 59, max(enabled)]
     for i, cid in enumerate(others, 1):
