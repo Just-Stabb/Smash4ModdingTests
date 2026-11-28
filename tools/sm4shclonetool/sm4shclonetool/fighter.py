@@ -400,7 +400,7 @@ PLATE_SETS = ('chrn_11', 'chrn_12', 'chrn_40', 'chrn_41')     # the name plates 
 
 def name_plates(rec, out_root, portraits, logs):
     """the clone's name plates: its copies of the base's plates (the base's name as a picture) redrawn with the clone's
-    title: capitals with an edge, in the game's plate channels (letters red + green, edge green), as large as the plate
+    title: capitals with an outline, in the game's plate channels (letters red + green, outline green), as large as the plate
     allows, in each plate's own size and format (an imported PNG for a plate set wins)"""
     import tempfile
     from PIL import Image, ImageDraw, ImageFont
@@ -437,7 +437,7 @@ def name_plates(rec, out_root, portraits, logs):
             box = dr.textbbox((0, 0), text, font=font, stroke_width=max(1, size // 12))
             x = (w - (box[2] - box[0])) / 2 - box[0]
             y = (h - (box[3] - box[1])) / 2 - box[1]
-            # the game's plates keep the letters in red + green and their edge in green alone (the plate's colours
+            # the game's plates keep the letters in red + green and their outline in green alone (the plate's colours
             # are the screen's): the same channels here
             dr.text((x, y), text, font=font, fill=(255, 255, 0, 255), stroke_width=max(2, size // 10),
                     stroke_fill=(0, 255, 0, 255))

@@ -1,6 +1,6 @@
 """Random select: the character select's random-fighter pool moved to a bigger set, and the per-clone choices.
 
-The game's pool (traced from the game's code; docs/README "Random select"):
+The game's pool (traced from the game's code; see the README "Limits"):
 - one 96-bit set (12 bytes) at +0x98 of the random-pool object (the stage pools follow at +0xA4, +0xB4, +0xC4,
   +0xD4, 128 bits each); the object comes from 0x0300174C(0x104D162C);
 - refill 0x02FFB610 (from the object's set-up 0x02FFBB0C and from the count): positions 0-0x50 of the character

@@ -181,7 +181,7 @@ AI scripts, sounds, effects, cameras) under its own name; its own sound banks an
 keyed by its name); its own random-select bit.
 
 Name plates (`chrn_11`, `chrn_12`, `chrn_40`, `chrn_41`: the name drawn as a picture) are redrawn with the clone's
-title: capitals with an edge, drawn in the plates' own channels (letters red + green, edge green: the screen colours
+title: capitals with an outline, drawn in the plates' own channels (letters red + green, outline green: the screen colours
 them), in each plate's size and format. That is not the game's
 plate lettering; import your own PNG per plate set for an exact look. The name text itself (`MmelChara*`) goes into
 the one `melee.msbt` your data has (one language per install: run the tool on each region's file for others).
@@ -200,6 +200,11 @@ Shared with the base, because that is how a Smash 4 clone works:
 - sound ids inside MSC scripts (only ACMD ids are moved to its own banks);
 - the custom moves' unlock bits (the clone owns what its base owns: the save has no room for new characters);
 - Kirby: Kirby can't copy a new kind (the game refuses kinds past its own); swallowing the clone gives no ability.
+
+Not in this version (the clone uses the base's, or nothing): its own announcer call and results / fanfare music, a
+Kirby copy hat (Kirby gets no ability from it), trophies, Palutena's Guidance conversations (the game's conversation
+switches send new characters to their default: no conversation), Smash Tour data beyond the base's behaviour, amiibo
+assignment, Final Smash scene tables and transformations of its own.
 
 ## Character select placement
 
