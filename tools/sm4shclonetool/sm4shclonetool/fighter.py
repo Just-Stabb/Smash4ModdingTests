@@ -400,8 +400,8 @@ PLATE_SETS = ('chrn_11', 'chrn_12', 'chrn_40', 'chrn_41')     # the name plates 
 
 def name_plates(rec, out_root, portraits, logs):
     """the clone's name plates: its copies of the base's plates (the base's name as a picture) redrawn with the clone's
-    title: white capitals with a dark edge, as large as the plate allows, on a clear background, in each plate's own
-    size and format (an imported PNG for a plate set wins)"""
+    title: capitals with an edge, in the game's plate channels (letters red + green, edge green), as large as the plate
+    allows, in each plate's own size and format (an imported PNG for a plate set wins)"""
     import tempfile
     from PIL import Image, ImageDraw, ImageFont
     done = []
@@ -437,14 +437,17 @@ def name_plates(rec, out_root, portraits, logs):
             box = dr.textbbox((0, 0), text, font=font, stroke_width=max(1, size // 12))
             x = (w - (box[2] - box[0])) / 2 - box[0]
             y = (h - (box[3] - box[1])) / 2 - box[1]
-            dr.text((x, y), text, font=font, fill=(255, 255, 255, 255), stroke_width=max(1, size // 12),
-                    stroke_fill=(20, 20, 30, 255))
+            # the game's plates keep the letters in red + green and their edge in green alone (the plate's colours
+            # are the screen's): the same channels here
+            dr.text((x, y), text, font=font, fill=(255, 255, 0, 255), stroke_width=max(2, size // 10),
+                    stroke_fill=(0, 255, 0, 255))
             tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
             tmp.close()
             pic.save(tmp.name)
             ids = [t for _o, t in T.texture_ids(T.read_nut(p))]
             blob = T.put_png(p, tmp.name, ids)
             open(p, 'wb').write(blob)
+            T._cache.pop(p, None)
             os.unlink(tmp.name)
             done.append('%s/%s' % (st, f))
     logs.append('name plates redrawn with %r: %s' % ((rec.get('title') or rec['ui_name']).upper(),

@@ -175,8 +175,10 @@ def main():
                                                         'sound/snd_se_Zssclone.nus3bank', 'sound/snd_vc_Zssclone.nus3bank',
                                                         'script/animcmd/body/effect.bin', 'model/body/c00/model.nud')],
           [True] * 6)
-    check('fighter/zssclone/: no article folders of the base (they load from fighter/szerosuit/)',
-          os.path.exists(os.path.join(z, 'model', 'paralyzer')), False)
+    zrec = [f for f in reg['fighters'] if f['name'] == 'zssclone'][0]
+    arts = sorted(d for d in os.listdir(os.path.join(z, 'model')) if d != 'body')
+    check('fighter/zssclone/model/: article folders only for its own articles (%s)' % ', '.join(arts),
+          set(arts) <= set(zrec['weapons']), True)
     ids = effect_ids(os.path.join(z, 'script', 'animcmd', 'body', 'effect.bin'))
     check('zssclone effect.bin: effect ids moved to bank 0x342 (%d), none left on 0x319' % ids.get(0x42, 0),
           (ids.get(0x42, 0) > 0, ids.get(0x19, 0)), (True, 0))

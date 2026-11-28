@@ -181,7 +181,8 @@ AI scripts, sounds, effects, cameras) under its own name; its own sound banks an
 keyed by its name); its own random-select bit.
 
 Name plates (`chrn_11`, `chrn_12`, `chrn_40`, `chrn_41`: the name drawn as a picture) are redrawn with the clone's
-title: white capitals with a dark edge on a clear background, in each plate's size and format. That is not the game's
+title: capitals with an edge, drawn in the plates' own channels (letters red + green, edge green: the screen colours
+them), in each plate's size and format. That is not the game's
 plate lettering; import your own PNG per plate set for an exact look. The name text itself (`MmelChara*`) goes into
 the one `melee.msbt` your data has (one language per install: run the tool on each region's file for others).
 
