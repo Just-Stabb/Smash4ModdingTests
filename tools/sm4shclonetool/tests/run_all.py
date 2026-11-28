@@ -187,6 +187,13 @@ def main():
     zp = sorted(os.listdir(os.path.join(pkg, 'ui', 'replace', 'chr', 'chr_00')))
     check('portraits: chr_00 of every clone (Foxclone 2 imported, Zssclone 8 re-ID\'d, Foxtwo 2 from Foxclone)',
           [len([f for f in zp if '_%s_' % n in f]) for n in ('Foxclone', 'Zssclone', 'Foxtwo')], [2, 8, 2])
+    sp = sorted(os.listdir(os.path.join(pkg, 'ui', 'replace', 'chr', 'stock_90')))
+    sids = [T.texture_ids(T.read_nut(os.path.join(pkg, 'ui', 'replace', 'chr', 'stock_90', f)))[0][1] for f in sp]
+    check('stock icons (stock_90, used by the match HUD and results by UI name and costume): Zssclone\'s 8 costumes, '
+          'decodable, texture ids unique (%d files)' % len(sp),
+          (len([f for f in sp if '_Zssclone_' in f]), all(T.decode(os.path.join(pkg, 'ui', 'replace', 'chr', 'stock_90',
+                                                                                  f)) is not None for f in sp),
+           len(set(sids)) == len(sids)), (8, True, True))
     dec = [T.decode(os.path.join(pkg, 'ui', 'replace', 'chr', 'chr_00', f)) for f in zp]
     check('portraits decode (%d chr_00 files)' % len(zp), all(d is not None for d in dec), True)
     own_checks(pkg, data, reg, e3)

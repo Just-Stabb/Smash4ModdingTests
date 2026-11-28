@@ -169,7 +169,7 @@ class App:
         self.p_set = ttk.Combobox(pf, values=PORTRAIT_SETS, width=9, state='readonly')
         self.p_set.set('chr_00')
         self.p_set.grid(row=0, column=0)
-        self.p_nn = ttk.Combobox(pf, values=['%02d' % i for i in range(1, 17)] + [''], width=4)
+        self.p_nn = ttk.Combobox(pf, values=['all'] + ['%02d' % i for i in range(1, 17)] + [''], width=4)
         self.p_nn.set('01')
         self.p_nn.grid(row=0, column=1)
         ttk.Button(pf, text='Import PNG...', command=self._import_portrait).grid(row=0, column=2)
@@ -374,7 +374,13 @@ class App:
         p = filedialog.askopenfilename(filetypes=[('PNG', '*.png')])
         if p:
             name = self.fv['name'].get() or 'clone'
-            self.portraits.setdefault(name, {})[(self.p_set.get(), self.p_nn.get())] = p
+            nn = self.p_nn.get()
+            try:
+                n = int(self.fv['costumes'].get() or 8)
+            except ValueError:
+                n = 8
+            for k in (['%02d' % i for i in range(1, n + 1)] if nn == 'all' else [nn]):   # one PNG for every costume
+                self.portraits.setdefault(name, {})[(self.p_set.get(), k)] = p
             self._list_portraits()
 
     def _clear_portraits(self):
