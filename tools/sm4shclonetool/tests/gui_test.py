@@ -44,6 +44,15 @@ def main():
     ok = b.get('title', '').startswith('Sm4shCloneTool')
     print('%s stages tab (folders from the remembered settings): %s' % ('ok  ' if ok else 'FAIL', 'error' not in b))
     fails += not ok
+    c = shot(py, ['--tab', 'extras', '--fighter', 'szerosuit:zclone'], os.path.join(shots, 'gui_extras.png'), home)
+    ok = 'font DF_Mincho_SU.ttf' in c.get('plate', '') and c.get('languages', 0) >= 1
+    print('%s extras tab: plate preview %r, %d language(s)' % ('ok  ' if ok else 'FAIL', c.get('plate'),
+                                                            c.get('languages', 0)))
+    fails += not ok
+    d = shot(py, ['--tab', 'voices'], os.path.join(shots, 'gui_voices.png'), home)
+    ok = d.get('voices', 0) > 0
+    print('%s voices tab: %d lines of the project\'s last clone with banks listed' % ('ok  ' if ok else 'FAIL', d.get('voices', 0)))
+    fails += not ok
     sys.exit(1 if fails else 0)
 
 

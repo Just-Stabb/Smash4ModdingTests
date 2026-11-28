@@ -39,7 +39,7 @@ SMALL_CAPS = 0.68           # a small capital's height / a capital's
 GAP = 0.035                 # space between letters / cap height
 SPACE = 0.30                # a word space / cap height
 TWO_LINES_FROM = 12         # a name with a space and this many characters or more goes on two lines (the game's
-                            # plates: "Captain Falcon", "Zero Suit Samus", "Mr. Game & Watch" two; "Master Hand", "Meta
+                            # plates: "Captain Falcon", "Zero Suit Samus", "Mr. Game & Watch" two; "Crazy Hand", "Meta
                             # Knight", "Little Mac" one; "Donkey Kong" two is the one exception); a "\n" in the title forces it
 BOLD = 0.045                # extra weight (dilation) / cap height: the game's letters are heavier than the font's
 
@@ -238,10 +238,10 @@ def render(text, set_name, font_path, size=None, style=None, lines=None):
     k = (sx + sy) / 2
     o = _dilate(m, geo['outline'] * k)
     sh = _shift(o, int(round(geo['shadow'][0] * sx)), int(round(geo['shadow'][1] * sy)))
-    edge = np.maximum(o, sh)
+    rim = np.maximum(o, sh)
     out = np.zeros((h, w, 4), np.float32)
     out[:] = bg
-    for cov, col, alpha in ((edge, outc, oa), (m, fill, 255)):
+    for cov, col, alpha in ((rim, outc, oa), (m, fill, 255)):
         c = cov[:, :, None]
         out[:, :, :3] = out[:, :, :3] * (1 - c) + np.array(col, np.float32) * c
         out[:, :, 3] = out[:, :, 3] * (1 - cov) + alpha * cov

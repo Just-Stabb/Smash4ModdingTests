@@ -19,13 +19,14 @@ your full UI every tile is its portrait. More in `screenshots/`: the stage tab, 
   the game, or your mod's `content/patch/data` merged over a dump). Vanilla or modded, both work. At least
   `param/ui/ui_character_db.bin` (fighters) or `param/ui/ui_stage_db.bin` (stages), `ui/message/melee.msbt` and the base's
   folder.
-- Your **cross_f.rpx** (`code/cross_f.rpx`): the game's latest update (v288) unmodified, or one this tool patched
-  before. New fighter / stage kinds need the patched executable; without one the tool only makes the data files.
+- Your **cross_f.rpx** (`code/cross_f.rpx`): the game's latest update (v288) unmodified (SHA-1
+  `a4cc56d89726c480637c20bea992a9afe8ee9ad9` as Nintendo ships it; a decompressed copy is recognised by its contents),
+  or one this tool patched before. New fighter / stage kinds need the patched executable; without one the tool only makes the data files.
 - Optional: a **custom UI folder** (your own portraits, your own character-select layout `lumen/chara/chara.lm`).
 
 ## Install
 
-1. Unzip `Sm4shCloneTool_v1_2.zip` anywhere.
+1. Unzip `Sm4shCloneTool_v1_3.zip` anywhere.
 2. Double-click **setup.bat** once (installs numpy and Pillow with pip).
 3. Double-click **run.bat** (the window) or use **run_cli.bat** (the command line).
 
@@ -85,8 +86,29 @@ marks your clones, which can be bases too). Then fill in:
   - **Own articles (all)**: every article of the base (its article list) becomes the clone's own weapon kind, with
     its files under the clone's folder. Without an own sound bank the articles keep the base's sounds.
 - **In the random select**: whether the character select's random pick can choose the clone (on by default).
-- Kirby: Kirby cannot copy a new fighter kind (the game refuses kinds past its own); swallowing the clone gives no
-  ability. This is the game's behaviour, not changed by the tool.
+- The announcer call, victory fanfare, Kirby's copy, name plates and languages: the **Fighter extras** tab (below).
+
+### Fighter extras tab (1.3)
+
+For the clone in the Fighters tab:
+
+| section | what | default |
+|---|---|---|
+| Announcer call | the character select's call and the results screen's "... <name>!": **own copy** of the base's call (new tones and labels in `sound/se/snd_se_narration_characall.nus3bank`, its 16 ids in `ui_sound_call_voice_db.bin`, and the executable's results call for its kind), **share** the base's, or **import WAV** (encoded to the game's DSP-ADPCM by the tool). **Preview** plays the WAV or the base's call | own |
+| Victory fanfare | **own copy** of the base's fanfare (a new BGM: `sound/bgm/snd_bgm_<base fanfare>_<Cap>.nus3bank`, a `bgm_property.mpb` entry, its `bgm_fighter.fbb` record), **share**, or **import WAV** (stereo, the BGM rate). The music after the fanfare is the mode's, the same for every fighter | own |
+| Kirby's copy | **Kirby copies the clone** with its base's copy ability (on), with its **own hat and copy motions** (`fighter/kirby/model/<name>cap/`, `motion/<name>body/`: copies of the base's, so you can change them; or the base's), or **import a hat model folder**. **Show hat** names the base's hat / motion folders and whether your data has them. Kirby's copy voices come from the clone's own `snd_se_vc_Kirby_copy_<Cap>` bank | on, own |
+| Names in every language | the clone's title and title line (the character select, results, the Boxing Ring's screen) in each language your data has (`data/ui/message/melee.msbt` and the region folders beside it, `data(us_fr)/` ...): the typed ones, or a language's own (select it, type, **Set**) | the typed title |
+| Name plates | the plates' text (default the title; `\n` for your own line break) and lines (auto: two from 12 characters with a space, as the game does), the **font** for each text type (name plates, titles, other text pictures): the bundled DFMincho-SU / DFGothic-SU, a font in your data's `ui/font/` ("game": a UI mod's .ttf), or **Choose font file...**. The preview draws chrn_40 / 11 / 12 as the game's plates look (small capitals, outline, drop shadow, the base plate's colours) | bundled Mincho |
+
+### Voices tab (1.3)
+
+For a clone already built in the project: every line of its own banks by category (taunt, victory (the lines its
+win poses' scripts play), hurt, KO, attack, special, jump, ledge, cheer, Kirby copy, other), **Preview**,
+**Replace with WAV...** (the selected lines), **Import a folder of WAVs** (each WAV named like a tone: the full name,
+`snd_vc_<Cap>_appeal01.wav`, or the part after the bank's name, `appeal01.wav`). The tones are written into the clone's
+own banks in the package (the base's files are never touched). Lines the game plays from its code by the base's ids
+(KO screams, damage voices, MSC scripts, the voice sequences) play these same tones: the clone's banks answer for the
+base's ids (see "The executable").
 
 **Portraits**: by default the clone gets every portrait the base has in your UI (`chr_00`, `chr_10`, `chr_11`,
 `chr_12`, `chr_13`, `chr_40`, `chr_70`, `chr_90`, `chrn_11`, `chrn_12`, `chrn_40`, `chrn_41`, `stock_90`), renamed and
@@ -156,13 +178,17 @@ clone to the ones already there.
   - the base's effect banks load with the clone (its articles' effects use the base's ids);
   - own articles: new weapon kinds (tables, switches, descriptors, the clone's article list);
   - custom moves: the clone's id owns its base's moves;
-  - stages: the stage-kind table (new kinds 0x80 + 2i / 0x81 + 2i), the stage-select names, the page-2 checks.
+  - stages: the stage-kind table (new kinds 0x80 + 2i / 0x81 + 2i), the stage-select names, the page-2 checks;
+  - (1.3) sound: the clone's own banks answer for its base's bank ids (the SoundModule set-up's aliases, so sounds the
+    game plays from code by the base's ids play the clone's tones); the results screen's announcer call for its kind;
+    Kirby: a clone is copied as its base's kind, with its own hat / copy-motion folder names and Kirby-copy voice bank.
 - All of it lives in the free code space after the game's code (`0x04B78000`-`0x04BB8000`, inside the game's own code
   region), plus the words it hooks in place.
 - **How the tool knows your executable**: before patching it checks every word it will hook against the game's
   original (several hundred words: switch bounds, table readers, counts, call sites) and that the code space after
-  the game's code is free. That is "vanilla" for the tool. Its SHA-1 is shown too (the research was done on
-  `3b7e1b3f421f330e259a3200d391f47ee6b5931a`).
+  the game's code is free. That is "vanilla" for the tool. Its SHA-1 is shown too: the game's v288 file is
+  `a4cc56d89726c480637c20bea992a9afe8ee9ad9` (tested on it in 1.3; 1.1 / 1.2 were tested on a stand-in rebuilt from a
+  modded executable).
 - **The marker**: a patched executable carries a block at `0x04B78000` starting `Sm4shCloneTool` with the list of
   clones and the original of every word the tool changed. Given that executable again, the tool puts the originals
   back in memory, adds the new clones to the list and patches from scratch: cloning again **adds** to the clones and
@@ -180,31 +206,38 @@ AI scripts, sounds, effects, cameras) under its own name; its own sound banks an
 (above); its victory fanfare and KO-voice records; its results-screen loser panel (`param/ui/result_param.bin`,
 keyed by its name); its own random-select bit.
 
-Name plates (`chrn_11`, `chrn_12`, `chrn_40`, `chrn_41`: the name drawn as a picture) are redrawn with the clone's
-title: capitals with an outline, drawn in the plates' own channels (letters red + green, outline green: the screen colours
-them), in each plate's size and format. That is not the game's
-plate lettering; import your own PNG per plate set for an exact look. The name text itself (`MmelChara*`) goes into
-the one `melee.msbt` your data has (one language per install: run the tool on each region's file for others).
+Name plates (`chrn_11`, `chrn_12`, `chrn_40`, `chrn_41`: the name drawn as a picture) are drawn with the clone's
+plate text in the game's plate style, measured on the game's own plates: small capitals (a capital at full height, a
+lowercase letter as a smaller capital; chrn_11 all full capitals) in DFMincho-SU's wide serif capitals, the game's line
+split (two lines from 12 characters with a space: "Captain / Falcon"), each line squeezed to the plate's text width,
+an outline and a drop shadow, in the base plate's own colours / channels (chrn_11 / 40: yellow letters, green outline
+on black; chrn_12: white letters, dark outline), each plate's size and format. Import your own PNG per plate set for
+another look. The name text itself (`MmelChara*`) goes into every language's `melee.msbt` your data has (the region
+folders `data(xx_yy)/` beside your data folder too; their copies are written to `INSTALL_TO_data(xx_yy)/`).
+
+Also its own (1.3): the announcer call (select and results), the victory fanfare, its win cameras
+(`motion/camera/result/<name>/`), Kirby's copy hat / motions / copy voices, every voice line (its banks answer for the
+base's ids the game plays from code), its names in every language, name plates in the game's style.
 
 Shared with the base, because that is how a Smash 4 clone works:
 - **the base's native code**: special moves, status logic, articles' behaviour, anything the game does for that
   kind in code. The clone's files decide what it looks and sounds like and its ACMD / MSC / params, but its moveset
-  structure is the base's. The base's per-fighter state lives in each fighter, so a clone and its base in one match
-  behave like two copies of the base (the game shares the kind's static specializer object between every fighter of
-  a kind already); the clone has its own parameter slot (its vl file) and article kinds;
-- the announcer call on the character select and the results (the clone's 16 call ids are the base's), the
-  victory fanfare's and the results screen's music track (its own records point at the base's tracks);
-- its Final Smash cutscene assets that the game finds by kind instead of by folder (its `camera/final/` and
-  `effect/Fin<Cap>/` folders are copied and renamed, but whether the game loads them for a new kind was not traced),
-  and a transformation (a clone of Bowser, Wario, Little Mac or Lucario transforms into the base's transformation);
-- sound ids inside MSC scripts (only ACMD ids are moved to its own banks);
+  structure is the base's. A clone and its base in one match behave like two copies of the base (each fighter keeps
+  its state in itself; the kind's static specializer object is shared between every fighter of a kind already);
+- **Kirby's copy scripts and effects**: Kirby's ACMD for a copy ability is his own, by motion name, so his copy of the
+  clone runs the base's copy scripts on the clone's own copy motions and hat; those scripts call the base's effect ids,
+  which show only while the base's effect bank is loaded (the base in the match, or the clone without its own effect
+  bank); the Kirby-copy voice bank keeps the base's bank id
+  (Kirby plays it by the base's row): with the base and the clone in one match only the first one's copy voices load;
+- its Final Smash cutscene assets the game finds by kind (its `camera/final/` and `effect/Fin<Cap>/` are copied and
+  renamed; the scene tables per kind are the base's), and a transformation (a clone of Bowser, Wario, Little Mac or
+  Lucario transforms into the base's transformed kind);
 - the custom moves' unlock bits (the clone owns what its base owns: the save has no room for new characters);
-- Kirby: Kirby can't copy a new kind (the game refuses kinds past its own); swallowing the clone gives no ability.
+- the stage clones' random switches (see "Game modes").
 
-Not in this version (the clone uses the base's, or nothing): its own announcer call and results / fanfare music, a
-Kirby copy hat (Kirby gets no ability from it), trophies, Palutena's Guidance conversations (the game's conversation
-switches send new characters to their default: no conversation), Smash Tour data beyond the base's behaviour, amiibo
-assignment, Final Smash scene tables and transformations of its own.
+Not in this version (researched, not built: see the internals doc for what each needs): trophies of its own, Palutena's
+Guidance conversations, Smash Tour data beyond the base's, amiibo assignment, its own Final Smash scene-table entries
+and transformed kinds, its own copy scripts for Kirby.
 
 ## Character select placement
 
@@ -216,13 +249,16 @@ keys order other menus and put the clone last). Without "after", the clone goes 
 
 ## Game modes
 
-| mode | with clones |
-|---|---|
-| Smash, Special Smash, Training | selectable on the character select, random included |
-| Classic | its row in `simple_character_db_cafe.bin`; its save records (per character, in memory only) |
-| amiibo | its learning row (`fighter_ai_nfp_learning_param.bin`) |
-| CPU AI | its AI params row and its own AI files |
-| All-Star, Stadium, Smash Tour, Events, Trophy Rush, online, replays | **not checked**: these modes were not traced with new kinds. Test them in Cemu before relying on them; please report any crash with the mode and what you selected |
+| mode | with clones | how it was checked |
+|---|---|---|
+| Smash, Special Smash, Training | selectable on the character select, random included; the announcer calls the clone's own call (`0x0294812C`, by character id) | emulated: the random pools (`random_select_test.py`), the results call (`extras_test.py`) |
+| results screen | winner call `0x02A65898` by kind: the clone's own (before 1.3 a clone had none), its fanfare record, win cameras by its name, loser panel (`result_param.bin`) | emulated (the call); traced (fanfare, cameras) |
+| Classic | its row in `simple_character_db_cafe.bin`; its save records (per character, in memory only) | traced (1.1) |
+| amiibo | its learning row (`fighter_ai_nfp_learning_param.bin`); no amiibo can be assigned to it | traced |
+| CPU AI | its AI params row and its own AI files | traced (1.1) |
+| Boxing Ring | its title line on the ring's screen: `ui/info/aurora_punch_out/`'s builder `0x026552B8` reads `MmelCharaA_<costume>_<UI name>` through `0x030A02A4` (character id, costume): the clone's labels, every costume and language | traced |
+| random stage switches | saved: 5 bits a stage at save `+0x38` (12 words, `0x02A517DC`), by the index `0x030A9230` gives a stage (the switch screen's list, DLC stages 9-16); a stage clone has no index (-1): it is always on, and never written to the save. Its "In the random stage select" option is its switch | traced |
+| All-Star, Stadium (Multi-Man, Target Blast, Home-Run), Trophy Rush, Events, Smash Tour, Records / Vault, replays, online | **not checked**: not traced with new kinds. Two places copy the 96-id available-fighters set (`0x0290D960` from the menus, `0x029E6CE0`) into structures whose readers were not traced: clones with ids 96 and up (the 38th clone on) are not in those sets. Test in Cemu first; please report any crash with the mode and what you selected | - |
 
 ## Custom UIs
 
@@ -252,6 +288,9 @@ python cli.py check  --data DATA --out OUT --exe EXE --fighter fox:wolf:title=Wo
 python cli.py build  --data DATA --out OUT --exe EXE --fighter fox:wolf:title=Wolf --portrait wolf:chr_00:01=wolf1.png
 python cli.py build  --data DATA --out OUT --exe EXE --stage BattleField_f:Skyworld:title=Skyworld,page=2
 python cli.py css    --data DATA --out OUT [--ui UI] --fighter fox:wolf --png preview.png
+python cli.py build  --data DATA --out OUT --exe EXE --fighter "fox:wolf:title=Wolf,call=wolf.wav,music=own,title@us_fr=Loup"
+python cli.py voices --data DATA --out OUT --name wolf --replace snd_vc_Wolf_appeal01=howl.wav --import-folder wavs
+python cli.py plate  --text "Fox Clone" --set chrn_40 --png plate.png
 ```
 
 `python cli.py --help` lists every key.
@@ -269,25 +308,24 @@ The window shows the current counts and limits under the plan ("Fighter clones: 
 | stage clones | **41**: 1 on page 1, 40 on page 2 | the stage select has 48 slots a page (`img_01`-`img_48`) and 2 pages; the game has 47 + 8 stages. More pages are not supported |
 | stage clones in random stage select | **every stage clone** (the 41) | the random stage pools cover ids below 0x63, which every stage clone has (0x38-0x60); any can be left out with "In the random stage select" off |
 | stage-select ids | 0x38-0xC7 | ids up to 0xC7 are found by position |
-| code space | grows with the clones (about 6 KB a fighter, more with articles) | from `0x04B78000`; past `0x04BB8000` the executable's code region is enlarged (as other code mods do; tested on Cemu by such mods, not on a console) |
+| code space | grows with the clones (about 6.5 KB a fighter, more with articles) | from `0x04B78000`; past `0x04BB8000` the executable's code region is enlarged (as other code mods do; tested on Cemu by such mods, not on a console) |
 | effect banks in one match | 8 | the game's bank slot table; a clone whose base isn't in the match uses two. A per-match limit, not a clone count |
 
 ## What is not confirmed in game
 
 - **Tested by emulating the patched code** (the game's own functions run on the patched executable), not yet in a
-  game: please report what you see. The tool was built without an untouched v288 executable at hand: the patch was
-  tested on a stand-in rebuilt from a modded one (every word the tool touches restored to the game's original), so
-  the first run on a real vanilla executable is the first true one. If the tool says your vanilla executable is not
-  vanilla, please report its SHA-1.
+  game: please report what you see. 1.3's tests run on the game's own v288 executable (the stand-in 1.1 / 1.2 were
+  tested on differed from it, at the words the tool patches, only in the originals of three words it records, which
+  the stand-in carried pre-patched).
+- 1.3's new parts not seen in a game: the announcer's results call, the bank aliases (the base's ids played from the
+  clone's banks), Kirby copying a clone (hat / motions / voices), the own fanfare BGM, region-folder names.
 - Many clones: 40 fighter and 8 stage clones were built and emulated; the enlarged code region (to about 0x04BD1000,
   356 KB, for 40 fighters and 8 stages), high kinds' resource ids (`kind * 0x11 + n`, map keys) and a select screen with 99 entries were not
   seen in a game.
 - A clone shares its base's **native code**: special moves, articles and anything the game does for that kind
   in code. What is in its files (model, motions, ACMD, MSC, params, effects, sounds) is its own to change.
-- **Sounds**: the clone's sound banks are the base's files renamed; they keep the base's bank ids, so with the base
-  and the clone in one match their banks may answer for each other (not tested). A bank of its own needs the
-  soundlabeltable edited (not in this version).
-- The announcer calls the clone with the base's call. Kirby can't copy clones.
+- **Sounds**: the clone's banks have ids of their own (1.2) and answer for the base's ids through the executable's alias
+  (1.3); the Kirby-copy voice bank keeps the base's id (see "What a clone owns").
 - **Records / Classic mode**: the new characters' records live in memory only (the save file has no room for them).
 - **Stages**: a clone is the base's folder renamed; the game builds it as a generic stage (its own models, collision
   and parameters). Stages whose behaviour is native code (moving platforms, hazards) may not move (not tested).

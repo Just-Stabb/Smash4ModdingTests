@@ -898,9 +898,12 @@ def main():
                 app.sv['cosmetic'].set('0x%X' % (0x38 + len(app.session.reg['stages'])))
             tabs = {'fighters': 0, 'extras': 1, 'voices': 2, 'stages': 3}
             app.nb.select(tabs.get(a.tab, 0))
-            if a.tab == 'voices' and app.session and app.session.reg['fighters']:
-                app.v_clone.set(app.session.reg['fighters'][-1]['name'])
-                app._fill_voices()
+            if a.tab == 'voices' and app.session:
+                for f in reversed(app.session.reg['fighters']):      # the last clone that has sound banks
+                    app.v_clone.set(f['name'])
+                    app._fill_voices()
+                    if app.v_lines:
+                        break
             app.preview()
             app.plate_preview()
             app.check()
@@ -914,7 +917,8 @@ def main():
             ImageGrab.grab(bbox=(x, y, x + w, y + h), xdisplay=os.environ.get('DISPLAY')).save(a.screenshot)
             info = {'title': root.title(), 'fighters': app.f_count, 'fighter_icons': app.f_icon_count,
                     'css': {k: v for k, v in getattr(app, 'css_slots', {}).items() if k != 'slot'},
-                    'limits': app.limits_label.cget('text')}
+                    'limits': app.limits_label.cget('text'), 'plate': app.plate_info.cget('text'),
+                    'voices': len(app.v_lines), 'languages': len(app.lang_tree.get_children())}
             print(json.dumps(info))
             root.destroy()
         root.after(500, shoot)

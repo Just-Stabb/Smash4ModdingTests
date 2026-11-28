@@ -22,7 +22,7 @@ from . import _paths  # noqa: F401
 from . import audio as AU
 
 CATEGORIES = [('taunt', r'appeal'), ('victory', r'win|result'), ('hurt', r'damage(?!_hoshikie)|dmg|furafura|sleep'),
-              ('KO', r'missfoot|hoshikie|dead|ko\b|falldown|star'), ('attack', r'attack|smash|throw|catch|swing'),
+              ('KO', r'missfoot|hoshikie|dead|_ko\b|falldown'), ('attack', r'attack|smash|throw|catch|swing'),
               ('special', r'special|final'), ('jump', r'jump'), ('ledge', r'cliff|ledge'),
               ('other', r'.')]
 WIN_MOTIONS = ('win1', 'win1wait', 'win2', 'win2wait', 'win3', 'win3wait', 'lose')

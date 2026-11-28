@@ -69,18 +69,21 @@ def results_calls(read, kind, costume):
     return r8 + 0x45 if costume & 1 else r8 + 0x31                   # 0x28
 
 
-def base_ids(rec, param_dirs, read=None):
-    """the base's call ids: its 16 select ids and its results ids for costumes 0-15 (a set, in order)"""
+def base_ids(rec, param_dirs, read=None, src=None):
+    """the source's call ids: its 16 select ids and its results ids for costumes 0-15 (a set, in order); src: the
+    source's registry record when the source is a clone (its own ids: its row, its results calls through its map)"""
     import add_fighter as A
     f = A.ParamEdit(param_dirs, CALL_DB)
-    row = next((e for e in f.entries() if e[0][1] == rec['base_ui_id']), None)
+    row = next((e for e in f.entries() if e[0][1] == (src['ui_id'] if src else rec['base_ui_id'])), None)
     out = []
     if row is not None:
         out += [row[k][1] for k in range(1, len(row))]
     if read is not None:
         from . import roster as RR
         bk = RR.KINDS.index(rec['base'])
-        out += [results_calls(read, bk, c) & 0xFFFFFFFF for c in range(16)]
+        mp = dict((src or {}).get('call_map') or [])
+        out += [mp.get(results_calls(read, bk, c) & 0xFFFFFFFF, results_calls(read, bk, c) & 0xFFFFFFFF)
+                for c in range(16)]
     seen = []
     for v in out:
         if v not in seen and v not in (0xFFFFFFFF, 0):
@@ -88,7 +91,7 @@ def base_ids(rec, param_dirs, read=None):
     return seen
 
 
-def own_call(rec, data_dir, out_data, read=None, mode='own', wav=None, log=print):
+def own_call(rec, data_dir, out_data, read=None, mode='own', wav=None, log=print, src=None):
     """the clone's call: mode 'own' (copies of the base's tones), 'wav' (one tone from wav), 'share' (the base's).
     Sets rec['call_map'] = [[old id, new id], ...] for the executable's results call. Returns the written files."""
     rec['call_map'] = []
@@ -111,7 +114,7 @@ def own_call(rec, data_dir, out_data, read=None, mode='own', wav=None, log=print
         log('announcer call: the soundlabeltable has no single row for %s (%d): kept the base\'s' % (name, bid))
         return []
     labels = table.tones(row)
-    ids = base_ids(rec, param_dirs, read)
+    ids = base_ids(rec, param_dirs, read, src)
     # the banks the base's ids play from: the main one, or a DLC fighter's own (by BINF id, in sound/se/)
     others = {}
     for d in dirs:
@@ -160,6 +163,11 @@ def own_call(rec, data_dir, out_data, read=None, mode='own', wav=None, log=print
         return []
     table.set_row(row, labels)
     mp = dict(cmap)
+    # a clone of a clone: the results hook maps the BASE's ids (the function runs with the base's kind), so its pairs
+    # are also keyed by the base ids its source had mapped
+    for raw, sid in (src or {}).get('call_map') or []:
+        if sid in mp and raw not in mp:
+            cmap.append([raw, mp[sid]])
     # the select's 16 ids
     import add_fighter as A
     import s4param

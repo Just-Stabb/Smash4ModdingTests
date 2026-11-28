@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Many clones: 40 fighter clones and 8 stage clones on the vanilla stand-in.
+"""Many clones: 40 fighter clones and 8 stage clones on the vanilla executable (the game's, or the stand-in).
 
   python3 tools/sm4shclonetool/tests/many_clones_test.py WORK STANDIN.rpx FIXTURES_DIR
 
 1. The executable: 40 fighters (8 vanilla bases in turn, every 4th with its base's article as its own weapon kind,
    clones 10 and 20 left out of random) + 8 stages (page 2), at once and as 20 + 20 (the second on the first's
-   output), same memory image; then the research tests (repo_test.py) and random_select_test.py on it.
+   output), same memory image; then the research tests (repo_test.py), random_select_test.py and extras_test.py on it.
 2. The data: a project of 40 Fox clones + 8 stage clones in one build with the custom UI (its chara.lm has
    arrangements up to num_112): rows, the CSS preview with every clone placed; with the game's layout (96 places)
    the same plan is refused.
@@ -98,6 +98,11 @@ def main():
     text = open(o).read()
     check('random_select_test: %d ok, %d failed' % (text.count('\nok ') + text.startswith('ok '),
                                                     text.count('\nFAIL ')), rc, 0)
+    o = os.path.join(work, 'extras_test.txt')
+    rc = run([sys.executable, os.path.join(HERE, 'extras_test.py'), e40, standin], o)
+    text = open(o).read()
+    check('extras_test with 40 clones (results call, aliases, Kirby\'s copy): %d ok, %d failed'
+          % (text.count('\nok ') + text.startswith('ok '), text.count('\nFAIL ')), rc, 0)
     # ---------------------------------------------------------------- data side, 40 Fox clones
     data = os.path.join(fx, 'data')
     cui = os.path.join(fx, 'custom_ui')

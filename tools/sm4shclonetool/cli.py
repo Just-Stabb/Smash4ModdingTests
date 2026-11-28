@@ -160,6 +160,7 @@ def main():
             print(json.dumps(info, indent=1))
             return
         print('%s: %s (SHA-1 %s%s)' % (a.exe, info['state'], info['sha1'],
+                                       ', the game\'s v288 executable' if info.get('v288') else
                                        ', the research base' if info['research_sha1'] else ''))
         for p in info.get('problems', []):
             print('  ' + p)

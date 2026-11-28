@@ -42,8 +42,21 @@ def forbidden():
     return words, sorted(set(subs))
 
 
+# the only font files the package may hold: the two bundled fonts (fonts/FONTS_NOTICE.txt), by name and SHA-256
+FONTS = {'Sm4shCloneTool/fonts/DF_Mincho_SU.ttf': 'MINCHO', 'Sm4shCloneTool/fonts/DF_Gothic_SU.ttf': 'GOTHIC'}
+FONT_EXT = ('.ttf', '.otf', '.ttc', '.bfttf', '.bffnt', '.bfotf', '.brf', '.woff', '.woff2')
+
+
+def font_hashes():
+    import hashlib
+    d = os.path.join(os.path.dirname(HERE), 'fonts')
+    return {k: hashlib.sha256(open(os.path.join(d, os.path.basename(k)), 'rb').read()).hexdigest() for k in FONTS}
+
+
 def main():
+    import hashlib
     words, subs = forbidden()
+    want_fonts = font_hashes()
     rx = re.compile(r'\b(%s)\b' % '|'.join(re.escape(w) for w in sorted(words, key=len, reverse=True)), re.I)
     hits = []
     z = zipfile.ZipFile(sys.argv[1])
@@ -53,6 +66,10 @@ def main():
             continue
         data = z.read(info)
         n += 1
+        if info.filename.lower().endswith(FONT_EXT):
+            if want_fonts.get(info.filename) != hashlib.sha256(data).hexdigest():
+                hits.append('%s: a font file other than the two bundled ones (or changed)' % info.filename)
+            continue
         if info.filename.endswith('.png'):
             text = b''.join(re.findall(rb'tEXt(.{0,200})', data)).decode('latin1')
         else:
@@ -62,7 +79,12 @@ def main():
         for s in subs:
             if s.lower() in text.lower() or s.lower() in info.filename.lower():
                 hits.append('%s: %r' % (info.filename, s))
-    print('%d files checked for %d names and %d strings' % (n, len(words), len(subs)))
+    names = {i.filename for i in z.infolist()}
+    for k in want_fonts:
+        if k not in names:
+            hits.append('%s: the bundled font is missing' % k)
+    print('%d files checked for %d names and %d strings; fonts: only %s' % (n, len(words), len(subs),
+                                                                          ', '.join(sorted(want_fonts))))
     for h in hits[:40]:
         print('FAIL ' + h)
     print('package clean: %s (%d hits)' % ('ok' if not hits else 'FAILED', len(hits)))

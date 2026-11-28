@@ -1,0 +1,6 @@
+DFMincho-SU (DF_Mincho_SU.ttf) and DFGothic-SU (DF_Gothic_SU.ttf), (c) DynaLab Inc. 1997 (as stated in the font files).
+Included for non-commercial use; this tool is free and non-commercial. Not covered by the tool's MIT licence.
+
+Sm4shCloneTool draws the clones' name plates with DFMincho-SU by default (the look of the game's own plates) and
+other text pictures with DFGothic-SU. You can pick another font file in the window ("Choose font file...") or on the
+command line (font_plate=..., font_title=..., font_other=...).

@@ -35,7 +35,12 @@ PARTS = [('marker', 0x0000, 0x4000), ('stage', 0x4000, 0x5000), ('customs', 0x50
          ('effects', 0x6000, 0x8000), ('random', 0x8000, 0x9000)]
 WEAPONS_AT = 0xA000                  # past 0x04B811D0, the last of the file's import-call targets
 DUMMY_OFF = 0x3FF8                   # the marker block's last 8 bytes: never read or run (moved relocations land here)
-# SHA-1 of the cross_f.rpx the research was done on; reported, not required (see README)
+# the game's latest update (v288) cross_f.rpx as Nintendo ships it (37 of its 48 sections zlib-compressed): its file's
+# SHA-1 and its memory image's digest (Rpx.image_digest: the loaded sections, so the same for a decompressed copy).
+# The research's own executable (3b7e1b3f...) is not reproduced by plainly decompressing this one (its section layout
+# differs); reported when seen. None of them is required: the hooked words decide (see README)
+V288_SHA1 = 'a4cc56d89726c480637c20bea992a9afe8ee9ad9'
+V288_IMAGE = '57ea6573427837227fbf66df472832c76951b0c1'
 RESEARCH_SHA1 = '3b7e1b3f421f330e259a3200d391f47ee6b5931a'
 WEAPON_FIRST = 0x185
 FIRST_KIND, FIRST_ID = 0x41, 59
@@ -126,6 +131,7 @@ def _inspect(path):
     x = Rpx(path)
     info = {'path': path, 'sha1': sha1_file(path), 'text_end': x.text_end(), 'text_region': x.text_region()}
     info['research_sha1'] = info['sha1'] == RESEARCH_SHA1
+    info['v288'] = info['sha1'] == V288_SHA1 or x.image_digest() == V288_IMAGE
     m = find_marker(x)
     if m:
         info.update(state='patched', base=m[0], registry=m[1]['registry'], tool_version=m[1].get('tool'))
@@ -208,7 +214,8 @@ def vanilla_view(path, force=False):
     info = inspect(path)
     if info['state'] == 'vanilla':
         notes.append('vanilla (every word the tool patches holds the game\'s original; SHA-1 %s%s)'
-                     % (info['sha1'], ', the research base' if info['research_sha1'] else ''))
+                     % (info['sha1'], ', the game\'s v288 executable' if info.get('v288') else
+                        ', the research base' if info['research_sha1'] else ''))
         return x, DEFAULT_BASE, info['registry'], notes
     if info['site_conflicts']:
         raise ExeError('this cross_f.rpx is modified where the Sm4shCloneTool patches it, so it can\'t be patched '

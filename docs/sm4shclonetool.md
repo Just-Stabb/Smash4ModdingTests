@@ -19,6 +19,10 @@ tools/sm4shclonetool/
     stage.py                     a stage clone's data (add_stage.py's helpers)
     textures.py                  .nut decode (nut.py), PNG -> portrait in a set's format, new NTWU icons
     preview.py                   CSS (chara.lm via chara_layout.py, or a grid) and SSS previews
+    clone_extras.py              (1.3) the executable's sound aliases, results announcer call, Kirby copy hooks
+    narration.py, music.py       (1.3) the clone's own announcer call / victory fanfare (data side)
+    voices.py, audio.py          (1.3) every voice line by category, WAV replace; nus3bank tones, IDSP, WAV, preview
+    plates.py, languages.py      (1.3) name plates in the game's style (fonts/), names in every region's melee.msbt
     session.py                   folders, registry, plan (Check), build (the package), post-build checks
   tests/                         repository-only: fixtures, the vanilla stand-in, run_all.py, repo_test.py
   make_vendor.py                 regenerates vendor/ (the tool's adapted copies of the research modules)
@@ -68,8 +72,9 @@ registry)` sets each generator's `CAVE` / `LIMIT`):
 | customs | 0x5000-0x6000 | `base_customs_cave` |
 | effects | 0x6000-0x8000 | `base_effects_cave` (kept at v1's place: the game's calls to imported functions point into this space in the file, and a wrapper on one of those addresses would look like such a call to `import_call_check`) |
 | random | 0x8000-0x8100 | `random_select.py` (the allow mask, the store stub) |
+| extras (1.3) | after the weapons, `0x800 + 0x1C0` per fighter (rounded to 0x1000) | `clone_extras.py` |
 | weapons | 0xA000- (past the file's import-call targets, which end at 0x04B811D0), 0x10000 + 0x1800 per own article | `weapon_expand` |
-| kinds | after the weapons, up to `MAX_SPACE` (3 MB) | `kind_expand` (about 5-6 KB a fighter: descriptor, motion table, vl cases) |
+| kinds | after the extras, up to `MAX_SPACE` (3 MB) | `kind_expand` (about 5-6 KB a fighter: descriptor, motion table, vl cases) |
 
 The code section is grown to the last word written, at least to `0x04BB8000` (`SIZE`); past the text region's end
 the region is raised (`textregion`). The marker records the end. `MAX_SPACE` keeps the copied vl load / unload cases'
@@ -157,6 +162,15 @@ columns, `stage_10` (page 2 `stage_13`). A UI profile `sm4shclonetool_ui.json` i
 path, icon sets and icon size.
 
 ## Tests (`tests/`)
+
+1.3: `run_all.py WORK VANILLA.rpx VPARAM VUI VFIGHTER SOUND_CONFIG [CUSTOM_CHR]` takes the game's v288 executable (the
+stand-in below only when given a modded one); new: `extras_test.py PATCHED VANILLA` (the results call for every kind /
+costume against the game's own function, the bank aliases, Kirby's copy hooks: unicorn), `media_test.py VUI_CHR WORK`
+(the DSP-ADPCM encoder against the C one, IDSP / WAV, the plates against the game's, fonts), run_all's 1.3 checks (the
+call's tones / labels, the fanfare BGM, win cameras, Kirby's copy files, a voice replaced from a WAV, every language's
+labels), `rpx_valid` on every build, gui_test's extras / voices tabs. Fixtures added by `make_fixtures.py`: the narration
+bank (SOUND_CONFIG's `snd_se_narration_characall.nus3bank` or `S4CT_CHARACALL`), `bgm_property.mpb`, a synthetic
+fanfare bank, synthetic win cameras / Kirby copy hats and motions, a `data(us_fr)` region beside the data folder.
 
 No untouched v288 cross_f.rpx was available. `make_vanilla_standin.py` makes a stand-in from a modded executable:
 `.text` cut to `0x04B77E1C`, the text region restored, every generator-hooked word restored to the generators' stated
@@ -273,3 +287,146 @@ its mirror, the random state, the lazy-init guard and the stack.
 - The game's character-select layout file is not read without a `chara.lm` in the UI folder; ties between equal sort
   keys are assumed to keep id order.
 - Rewriting a custom `chara.lm` for a new count (only detected and reported).
+
+## 1.3
+
+### The game's own executable
+
+1.3 was tested on the game's v288 `cross_f.rpx` (SHA-1 `a4cc56d89726c480637c20bea992a9afe8ee9ad9`, 37 of its 48
+sections zlib-compressed; memory-image digest `57ea6573...`, `exe.V288_SHA1` / `V288_IMAGE`). Plainly decompressing it
+does not give the research's `3b7e1b3f...` (that one's section layout differs), so that hash stays a "seen before" note.
+The stand-in 1.1 / 1.2 were tested on (`tests/make_vanilla_standin.py`, from a modded executable) compared with it:
+- memory: 1304 words differ in all, every one another mod's (hooks into the cut code space, data edits) that the
+  stand-in left on purpose; none is a word the tool patches;
+- the words the tool patches (445 for the run_all registry, every part): their recorded originals are identical except
+  three: `0x030A926C` / `70` / `78`, the DLC unlock index (`0x030A9230`) that `stage_slot_cave` bounds. The game has
+  `addic. r12, r28, -0x30` / `blt 0x030A92B0` / `addi r31, r12, 9` / `b 0x030A92B4` (no upper bound); the stand-in
+  carried the research's bounded version (`cmplwi r12, 8` ...) as its "original". The patch written is the same; on
+  the game's executable the marker now records the game's words (so un-patching restores the game exactly);
+- relocations: the 124 the tool moves are identical; the stand-in still had 116 of other mods' relocations parked on
+  the research's dummy word (none at a site the tool touches);
+- the patched images from both are identical outside the code space except those 1304 words.
+`run_all.py` takes the game's executable as its second argument (it makes a "modified" copy with one hooked word
+changed for the refusal check); a modded executable still works the old way (stand-in). Every build is checked to be a
+valid RPX (`rpx_valid`: each section's CRC, compressed sizes, the text region covering the code).
+
+### Sounds (sound.py, clone_extras.py, voices.py)
+
+- **Bank aliases.** A fighter's sound (row << 16 | label) plays only from that fighter's own bank handles: the finder
+  `0x02C71898` matches the row's bank id with each handle's BINF id or the handle's alias (`+0x5C0` se, `+0x5C4` vc,
+  `+0x5C8` cheer, `+0x580` the Final Smash's se_common), which the SoundModule set-up `0x02761C50` reads from
+  `fightermodelbanktable.mtb` by the fighter's name (none for a new kind). With 1.2's own bank ids the base's ids the
+  game plays from code (commonsoundtable.csb's KO / missfoot voices, the voice sequences, MSC scripts, the base's
+  native code) found no bank for a clone. `clone_extras.py` gives a clone's handles its base's ids as aliases: hook
+  SETUP `0x03127990` (`lwz r12, 0(r3)`, the sound manager's getter; acts only when called from `0x02761E44`, LR
+  `0x02761E48`, after the MTB reads) and FS `0x03121FA8` (`lwz r3, 0(r3)`; from `0x02761598`, LR `0x0276159C`). The
+  research's `sound_alias_cave.py` design, per clone kind (`rec["sound_alias"]`: the base's se / vc / cheer /
+  se_common ids, from the banks' BINF before `own_banks` renumbers them). So **MSC sound ids** need no rewriting:
+  they keep the base's ids and play from the clone's banks (item 12 of the 1.3 brief: documented instead of an MSC
+  rewriter); the same for the soundseq `.sqb` and the csb records.
+- **Kirby-copy voice bank** (`snd_se_vc_Kirby_copy_<Cap>`): Kirby's copy handles (`+0x5DC`, filled at `0x02761B00`
+  from `0x02EFDE88`) have no alias, and Kirby plays it by the base's row: the clone's copy keeps the base's id (its own
+  file / tones). nus3 loads one bank an id, so with the base and the clone in one match the later player's Kirby-copy
+  bank is refused (only Kirby's copy voices of that player are affected).
+- **Voices.** `voices.lines()` lists every tone of the clone's banks by category (the victory lines: the tones its
+  `sound.bin` Win1 / Win2 / Win3 / ... scripts play through the soundlabeltable); `replace()` appends the WAV's
+  DSP-ADPCM to PACK and points the tone at it (the TONE entry's group / volume kept). Replacing changes that line
+  everywhere the game plays it for the clone (its own rows and, through the alias, the base's ids).
+- **DSP-ADPCM**: `vendor/dspadpcm.py`, a port of jackoalan's grok.c (MIT); `media_test.py` checks it against the C
+  encoder byte for byte (coefficients and frames).
+
+### The announcer call (narration.py, clone_extras.py)
+
+- Select: `0x0204CA14` -> `0x0294812C(the call database, character id, costume + 1)`, the only reader of
+  `ui_sound_call_voice_db.bin` (searched by id; an id not in it would read entry -1: every clone has its row).
+- Results ("... the winner is X") and three other callers: `0x02A65898(mode, kind, costume, flag)` (`play_result_characall_se`
+  `0x030EECB4`, `0x02FE14A8`, `0x02FE1708`, `0x02FE1A28`): a switch on the kind (tables `0x100C870C`, `0x100C8640`,
+  `0x100C8624`, the Koopalings' `0x02A65790` / `0x100C868C`, costume variants for Olimar / Alph, Wii Fit Trainer,
+  Villager, Robin), kinds `0x3E`-`0x40` one call, **past 0x40 none** (a 1.2 clone was not called), then the region
+  remap `0x02A657BC` (`0x10340CE4` pairs). `narration.results_calls` is the switch in Python (checked against the
+  function for every kind and costume in `extras_test.py`).
+- The hook: `0x02A65898`'s first four words become a far jump (the code space is out of a `b`'s reach); for a clone
+  kind the function body runs with the base's kind and the result goes through the clone's `call_map` (base id ->
+  its own label); other kinds replay the four words and jump back.
+- Data: every base call id (16 select ids + results ids for costumes 0-15) gets a new tone in the main narration bank
+  (a copy of the base's, from its DLC bank for a DLC base, or the creator's WAV) and a label appended to that bank's
+  row (`sound.Table.set_row` rebuilds the label area; every other row keeps its list).
+
+### The fanfare (music.py)
+
+`bgm_fighter.fbb` record = kind (names `0x10340BBC`, kind order) -> BGM id -> `bgm_property.mpb` entry; the game's own
+entries' names come from the executable's `(id, name)` table `0x100C7380` (593 pairs, filled at load by `0x02A640DC`
+unless `0x02A7BA48` says the file's names stand), an added entry keeps its file name (`0x03116ECC`:
+`%s/snd_bgm_%s.nus3bank`). A clone's own fanfare: the base's bank copied under `<name>_<Cap>` (BINF name / id 6400+
+unused), a new entry (the lowest free id) copying the base's ints, the fbb record pointed at it. The results music after
+the fanfare (`CRS24_VS_Result` ...) is per mode, not per fighter.
+
+### Kirby (clone_extras.py, fighter.kirby_files)
+
+Hooks (originals in the marker; the research's `kirby_copy_new_cave.py` design, generic): GRANT `0x02EFCDA4`
+(`mr r28, r6`: a clone kind -> its base's: Kirby gets the base's ability, every copy table / switch the base's), RES
+`0x030C46A8` / `0x030C5254` / `0x030C5BD0` (`mr r28|r16|r23, r4`: the copy resources' loader / helper / release; the
+helper keeps the real kind), BODY `0x030C4710` (`lbz r10, 0(r7)`: motion folder `fighter/kirby/motion/<name>body`; not
+`0x030C470C`, which carries a relocation) and HAT `0x030C4830` (`lwzx r7, r23, r21`: `fighter/kirby/model/<name>cap/cNN`)
+for a clone with its own, VOICE `0x030C0FF8` (`cmplwi r29, 0x39`: the Kirby-copy voice bank loads for a clone that has
+one). Kirby's copy ACMD is his own by motion name: the clone's copy motions run the base's copy scripts (own scripts
+would need new motion names in Kirby's motion table: not built). Copy effects: Kirby's `effect.bin` calls the COPIED fighter's
+bank (`0x3KK....`, KK = the copied kind: 54 / 56 / 41 ... for his copy scripts; read from a Kirby `effect.bin` of the
+research repository's packages), not a sub-bank of his own; for a clone copied as its base those are the base's ids, so
+they show only while the base's bank is loaded (the base in the match, or a clone without its own effect bank, whose
+base banks load with it). Giving the copy the clone's own effects needs either Kirby scripts of its own (new motion
+names) or an effect-id remap for Kirby while he holds a clone's copy: not built.
+
+Kirby's copy sounds: his copy voices come from the copied player's Kirby-copy bank (the clone's own file, listed and
+replaceable in the Voices tab); the copy's sound effects are labels of Kirby's own se bank played by his own copy
+scripts (shared with the base's copy: separate labels would need separate scripts). The hat folder copy carries the
+hat's own files (its model and material animations); the copy motions are the whole `<base>body` folder copied. No
+Sm4shCommand names file is written: no new script slots exist (Kirby's scripts are shared). The window offers a hat
+folder import; replacing single copy motions is done by putting .omo files in the clone's `motion/<name>body/`.
+
+### Plates, fonts, languages
+
+- `plates.py`: per set the text centre / width / line boxes / outline / shadow measured on the game's 66 plates;
+  `media_test.py` compares 8 names a set (lines within 4 % of the height, centre within 4 %, width within 12 %).
+- Fonts: bundled DFMincho-SU / DFGothic-SU (`fonts/`, FONTS_NOTICE.txt; package_clean_test allows exactly those two
+  by name and SHA-256). The game's own fonts are Lumen `.brf` resources (`ui/font/resource/static/Gothic.brf`,
+  `Folk.brf`, `ui/font/lumen/...`): bitmap fonts the tool does not draw with; "game" uses a TrueType font a UI mod put
+  in `ui/font/`.
+- Boxing Ring: `ui/info/aurora_punch_out/` (builder `0x026552B8`, from `0x02655434` / `0x02655F80`) reads
+  `MmelCharaA_<costume>_<UI name>` through `0x030A02A4` (`0x0309FF74`: the db entry's per-costume label byte, by
+  position for ids up to 0xC7): the clone's copies of its base's title-line labels.
+- No other per-character text pictures are made by the tool: the Boxing Ring's title, the results screen's winner name
+  (`ui/font/result_fgb/`) and the menus draw text with the game's fonts from `melee.msbt`.
+- `languages.py`: `data(<region>)/ui/message/melee.msbt` beside the data folder, written to `INSTALL_TO_data(<region>)/`.
+
+### Random stage switches
+
+`0x02FFB76C` (the stage pool refill) keeps a stage when `0x0301BA8C(kind, 4)` (`0x0293FD40` on the type-1 checker,
+vtable `0x100BAAFC`: +0x74 unlocked `0x026F2ED0`, +0x6C the switch `0x0293F298`, +0x4C) and the mask `0x02948858`
+(an object never loaded in normal play: null -> allowed) pass. The switch: save `+0x38` (12 words, 5 bits a stage,
+`0x02A517DC`, bounded) at the index `0x030A9230` returns (the switch screen's list `[0x102F7C38]`; DLC 0x30-0x37 ->
+9-16): a stage clone has none (-1) -> always on, never written. No save layout change.
+
+### Not built in 1.3 (researched; why)
+
+- **Trophies**: `ui_figure_db.bin` (743 entries x 47 values), `ending_fig_get.bin` (Classic / All-Star awards), the
+  trophy texts (not in the test data) and the save's trophy ownership (a bitfield sized to the game's 743 / 716 ids;
+  not traced). Without the save's ownership layout traced, new ids can't be made safe; reusing unused ids was not
+  researched far enough to name any. Not built.
+- **Palutena's Guidance**: the conversation table is `ui_smashappeal_angeland.bin` (portraits `chr_14_<Name>_NN`,
+  groups of 23 / 7 values), its voices and texts are not in the test data (no voice bank / msbt to copy), and the
+  per-character lookup was not traced. Not built.
+- **Smash Tour**: `param/worldsmash/*` (stat params, board data); its fighter pools / kind tables not traced. Not built.
+- **amiibo**: `ui_nfp_db.bin` (66 entries x 5: the fighter's id ... amiibo character number, e.g. 58 -> 8453); writing a
+  clone's id to a figure would put an id the unpatched game doesn't know on it: not built (no figure write traced, so
+  none is done: the tool never touches figure data).
+- **Final Smash**: transform kinds `0x3A`-`0x3D` map back to their base by `0x030BF9C0` / `0x030C1FDC` (fixed compares);
+  a clone of Bowser / Wario / Little Mac / Lucario transforms into the base's transformed kind. Its own transformed kind
+  (a kind cloned from 0x3A-0x3D, its resources by `kind * 9 + n`) and its own FS scene-table entries were not built.
+- **Mode-by-mode emulation** (All-Star, Stadium, Trophy Rush, Events, Smash Tour, Records, replays, online): not done;
+  the README's mode table says what was checked and how. `0x0290D960` (from the menus, `0x02178E24` -> `0x0290D708`)
+  and `0x029E6CE0` (`0x029E6CC4`, from `0x029E7000` / `7118` / `76C8`) copy the 96-id available-fighters set (12 bytes)
+  into structures at `+0x24` / `+0x30`; their readers were not traced (clones with ids 96+ are absent from them).
+- **Base + clone in one match**: the per-kind state is per fighter; the shared things found are the kind's static
+  specializer object (as for two players of one vanilla kind), the Kirby-copy voice bank id (above) and the Kirby
+  loader's `res_kind` word (set at each helper call; the loader runs the match's fighters one after another).

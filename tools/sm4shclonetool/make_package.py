@@ -19,6 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 TOP = 'Sm4shCloneTool'
 FILES = ['cli.py', 'gui.py', 'setup.bat', 'run.bat', 'run_cli.bat', 'requirements.txt', 'README.md', 'LICENSE.txt',
          'THIRD_PARTY.txt']
+FONTS = ['DF_Mincho_SU.ttf', 'DF_Gothic_SU.ttf']
 
 
 def build(out, shots):
@@ -34,6 +35,8 @@ def build(out, shots):
                         z.write(p, os.path.join(TOP, os.path.relpath(p, HERE)))
         for f in FILES:
             z.write(os.path.join(HERE, f), os.path.join(TOP, f))
+        for f in FONTS + ['FONTS_NOTICE.txt']:              # the bundled fonts (fonts/FONTS_NOTICE.txt)
+            z.write(os.path.join(HERE, 'fonts', f), os.path.join(TOP, 'fonts', f))
         for d in shots:
             for f in sorted(os.listdir(d)):
                 if f.endswith('.png'):

@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Sm4shCloneTool end-to-end tests (headless), on a vanilla stand-in executable and vanilla data.
 
-  python3 tools/sm4shclonetool/tests/run_all.py WORK MODDED.rpx VPARAM VUI VFIGHTER SOUND_CONFIG [CUSTOM_CHR]
+  python3 tools/sm4shclonetool/tests/run_all.py WORK VANILLA.rpx VPARAM VUI VFIGHTER SOUND_CONFIG [CUSTOM_CHR]
 
-WORK gets the fixtures (make_fixtures.py), the stand-in (make_vanilla_standin.py from MODDED.rpx), three builds into one
+VANILLA.rpx: the game's v288 cross_f.rpx (1.3 on; never in the repository: the tests take its path). A modded executable
+instead (the 1.2 way) is turned into a stand-in by make_vanilla_standin.py.
+WORK gets the fixtures (make_fixtures.py), three builds into one
 project (1: Fox -> foxclone with its own article, custom moves, PNG portraits, placed after Fox, + stage
 BattleField_f -> CloneField; 2: on build 1's executable, Zero Suit Samus -> zssclone with her portraits re-ID'd;
 3: on build 2's executable, foxclone -> foxtwo, a clone of a clone), and results.txt. Repository only.
@@ -52,10 +54,20 @@ def main():
     fx = os.path.join(work, 'fx')
     run([sys.executable, os.path.join(HERE, 'make_fixtures.py'), fx, vparam, vui, vfighter, sconf] +
         ([custom] if custom else []), os.path.join(work, 'fixtures.txt'))
-    standin = os.path.join(work, 'vanilla_standin.rpx')
-    if not os.path.exists(standin):
-        run([sys.executable, os.path.join(HERE, 'make_vanilla_standin.py'), modded, standin],
-            os.path.join(work, 'standin.txt'))
+    if os.path.exists(modded) and X.inspect(modded)['state'] == 'vanilla':
+        standin = modded                       # the game's own executable
+        modded = os.path.join(work, 'modified.rpx')
+        mx = Rpx(standin)
+        mx.w32(0x02A65898, 0x60000000)          # one word the tool hooks changed: another mod's executable
+        mx.save(modded)
+    else:
+        standin = os.path.join(work, 'vanilla_standin.rpx')
+        if not os.path.exists(standin):
+            run([sys.executable, os.path.join(HERE, 'make_vanilla_standin.py'), modded, standin],
+                os.path.join(work, 'standin.txt'))
+        else:
+            run([sys.executable, os.path.join(HERE, 'make_vanilla_standin.py'), '--others', standin],
+                os.path.join(work, 'standin.txt'))
     data, png = os.path.join(fx, 'data'), os.path.join(fx, 'png')
     out = os.path.join(work, 'project')
     if os.path.exists(out):
@@ -66,13 +78,15 @@ def main():
 
     # ---------------------------------------------------------------- executable state
     info = X.inspect(standin)
-    check('stand-in executable inspects as vanilla', info['state'], 'vanilla')
-    check('a modified executable (MODDED) is refused', X.inspect(modded)['state'], 'modified')
+    check('the vanilla executable inspects as vanilla%s' % (' (the game\'s v288: SHA-1 %s)' % info['sha1']
+                                                            if info.get('v288') else ' (a stand-in)'),
+          info['state'], 'vanilla')
+    check('a modified executable is refused (a hooked word changed)', X.inspect(modded)['state'], 'modified')
 
     # ---------------------------------------------------------------- build 1
     s = Session(data, out, standin, None, log=say)
     f1 = s.fighter_spec('fox', 'foxclone', ui_name='Foxclone', title='Fox Clone', weapons=['blaster'], customs=True,
-                        after='Fox')
+                        after='Fox', titles={'us_fr': {'title': 'Renard Clone'}})
     st = s.stage_spec('BattleField_f', 'CloneField', title='Clone Field')
     portraits = {'foxclone': {(set_, '01'): os.path.join(png, 'fox_%s_01.png' % set_)
                               for set_ in ('chr_00', 'chr_10', 'chr_11', 'chr_13', 'stock_90')}}
@@ -80,6 +94,7 @@ def main():
     s.build([f1], [st], portraits, {'CloneField': {'stage_10': os.path.join(png, 'clone_stage_10.png')}})
     e1 = os.path.join(work, 'e1.rpx')
     _copy(os.path.join(out, 'INSTALL_TO_code', 'cross_f.rpx'), e1)
+    check('build 1: a valid RPX (every section\'s CRC, zlib sizes, file info: %s)' % rpx_valid(e1), rpx_valid(e1), 'valid')
     check('build 1: executable patched, 1 fighter + 1 stage in its marker',
           [X.inspect(e1)['state'], len(X.inspect(e1)['registry']['fighters']), len(X.inspect(e1)['registry']['stages'])],
           ['patched', 1, 1])
@@ -113,6 +128,7 @@ def main():
     r1 = os.path.join(work, 'e1b.rpx')
     X.build(standin, r1, X.inspect(e1)['registry'], log=lambda _s: None)
     check('build 1 rebuilds byte for byte from the stand-in and its registry', sha1_file(r1), sha1_file(e1))
+    check('build 3: a valid RPX (CRCs, zlib sizes, file info)', rpx_valid(e3), 'valid')
     for p in (eall, again, r1):
         os.unlink(p)
 
@@ -199,6 +215,7 @@ def main():
     dec = [T.decode(os.path.join(pkg, 'ui', 'replace', 'chr', 'chr_00', f)) for f in zp]
     check('portraits decode (%d chr_00 files)' % len(zp), all(d is not None for d in dec), True)
     own_checks(pkg, data, reg, e3)
+    extras_checks(work, out, pkg, data, reg, e3, standin, fx)
     st_icon = os.path.join(pkg, 'ui', 'replace', 'stage', 'stage_10', 'stage_10_CloneField.nut')
     check('stage icon stage_10_CloneField.nut: the imported PNG, a new texture id',
           [T.decode(st_icon) is not None, T.texture_ids(T.read_nut(st_icon))[0][1] != 0x28000999], [True, True])
@@ -206,8 +223,10 @@ def main():
                                                               'CloneField_param.bin')) for v in ('melee', 'end')],
           [True, True])
     readme = open(os.path.join(out, 'README.txt')).read()
-    check('package: INSTALL_TO_data, INSTALL_TO_code/cross_f.rpx, README.txt, project file; no wrapper folder',
-          sorted(os.listdir(out)), ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'sm4shclonetool_project.json'])
+    check('package: INSTALL_TO_data, INSTALL_TO_data(us_fr) (the region beside the data folder), INSTALL_TO_code/cross_f.rpx, '
+          'README.txt, project file; no wrapper folder',
+          sorted(os.listdir(out)), ['INSTALL_TO_code', 'INSTALL_TO_data', 'INSTALL_TO_data(us_fr)', 'README.txt',
+                                'sm4shclonetool_project.json'])
     check('README lists the clones', all(n in readme for n in ('foxclone', 'zssclone', 'foxtwo', 'CloneField')), True)
 
     # ---------------------------------------------------------------- previews / placement
@@ -241,10 +260,42 @@ def main():
                               os.path.join(shots, 'sss_vanilla_ui.png'))
     check('SSS: CloneField on page 1, last', isss['pages'][1][-1], 0x38)
 
+    o = os.path.join(work, 'media_test.txt')
+    rc = run([sys.executable, os.path.join(HERE, 'media_test.py'), os.path.join(vui, 'replace', 'chr'), shots], o)
+    text = open(o).read()
+    check('media_test (DSP-ADPCM encoder = the C one, IDSP / WAV, name plates vs the game\'s, fonts): %d ok (exit %d)'
+          % (text.count('\nok ') + text.startswith('ok '), rc), [x for x in text.splitlines() if x.startswith('FAIL')], [])
     open(os.path.join(work, 'results.txt'), 'w').write('\n'.join(RES) + '\n\n%d checks, %d failed\n' % (
         len(RES), len(FAILS)))
     print('%d checks, %d failed' % (len(RES), len(FAILS)))
     sys.exit(1 if FAILS else 0)
+
+
+def rpx_valid(path):
+    """'valid' when every section's data matches the CRC table, compressed sections inflate to their stated size,
+    and the file info's text region covers the code section; else what is wrong"""
+    import zlib
+    import struct as st
+    x = Rpx(path)
+    d = bytes(x.d)
+    crc_idx = next(i for i, s in enumerate(x.secs) if s[1] == 0x80000003)
+    crcs = st.unpack('>%dI' % len(x.secs), bytes(x.data(crc_idx))[:4 * len(x.secs)])
+    for i, s in enumerate(x.secs):
+        if i == crc_idx or not s[5] or s[1] == 8:
+            continue
+        raw = d[s[4]:s[4] + s[5]]
+        if s[2] & 0x08000000:
+            n = st.unpack('>I', raw[:4])[0]
+            dat = zlib.decompress(raw[4:])
+            if len(dat) != n:
+                return 'section %d inflates to %d bytes, not %d' % (i, len(dat), n)
+        else:
+            dat = raw
+        if zlib.crc32(dat) & 0xFFFFFFFF != crcs[i]:
+            return 'section %d: CRC differs' % i
+    if x.text_region() < x.text_end() - 0x02000000:
+        return 'the text region (0x%X) ends before the code (0x%08X)' % (x.text_region(), x.text_end())
+    return 'valid'
 
 
 def _copy(a, b):
@@ -274,12 +325,16 @@ def own_checks(pkg, data, reg, exe_path):
         onm, oid = SND.binf(old)
         banks.append((f, nm, bid))
         same &= [s for s in SND.sections(new) if s[0] != b'BINF'] == [s for s in SND.sections(old) if s[0] != b'BINF']
-        if t0.row_of(oid) is not None:
+        if t0.row_of(oid) is not None and not f.startswith('snd_se_vc_Kirby_copy_'):
             rowmap[t0.row_of(oid)] = t1.row_of(bid)
             same &= t1.tones(t1.row_of(bid)) == t0.tones(t0.row_of(oid))
-    check('its banks: BINF names = their files, ids new and unique (%s)' % ', '.join('%s %d' % (n, i) for _f, n, i in banks),
-          all(nm == f[:-9] and bid not in old_ids for f, nm, bid in banks) and len({b for _f, _n, b in banks}) == len(banks),
+    own = [(f, nm, bid) for f, nm, bid in banks if not f.startswith('snd_se_vc_Kirby_copy_')]
+    kc = [(f, nm, bid) for f, nm, bid in banks if f.startswith('snd_se_vc_Kirby_copy_')]
+    check('its banks: BINF names = their files, ids new and unique (%s)' % ', '.join('%s %d' % (n, i) for _f, n, i in own),
+          all(nm == f[:-9] and bid not in old_ids for f, nm, bid in own) and len({b for _f, _n, b in own}) == len(own),
           True)
+    check('its Kirby-copy voice bank keeps the base\'s id (Kirby plays it by the base\'s row) (%s)'
+          % ', '.join('%s %d' % (n, i) for _f, n, i in kc), all(bid in old_ids for _f, _n, bid in kc), True)
     check('its banks\' tones / packs are the base\'s byte for byte, its rows the base\'s label lists (%s)'
           % ', '.join('%d -> %s' % kv for kv in sorted(rowmap.items())), same and None not in rowmap.values(), True)
     import acmd
@@ -310,6 +365,108 @@ def own_checks(pkg, data, reg, exe_path):
                                                                     if n in names], ['foxclone', 'zssclone', 'foxtwo'])
     check('the base\'s files are untouched (no fighter/szerosuit/ in the package)',
           os.path.exists(os.path.join(pkg, 'fighter', 'szerosuit')), False)
+
+
+def extras_checks(work, out, pkg, data, reg, e3, standin, fx):
+    """1.3: the executable's extras (emulated), the announcer call, fanfare, win cameras, Kirby's copy files, voices,
+    languages, name plates"""
+    from sm4shclonetool import audio as AU
+    from sm4shclonetool import languages as L
+    from sm4shclonetool import music as MU
+    from sm4shclonetool import narration as N
+    from sm4shclonetool import sound as SND
+    from sm4shclonetool import voices as V
+    import add_fighter as A
+    o = os.path.join(work, 'extras_test.txt')
+    rc = run([sys.executable, os.path.join(HERE, 'extras_test.py'), e3, standin], o)
+    text = open(o).read()
+    check('extras_test (results call, sound aliases, Kirby\'s copy: emulated): %d ok, 0 failed (exit %d)'
+          % (text.count('\nok ') + text.startswith('ok '), rc),
+          [x for x in text.splitlines() if x.startswith('FAIL')], [])
+    fs = {f['name']: f for f in reg['fighters']}
+    # the announcer call
+    t0 = SND.Table(open(os.path.join(data, 'sound', 'config', 'soundlabeltable.bin'), 'rb').read())
+    t1 = SND.Table(open(os.path.join(pkg, 'sound', 'config', 'soundlabeltable.bin'), 'rb').read())
+    b0 = AU.Bank(open(os.path.join(data, N.MAIN_BANK), 'rb').read())
+    b1 = AU.Bank(open(os.path.join(pkg, N.MAIN_BANK), 'rb').read())
+    row = t0.row_of(b0.binf()[1])
+    f = A.ParamEdit([os.path.join(pkg, 'param')], N.CALL_DB)
+    ok, n = True, 0
+    for c in fs.values():
+        e = next(x for x in f.entries() if x[0][1] == c['ui_id'])
+        ids = {e[k][1] for k in range(1, len(e))}
+        new = {b for _a, b in c.get('call_map') or []}
+        for old, nw in c.get('call_map') or []:
+            # old: the base's id (in the game's table) or, for a clone of a clone, its source's own label
+            ta, tb = t1.tones(old >> 16)[old & 0xFFFF], t1.tones(nw >> 16)[nw & 0xFFFF]
+            ok &= b1.data_of(tb) == b1.data_of(ta) and tb >= len(b0.tones) and ta != tb
+            n += 1
+        ok &= bool(new) and ids <= new | {0}
+    check('announcer call: every clone\'s 16 select ids on labels of its own (%d pairs), each a new tone with its '
+          'source\'s audio byte for byte (foxtwo: foxclone\'s own call)' % n, ok, True)
+    check('announcer call: the bank\'s %d old tones and row 0x%X\'s old labels unchanged; the row grew by the clones\''
+          % (len(b0.tones), row),
+          ([b1.data_of(i) == b0.data_of(i) for i in range(len(b0.tones)) if b0.tones[i]].count(False),
+           t1.tones(row)[:len(t0.tones(row))] == t0.tones(row), len(t1.tones(row)) - len(t0.tones(row))),
+          (0, True, sum(len({b for _a, b in c.get('call_map') or []}) for c in fs.values())))
+    # the fanfare
+    z = fs['zssclone']
+    import struct as _st
+    fbb = open(os.path.join(pkg, 'sound', 'config', 'bgm_fighter.fbb'), 'rb').read()
+    bgm = _st.unpack_from('<I', fbb, 0xC + 0x14 * z['kind'] + 0x10)[0]
+    ents = MU.mpb_entries(open(os.path.join(pkg, 'sound', 'config', 'bgm_property.mpb'), 'rb').read())
+    ents0 = MU.mpb_entries(open(os.path.join(data, 'sound', 'config', 'bgm_property.mpb'), 'rb').read())
+    nm = ents.get(bgm, b'')[:0x3C].rstrip(b'\0').decode()
+    fb = os.path.join(pkg, 'sound', 'bgm', 'snd_bgm_%s.nus3bank' % nm)
+    src = AU.Bank(open(os.path.join(data, 'sound', 'bgm', 'snd_bgm_Z24_F_ZeroSamus.nus3bank'), 'rb').read())
+    check('fanfare: zssclone\'s fbb record -> its own BGM %d (%s, a new bgm_property entry; the old entries unchanged), '
+          'its bank a copy of the base\'s audio under its own BINF' % (bgm, nm),
+          (bgm not in ents0, z.get('fanfare_bgm') == bgm, all(ents[i] == ents0[i] for i in ents0),
+           os.path.exists(fb) and AU.Bank(open(fb, 'rb').read()).data_of(0) == src.data_of(0),
+           os.path.exists(fb) and AU.Bank(open(fb, 'rb').read()).binf()[1] != src.binf()[1]),
+          (True, True, True, True, True))
+    # win cameras, Kirby
+    check('win cameras: motion/camera/result/<clone>/ for the clones whose base has them (foxclone, foxtwo, zssclone)',
+          [os.path.isdir(os.path.join(pkg, 'motion', 'camera', 'result', n)) for n in ('foxclone', 'foxtwo', 'zssclone')],
+          [True, True, True])
+    kd = os.path.join(pkg, 'fighter', 'kirby')
+    check('Kirby: each clone\'s own copy hat / motions (fighter/kirby/model/<name>cap, motion/<name>body), none of the '
+          'base\'s changed', [(os.path.isdir(os.path.join(kd, 'model', n + 'cap')),
+                                os.path.isdir(os.path.join(kd, 'motion', n + 'body')), fs[n].get('kirby_hat'))
+                               for n in ('foxclone', 'zssclone')] + [os.path.exists(os.path.join(kd, 'model', 'foxear'))],
+          [(True, True, 'foxclonecap'), (True, True, 'zssclonecap'), False])
+    # voices
+    ls = V.lines(z, pkg)
+    cats = sorted({x['category'] for x in ls})
+    check('voices: zssclone\'s lines by category (%s), victory lines found from its win scripts'
+          % ', '.join(cats), {'victory', 'taunt', 'cheer', 'KO', 'Kirby copy'} <= set(cats), True)
+    import math
+    wav = os.path.join(work, 'voice_test.wav')
+    AU.write_wav(wav, [int(9000 * math.sin(i * 0.02) * math.sin(i * 0.0005)) for i in range(24000)])
+    t = next(x for x in ls if x['category'] == 'taunt')
+    base_bank = open(os.path.join(data, 'fighter', 'szerosuit', 'sound', t['file'].replace('Zssclone', 'SZerosuit')),
+                     'rb').read()
+    blob = V.replace(z, pkg, t['file'], t['tone'], wav)
+    rate, ch = AU.idsp_decode(V.tone_data(z, pkg, t['file'], t['tone']))
+    import numpy as np
+    a, b = np.array(AU.read_wav(wav), float), np.array(ch[0], float)
+    snr = 10 * np.log10((a ** 2).sum() / ((a - b) ** 2).sum())
+    check('voices: %s replaced by a WAV: decodes at %.1f dB SNR (> 25), the base\'s bank file untouched' % (t['name'], snr),
+          (snr > 25, open(os.path.join(data, 'fighter', 'szerosuit', 'sound',
+                                       t['file'].replace('Zssclone', 'SZerosuit')), 'rb').read() == base_bank),
+          (True, True))
+    check('voices: the base\'s ids its code plays answer from its own banks (alias se / vc / cheer = the base\'s ids)',
+          z.get('sound_alias', [])[:3], [SND.binf(open(os.path.join(data, 'fighter', 'szerosuit', 'sound', '%s.nus3bank' % f),
+                                                       'rb').read())[1] for f in ('snd_se_SZerosuit', 'snd_vc_SZerosuit',
+                                                                                  'snd_vc_SZerosuit_ouen')])
+    # languages
+    miss = L.check_all(reg, data, pkg)
+    import msbt
+    fr = msbt.Msbt(open(os.path.join(out, 'INSTALL_TO_data(us_fr)', 'ui', 'message', 'melee.msbt'), 'rb').read())
+    check('languages: every clone\'s MmelChara labels in every language (%s); foxclone\'s French title its own, the '
+          'others the title' % ', '.join(sorted(miss)), (miss, fr.text('MmelCharaN_01_Foxclone'),
+                                                         fr.text('MmelCharaN_01_Zssclone')),
+          ({k: [] for k in miss}, 'Renard Clone', 'Zero Clone'))
 
 
 def customs_check(patched, original):

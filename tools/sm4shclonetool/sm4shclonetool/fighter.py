@@ -234,9 +234,10 @@ def build(rec, data_dir, ui_dir, out_data, reg, portraits=None, log=print, renum
             logs.append('voice %s (%s, %s) = %s' % (hit['name'], hit['file'], hit['category'], os.path.basename(wav)))
     logs += win_cameras(rec, data_dir, out_data)
     from . import narration
-    narration.own_call(rec, data_dir, out_data, read, rec.get('call', 'own'), rec.get('call_wav'), logs.append)
+    src_rec = next((f for f in reg['fighters'] if f['name'] == rec['source']), None)
+    narration.own_call(rec, data_dir, out_data, read, rec.get('call', 'own'), rec.get('call_wav'), logs.append, src_rec)
     if read is not None:
-        logs += kirby_files(rec, data_dir, out_data, read)
+        logs += kirby_files(rec, data_dir, out_data, read, src_rec)
     from . import languages
     logs += languages.names(rec, data_dir, out_data)
     for line in logs:
@@ -277,7 +278,7 @@ def win_cameras(rec, data_dir, out_data):
 KIRBY_BODY, KIRBY_HAT = 0x1041A6D0, 0x1041A7B8     # Kirby's copy tables: motion folder name, hat name (per kind)
 
 
-def kirby_files(rec, data_dir, out_data, read):
+def kirby_files(rec, data_dir, out_data, read, src_rec=None):
     """Kirby's copy of the clone: its own hat (fighter/kirby/model/<name>cap/, a copy of the base's hat) and copy
     motions (fighter/kirby/motion/<name>body/), when the base has them in the data folder; the executable then loads
     them for a Kirby who copies the clone (clone_extras.py). rec["kirby"] False: Kirby gets no ability (vanilla)."""
@@ -288,8 +289,8 @@ def kirby_files(rec, data_dir, out_data, read):
     if rec.get('kirby_hat_mode', 'own') == 'share':
         return ['Kirby: copies the clone as its base (the base\'s hat and motions)']
     bk = R.KINDS.index(rec['base'])
-    body = _rstr(read, read(KIRBY_BODY + 4 * bk))
-    hat = _rstr(read, read(KIRBY_HAT + 4 * bk))
+    body = (src_rec or {}).get('kirby_body') or _rstr(read, read(KIRBY_BODY + 4 * bk))   # a clone of a clone: its
+    hat = (src_rec or {}).get('kirby_hat') or _rstr(read, read(KIRBY_HAT + 4 * bk))      # source's own copies
     logs = []
     kd = [os.path.join(out_data, 'fighter', 'kirby'), os.path.join(data_dir, 'fighter', 'kirby')]
     if body:
