@@ -6,6 +6,8 @@
   python cli.py check   --data DATA --out OUT [--exe EXE] [--ui UI] CLONES...   validate, list the files and patches
   python cli.py build   --data DATA --out OUT [--exe EXE] [--ui UI] CLONES...   write the package
   python cli.py repair  --data DATA --out OUT [--exe EXE] [--ui UI]              rebuild a package a stopped build broke
+  python cli.py outputs --data DATA --out OUT --exe EXE --exe-output rpx|aroma|cemu|all
+                        the project's clones written again for another executable output (adds no clone)
   python cli.py css     --data DATA --out OUT [--ui UI] [--exe EXE] [--png FILE] [CLONES...]   CSS preview
   python cli.py sss     ...                                                                    SSS preview
   python cli.py voices  --out OUT --data DATA --name CLONE [--replace TONE=WAV ...] [--import-folder DIR]
@@ -144,7 +146,7 @@ def main():
     ap = argparse.ArgumentParser(description='Sm4shCloneTool %s' % VERSION, epilog=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('command', choices=['info', 'roster', 'check', 'build', 'css', 'sss', 'voices', 'plate',
-                                        'patchinfo', 'repair'])
+                                        'patchinfo', 'repair', 'outputs'])
     ap.add_argument('--exe-output', default='rpx')
     ap.add_argument('--patch')
     ap.add_argument('--name')
@@ -233,6 +235,10 @@ def main():
         for st in R.stages(s.param_dirs(), s.reg):
             print('stage 0x%02X %-16s kind 0x%02X page %d order %d%s' % (st['id'], st['name'], st['kind'], st['page'],
                                                                      st['order'], ' (clone)' if st['clone'] else ''))
+        return
+    if a.command == 'outputs':
+        s.rebuild_outputs()
+        print('executable outputs made: %s -> %s' % (', '.join(s.present_outputs()), s.out))
         return
     if a.command == 'repair':
         problems = s.repair_problems()

@@ -111,6 +111,29 @@ class Session:
                 return copy.deepcopy(ereg)
         return reg
 
+    # ------------------------------------------------------------ executable outputs
+    def present_outputs(self):
+        """the executable outputs the package already has (an earlier build made them)"""
+        have = {'rpx': os.path.exists(os.path.join(self.pkg_code, 'cross_f.rpx')),
+                'aroma': os.path.isdir(os.path.join(self.pkg_sd, 'wiiu', 'sm4shclonetool')),
+                'cemu': os.path.isdir(os.path.join(self.pkg_cemu, 'graphicPacks', CEMU_PACK))}
+        return tuple(o for o in EXE_OUTPUTS if have[o])
+
+    def outputs(self):
+        """(1.5.2) what a build writes: the chosen outputs and every one the package already has (each is made
+        again, so none is left with an older set of clones; none is removed: delete its INSTALL_TO_* folder for that)"""
+        want = set(self.exe_output) | set(self.present_outputs())
+        return tuple(o for o in EXE_OUTPUTS if o in want)
+
+    def rebuild_outputs(self):
+        """(1.5.2) the project's clones written again for the chosen executable output (and the ones the package
+        has), adding no clone: e.g. a project built for the SD card, later for Cemu or as a patched rpx"""
+        if not self.reg['fighters'] and not self.reg['stages']:
+            raise X.ExeError('the project has no clones yet: build one first')
+        if not self.exe:
+            raise X.ExeError('choose the executable (cross_f.rpx: the game\'s own, or one this tool patched)')
+        return self.build([], [])
+
     # ------------------------------------------------------------ planning
     def articles(self, source, reg=None):
         """the base's articles (by the native base: a clone of a clone has its base's)"""
@@ -198,8 +221,11 @@ class Session:
                 notes += n
             except X.ExeError as e:
                 errors.append('executable: %s' % e)
-            exe_items.append('output: %s' % ', '.join(EXE_OUTPUT_NAMES[o] for o in self.exe_output))
-            if set(self.exe_output) - {'rpx'} and self.force and self.exe_info and \
+            kept = [o for o in self.outputs() if o not in self.exe_output]
+            exe_items.append('output: %s%s' % (', '.join(EXE_OUTPUT_NAMES[o] for o in self.exe_output),
+                                               ('; made again, already in the package: %s' % ', '.join(
+                                                   EXE_OUTPUT_NAMES[o] for o in kept)) if kept else ''))
+            if set(self.outputs()) - {'rpx'} and self.force and self.exe_info and \
                     self.exe_info.get('state') == 'modified':
                 errors.append('executable: the Aroma / Cemu outputs patch the game\'s own v288 executable in memory; '
                               'they can\'t carry another mod\'s code ("patch anyway"): use the patched rpx output')
@@ -471,27 +497,27 @@ class Session:
         return self._finish(reg, summary, {'added': [], 'repair': True})
 
     def _build_exe(self, reg):
-        """the executable outputs (exe_output): INSTALL_TO_code/cross_f.rpx, INSTALL_TO_sd/ (the Aroma plugin and its
-        patch file), INSTALL_TO_cemu/ (a graphic pack); an output not chosen is removed from the package"""
+        """the executable outputs (outputs(): the chosen ones and those the package has): INSTALL_TO_code/cross_f.rpx,
+        INSTALL_TO_sd/ (the Aroma plugin and its patch file), INSTALL_TO_cemu/ (a graphic pack). None is removed (the
+        executable read may be the package's own cross_f.rpx)"""
         import shutil
         from . import patchset as PS
         out = {}
+        outs = self.outputs()
+        kept = [o for o in outs if o not in self.exe_output]
+        if kept:
+            self.log('also made again (already in the package): %s' % ', '.join(EXE_OUTPUT_NAMES[o] for o in kept))
         dst = os.path.join(self.pkg_code, 'cross_f.rpx')
-        if 'rpx' in self.exe_output:
+        if 'rpx' in outs:
             os.makedirs(self.pkg_code, exist_ok=True)
             tmp = dst + '.new'
             out['exe'] = X.build(self.exe, tmp, reg, self.force, self.log, work=self.out)
             os.replace(tmp, dst)
-        elif os.path.isdir(self.pkg_code):
-            shutil.rmtree(self.pkg_code)
-        for o, d in (('aroma', self.pkg_sd), ('cemu', self.pkg_cemu)):
-            if o not in self.exe_output and os.path.isdir(d):
-                shutil.rmtree(d)
-        if not set(self.exe_output) & {'aroma', 'cemu'}:
+        if not set(outs) & {'aroma', 'cemu'}:
             return out
         ps = PS.export(self.exe, reg, self.log, work=self.out)
         out['patchset'] = {'sites': len(ps.sites), 'cave': ps.size, 'veneers': len(ps.veneers)}
-        if 'aroma' in self.exe_output:
+        if 'aroma' in outs:
             pd = os.path.join(self.pkg_sd, 'wiiu', 'sm4shclonetool')
             if os.path.isdir(pd):
                 shutil.rmtree(pd)
@@ -508,7 +534,7 @@ class Session:
                          'from aroma/ (README "The Aroma plugin")')
             self.log('Aroma: %s/<title id>.patch (%d bytes; %d game words, a %d KB cave)'
                      % (os.path.relpath(pd, self.out), len(blob), len(ps.sites), ps.size >> 10))
-        if 'cemu' in self.exe_output:
+        if 'cemu' in outs:
             gd = os.path.join(self.pkg_cemu, 'graphicPacks', CEMU_PACK)
             os.makedirs(gd, exist_ok=True)
             hashes = [PS.V288_CEMU_HASH]
@@ -580,12 +606,12 @@ class Session:
                 have = {p for p in ('model/body/c00', 'script/animcmd/body', 'effect/%s' % f['name'])
                         if os.path.isdir(os.path.join(d, p))}
                 out.append('fighter/%s/: %s' % (f['name'], ', '.join(sorted(have)) or 'no model / scripts / effects'))
-        if self.exe and 'rpx' in self.exe_output:
+        if self.exe and 'rpx' in self.outputs():
             info = X.inspect(os.path.join(self.pkg_code, 'cross_f.rpx'))
             reg = info.get('registry') or {}
             out.append('executable: %s, %d fighter / %d stage clone(s) in its marker' % (
                 info['state'], len(reg.get('fighters', [])), len(reg.get('stages', []))))
-        if self.exe and 'aroma' in self.exe_output:
+        if self.exe and 'aroma' in self.outputs():
             from . import patchset as PS
             pd = os.path.join(self.pkg_sd, 'wiiu', 'sm4shclonetool')
             got = []
@@ -596,7 +622,7 @@ class Session:
                 sum(got), len(got), '' if os.path.exists(os.path.join(self.pkg_sd, 'wiiu', 'environments', 'aroma',
                                                                        'plugins', 'sm4shclonetool.wps'))
                 else '; the plugin itself is not in the package'))
-        if self.exe and 'cemu' in self.exe_output:
+        if self.exe and 'cemu' in self.outputs():
             gd = os.path.join(self.pkg_cemu, 'graphicPacks', CEMU_PACK)
             out.append('Cemu graphic pack: %s' % ', '.join(f for f in ('rules.txt', 'patches.txt')
                                                           if os.path.exists(os.path.join(gd, f))))

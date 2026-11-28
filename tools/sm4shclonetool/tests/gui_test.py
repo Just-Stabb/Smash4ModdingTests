@@ -49,6 +49,18 @@ def main():
     print('%s extras tab: plate preview %r, %d language(s)' % ('ok  ' if ok else 'FAIL', c.get('plate'),
                                                             c.get('languages', 0)))
     fails += not ok
+    e = shot(py, ['--fighter', 'fox:mywolf', '--repick', 'falco', '--repick', 'fox', '--repick', 'metaknight'],
+             os.path.join(shots, 'gui_repick.png'), home)
+    got = [(r['source'], r['name'], r['cap'], r['ui_name'], r['title']) for r in e.get('repicks', [])]
+    ok = got == [('falco', 'falcoclone', 'Falcoclone', 'Falcoclone', 'Falcoclone'),
+                 ('fox', 'foxclone2', 'Foxclone2', 'Foxclone2', 'Foxclone2'),
+                 ('metaknight', 'metaknightclone', 'Metaknightclone', 'Metaknightclone', 'Metaknightclone')]
+    print('%s reselecting a base resets the internal / Cap / UI names and title to the new base\'s (fox -> typed '
+          '"mywolf" -> falco -> fox: foxclone is taken -> metaknight): %s' % ('ok  ' if ok else 'FAIL', got))
+    fails += not ok
+    ok = e.get('outputs', '').startswith('package has: ')
+    print('%s the executable outputs the package has are shown: %r' % ('ok  ' if ok else 'FAIL', e.get('outputs')))
+    fails += not ok
     d = shot(py, ['--tab', 'voices'], os.path.join(shots, 'gui_voices.png'), home)
     ok = d.get('voices', 0) > 0
     print('%s voices tab: %d lines of the project\'s last clone with banks listed' % ('ok  ' if ok else 'FAIL', d.get('voices', 0)))
