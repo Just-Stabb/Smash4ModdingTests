@@ -12,11 +12,13 @@ CLONES:
   --fighter SOURCE:NAME[:key=value,...]   e.g. --fighter fox:foxclone:ui_name=Wolfo,title=Wolfo,costumes=8
        keys: cap, ui_name, title, subtitle, series, costumes, after (place after this character on the CSS),
              sort_key (first sort key), weapons (article names joined by +), customs (1), fanfare (0 / 1),
-             random (0: never picked by the character select's random; ids past 95 never are),
+             random (0: never picked by the character select's random),
+             own_sound / own_effects (1 by default: its own sound banks / effect bank; 0: the base's),
+             weapons: all (default) / none / names joined by + (its own articles),
              kind, ui_id (overrides; must be the next free ones)
   --portrait NAME:SET:NN=PNG              e.g. --portrait foxclone:chr_00:01=red.png  (NN empty for one-file sets)
   --stage SOURCE:NAME[:key=value,...]     e.g. --stage BattleField_f:CloneField:title=Clone Field,page=1
-       keys: title, series, page (1 / 2), cosmetic
+       keys: title, series, page (1 / 2), cosmetic, random (0: never picked by the random stage select)
   --stage-icon NAME:SET=PNG
   --force                                 patch an executable that is not vanilla (another mod's code space) anyway
 """
@@ -32,7 +34,8 @@ from sm4shclonetool import exe as X  # noqa: E402
 from sm4shclonetool import roster as R  # noqa: E402
 from sm4shclonetool.session import Session  # noqa: E402
 
-INTS = {'costumes', 'series', 'sort_key', 'kind', 'ui_id', 'page', 'cosmetic', 'customs', 'fanfare', 'random'}
+INTS = {'costumes', 'series', 'sort_key', 'kind', 'ui_id', 'page', 'cosmetic', 'customs', 'fanfare', 'random',
+        'own_sound', 'own_effects'}
 
 
 def kv(text):
@@ -48,11 +51,11 @@ def parse_clones(a, s):
     for f in a.fighter or []:
         src, name, *rest = f.split(':', 2)
         opt = kv(rest[0]) if rest else {}
-        if 'weapons' in opt:
-            opt['weapons'] = [w for w in opt['weapons'].split('+') if w]
+        if 'weapons' in opt and opt['weapons'] != 'all':
+            opt['weapons'] = [w for w in opt['weapons'].split('+') if w and w != 'none']
         if 'customs' in opt:
             opt['customs'] = bool(opt['customs'])
-        for k in ('fanfare', 'random'):
+        for k in ('fanfare', 'random', 'own_sound', 'own_effects'):
             if k in opt:
                 opt[k] = bool(opt[k])
         fighters.append(opt.pop('_spec', None) or s.fighter_spec(src, name, **opt))
@@ -65,6 +68,8 @@ def parse_clones(a, s):
     for st in a.stage or []:
         src, name, *rest = st.split(':', 2)
         opt = kv(rest[0]) if rest else {}
+        if 'random' in opt:
+            opt['random'] = bool(opt['random'])
         stages.append(s.stage_spec(src, name, **opt))
     for p in a.stage_icon or []:
         left, png = p.split('=', 1)

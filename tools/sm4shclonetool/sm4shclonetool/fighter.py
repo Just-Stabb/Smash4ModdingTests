@@ -134,7 +134,8 @@ def record(spec, reg):
             'base_ui_name': R.UI_NAMES[base_ui_id], 'series': spec.get('series'), 'costumes': spec.get('costumes'),
             'sort': spec.get('sort'), 'subtitle': spec.get('subtitle'),
             'weapons': list(spec.get('weapons') or []), 'customs': bool(spec.get('customs')),
-            'fanfare': bool(spec.get('fanfare', True)), 'random': bool(spec.get('random', True))}
+            'fanfare': bool(spec.get('fanfare', True)), 'random': bool(spec.get('random', True)),
+            'own_sound': bool(spec.get('own_sound', True)), 'own_effects': bool(spec.get('own_effects', True))}
 
 
 def sort_keys(param_dirs, reg, after=None, value=None):
@@ -203,6 +204,9 @@ def build(rec, data_dir, ui_dir, out_data, reg, portraits=None, log=print, renum
         logs += customs(rec, data_dir, ui_dir, out_data, ui_dirs)
     if rec.get('fanfare', True):
         logs += sound_config(rec, data_dir, out_data, reg, csb_names)
+    if rec.get('own_sound'):
+        from . import sound
+        sound.own_banks(rec, out_data, data_dir, logs.append)
     for line in logs:
         log(line)
     return logs

@@ -221,7 +221,8 @@ def kind_spec(reg):
     for f in reg['fighters']:
         r = {'kind': '0x%X' % f['kind'], 'name': f['name'], 'cap': f['cap'], 'base': f['base'], 'ai': 'base',
              'ui': {'id': f['ui_id'], 'name': f['ui_name'], 'base_id': f.get('customs_base_id', f.get('base_ui_id')),
-                    'base_name': f.get('base_ui_name')}}
+                    'base_name': f.get('base_ui_name')},
+             'effects_base': not f.get('own_effects')}
         if f.get('weapons'):
             r['weapons'] = {}
             for art in f['weapons']:
@@ -232,6 +233,28 @@ def kind_spec(reg):
     cap = max(0x60, (FIRST_KIND + n + 0xF) & ~0xF)
     wcap = max(0x1C0, (WEAPON_FIRST + n_weapons(reg) + 0xF) & ~0xF)
     return {'capacity': '0x%X' % cap, 'weapon_capacity': '0x%X' % wcap, 'kinds': kinds}
+
+
+def base_articles(path, base):
+    """the names of the base fighter's own articles (its article list's entries before the special ones, named by
+    the executable's weapon name table)"""
+    import kind_expand as K
+    import weapon_expand as W
+    img = K.Image(path)
+    fdesc = W.fighter_descriptor(img, {'desc_from': base})
+    alist = img.w(fdesc + 8)
+    entries, count = img.w(alist), img.w(alist + 4)
+    out = []
+    for i in range(count):
+        e = img.w(entries + W.ARTICLE * i)
+        if e & 0x80000000:
+            break
+        k = e & 0x3FFFFFFF
+        if k < W.OLD_N:
+            nm = img.cstr(img.w(0x10419604 + 4 * k))
+            if nm and nm not in out:
+                out.append(nm)
+    return out
 
 
 def weapon_kinds(reg):

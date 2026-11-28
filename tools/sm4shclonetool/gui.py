@@ -144,13 +144,23 @@ class App:
         self.fv['name'].trace_add('write', self._auto_names)
         opt = ttk.LabelFrame(mid, text='Options')
         opt.pack(fill='x', pady=4)
+        self.independent = tk.BooleanVar(value=True)
+        self.own_sound = tk.BooleanVar(value=True)
+        self.own_effects = tk.BooleanVar(value=True)
+        ttk.Checkbutton(opt, text='Fully independent clone (recommended): own sounds, effects and articles',
+                        variable=self.independent, command=self._preset).pack(anchor='w')
+        ttk.Checkbutton(opt, text='  Own sound bank (copy of the base\'s)', variable=self.own_sound).pack(anchor='w')
+        ttk.Checkbutton(opt, text='  Own effect bank (copy of the base\'s)', variable=self.own_effects).pack(anchor='w')
         self.random = tk.BooleanVar(value=True)
-        ttk.Checkbutton(opt, text='In the random select (the first 37 clones can be)', variable=self.random).pack(anchor='w')
+        ttk.Checkbutton(opt, text='In the random select', variable=self.random).pack(anchor='w')
         self.customs = tk.BooleanVar(value=True)
         self.fanfare = tk.BooleanVar(value=True)
         ttk.Checkbutton(opt, text='Custom moves (owns the base\'s; menu labels / icons)', variable=self.customs).pack(anchor='w')
         ttk.Checkbutton(opt, text='Victory fanfare and KO voices (sound config records)', variable=self.fanfare).pack(anchor='w')
-        ttk.Label(opt, text='Own articles (weapon kinds) - the base\'s articles:').pack(anchor='w')
+        af = ttk.Frame(opt)
+        af.pack(fill='x')
+        ttk.Label(af, text='Own articles (selected; without an own sound bank they keep the base\'s sounds):').pack(side='left')
+        ttk.Button(af, text='All', width=4, command=lambda: self.weapons.select_set(0, 'end')).pack(side='right')
         self.weapons = tk.Listbox(opt, selectmode='multiple', height=3, exportselection=False)
         self.weapons.pack(fill='x')
         ttk.Label(opt, text='Kirby: vanilla Kirby can\'t copy new kinds (no copy ability).', foreground='#806020').pack(anchor='w')
@@ -194,6 +204,9 @@ class App:
             self.sv[k] = v
             ttk.Entry(form, textvariable=v, width=26).grid(row=i, column=1, padx=3, pady=1)
             v.trace_add('write', lambda *_: self._schedule_preview())
+        self.s_random = tk.BooleanVar(value=True)
+        ttk.Checkbutton(form, text='In the random stage select', variable=self.s_random).grid(row=6, column=0,
+                                                                                         columnspan=2, sticky='w')
         pf = ttk.LabelFrame(mid, text='Stage icons (default: the base\'s, new texture ids)')
         pf.pack(fill='x', pady=4)
         self.i_set = ttk.Combobox(pf, values=['stage_00', 'stage_10', 'stage_11', 'stage_12', 'stage_13', 'stage_30',
@@ -328,12 +341,19 @@ class App:
         if not self.fv['name'].get():
             self.fv['name'].set(f['name'] + 'clone')
         self.weapons.delete(0, 'end')
-        d = R.first([os.path.join(s.pkg_data, 'fighter', f['name'], 'model'),
-                     os.path.join(s.data, 'fighter', f['name'], 'model')], '')
-        if d and os.path.isdir(d):
-            for a in sorted(os.listdir(d)):
-                if a != 'body' and os.path.isdir(os.path.join(d, a)):
-                    self.weapons.insert('end', a)
+        for a in s.articles(f['name']):
+            self.weapons.insert('end', a)
+        if self.independent.get():
+            self.weapons.select_set(0, 'end')
+
+    def _preset(self):
+        on = self.independent.get()
+        self.own_sound.set(on)
+        self.own_effects.set(on)
+        if on:
+            self.weapons.select_set(0, 'end')
+        else:
+            self.weapons.select_clear(0, 'end')
 
     def _auto_names(self, *_):
         n = self.fv['name'].get()
@@ -381,6 +401,7 @@ class App:
             return None
         opt = {'cap': v['cap'] or None, 'ui_name': v['ui_name'] or None, 'title': v['title'] or None,
                'customs': self.customs.get(), 'fanfare': self.fanfare.get(), 'random': self.random.get(),
+               'own_sound': self.own_sound.get(), 'own_effects': self.own_effects.get(),
                'weapons': [self.weapons.get(i) for i in self.weapons.curselection()]}
         if v['subtitle']:
             opt['subtitle'] = v['subtitle']
@@ -398,7 +419,7 @@ class App:
         v = {k: x.get().strip() for k, x in self.sv.items()}
         if not (v['source'] and v['name']):
             return None
-        opt = {'title': v['title'] or None, 'page': int(v['page'] or 1)}
+        opt = {'title': v['title'] or None, 'page': int(v['page'] or 1), 'random': self.s_random.get()}
         if v['series']:
             opt['series'] = v['series']
         if v['cosmetic']:

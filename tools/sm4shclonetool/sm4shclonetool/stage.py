@@ -77,7 +77,7 @@ def record(spec, param_dirs, reg):
     cos, k, name = source_info(spec['source'], param_dirs, reg)
     return {'name': spec['name'], 'cosmetic': spec['cosmetic'], 'kind': next_slots(reg)[1], 'source': name,
             'source_cosmetic': cos, 'title': spec.get('title') or spec['name'], 'series': spec.get('series'),
-            'page': spec.get('page', 1)}
+            'page': spec.get('page', 1), 'random': bool(spec.get('random', True))}
 
 
 def _db(path_in, path_out, edit):

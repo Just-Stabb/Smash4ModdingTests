@@ -75,8 +75,22 @@ class Session:
         return reg
 
     # ------------------------------------------------------------ planning
+    def articles(self, source, reg=None):
+        """the base's articles (by the native base: a clone of a clone has its base's)"""
+        if not self.exe:
+            return []
+        reg = reg or self.reg
+        native = next((f['base'] for f in reg['fighters'] if f['name'] == source), source)
+        try:
+            return X.base_articles(self.exe, native)
+        except Exception:
+            return []
+
     def fighter_spec(self, source, name, cap=None, ui_name=None, title=None, **opt):
         kind, cid = F.next_slots(self.param_dirs(), self.reg)
+        opt.setdefault('weapons', 'all')               # the "fully independent clone" preset
+        opt.setdefault('own_sound', True)
+        opt.setdefault('own_effects', True)
         spec = {'source': source, 'name': name, 'cap': cap or name.capitalize(),
                 'ui_name': ui_name or (cap or name.capitalize()), 'title': title, 'kind': opt.pop('kind', None) or kind,
                 'ui_id': opt.pop('ui_id', None) or cid}
@@ -98,7 +112,15 @@ class Session:
             errors += ['%s: %s' % (spec['name'], x) for x in e]
             if e:
                 continue
+            if spec.get('weapons') == 'all':
+                spec = dict(spec, weapons=self.articles(spec['source'], reg))
             rec = F.record(spec, reg)
+            if rec.get('own_effects') and self.exe:
+                missing = sorted(set(self.articles(spec['source'], reg)) - set(rec['weapons']))
+                if missing:
+                    notes.append('%s: own effect bank, but articles %s stay the base\'s: their effects only show with '
+                                 'the base in the match (own every article for a fully independent clone)'
+                                 % (rec['name'], ', '.join(missing)))
             if spec.get('after') is not None or spec.get('sort_key') is not None:
                 keys, shift = F.sort_keys(self.param_dirs(), reg, spec.get('after'), spec.get('sort_key'))
                 rec['sort'], rec['renumber'] = keys, shift

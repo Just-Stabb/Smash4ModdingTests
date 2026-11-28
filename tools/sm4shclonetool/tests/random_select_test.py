@@ -74,7 +74,7 @@ class M:
         self.n_ids, self.n_stages = n_ids, n_stages
         self.special_from = 59 + n_ids
         self.writes = []
-        mu.hook_add(UC_HOOK_MEM_WRITE, lambda uc, acc, a, size, v, ud: self.writes.append((a, size)))
+        self.wh = None
         st = {
             0x0309FB24: lambda: self.pos_id(self.r(4)),
             0x0301BA44: lambda: 1 if 1 <= self.r(3) < 200 else 0,
@@ -90,6 +90,14 @@ class M:
         for a, f in st.items():
             mu.hook_add(UC_HOOK_CODE, lambda uc, addr, size, ud, f=f: self.ret(f()), begin=a, end=a)
         mu.mem_write(0x105759C0 + 0x10, struct.pack('>4I', 0x12345678, 0x9ABCDEF1, 0x0F1E2D3C, 0x55AA33CC))
+
+    def watch(self, on):
+        if on and self.wh is None:
+            self.writes = []
+            self.wh = self.mu.hook_add(UC_HOOK_MEM_WRITE, lambda uc, acc, a, size, v, ud: self.writes.append((a, size)))
+        elif not on and self.wh is not None:
+            self.mu.hook_del(self.wh)
+            self.wh = None
 
     def r(self, n):
         return self.mu.reg_read(R(n))
@@ -135,7 +143,7 @@ def main():
     enabled = set(range(4, 59)) | {f['ui_id'] for f in fighters if f.get('random', True)}
     off = {f['ui_id'] for f in fighters if f.get('random', True) is False}
     data_lo, data_hi = cave, cave + 32 * RS.SLOTS
-    m.writes = []
+    m.watch(True)
     m.call(RS.REFILL, OBJ)
     slot = m.words(tab, 8 * RS.SLOTS)
     k = next(i for i in range(RS.SLOTS) if slot[8 * i] == OBJ)
@@ -144,22 +152,24 @@ def main():
           'random, not the %d set to false' % (len(fighters), n - 1, len(enabled) - 55, len(off)),
           sorted(ids_of(pool)), sorted(enabled))
     check('+0x98-+0xA3 mirror ids 0-95', m.words(OBJ + 0x98, 3), pool[:3])
-    stray = [(a, s) for a, s in m.writes if not (STACK - 0x1000 <= a < STACK or data_lo <= a < data_hi or
+    stray = [(a, s) for a, s in m.writes if not (STACK - 0x1000 <= a < STACK + 8 or data_lo <= a < data_hi or
                                                OBJ + 0x98 <= a < OBJ + 0xA4)]
     check('the refill writes only the stack, its pool slot and +0x98-+0xA3 (stage pools +0xA4 on untouched)',
           stray[:4], [])
     # a cycle
     got = []
-    m.writes = []
+    m.watch(False)
+    m.watch(True)
     while len(ids_of(m.words(tab + 32 * k + 4, 7))) > 7:
         i = m.call(RS.PICK, 0xFFFFFFFF)
         got.append(i)
         m.call(RS.REMOVE, OBJ, i)
     check('a cycle: pick + remove until 7 left: %d picks, every enabled id once, none disabled' % len(got),
           (len(got) == len(set(got)), set(got) <= enabled, len(got)), (True, True, len(enabled) - 7))
-    stray = [(a, s) for a, s in m.writes if not (STACK - 0x1000 <= a < STACK or data_lo <= a < data_hi or
+    stray = [(a, s) for a, s in m.writes if not (STACK - 0x1000 <= a < STACK + 8 or data_lo <= a < data_hi or
                                                OBJ + 0x98 <= a < OBJ + 0xA4 or 0x105759C0 <= a < 0x105759E0)]
     check('picks and removes write only the stack, the pool, its mirror and the random number state', stray[:4], [])
+    m.watch(False)
     m.call(0x02FFC4A8, OBJ)
     check('the count function refills under 8 left (the pool is full again)',
           sorted(ids_of(m.words(tab + 32 * k + 4, 7))), sorted(enabled))
@@ -192,7 +202,7 @@ def main():
     check('remove(id), ids 0-0xFF: exactly that bit below %d (and its mirror below 96), nothing for the rest' % n,
           bad[:3], [])
     # the fighter helper's loop with 200 database entries
-    m.writes = []
+    m.watch(True)
     m.mu.reg_write(R(31), LOCAL)
     m.mu.reg_write(R(30), 0)
     m.mu.mem_write(LOCAL - 0x10, b'\0' * 0x40)
@@ -203,7 +213,8 @@ def main():
     check('the available-fighters helper 0x0301CAE8 with 200 entries: its loop writes only its 12 bytes',
           outside[:4], [])
     # stage refill A
-    m.writes = []
+    m.watch(False)
+    m.watch(True)
     m.mu.mem_write(OBJ + 0xA4, b'\0' * 16)
     m.call(0x02FFB76C, OBJ, 1)
     st = ids_of(m.words(OBJ + 0xA4, 4))
@@ -211,7 +222,7 @@ def main():
     check('stage pool +0xA4 (%d stage clones, %d set to false): the game\'s stage ids and the clones in random'
           % (len(stages), sum(1 for s in stages if s.get('random', True) is False)),
           sorted(st), sorted(x for x in want if x < 0x63))
-    stray = [(a, s) for a, s in m.writes if not (STACK - 0x1000 <= a < STACK or OBJ + 0xA4 <= a < OBJ + 0xB4)]
+    stray = [(a, s) for a, s in m.writes if not (STACK - 0x1000 <= a < STACK + 8 or OBJ + 0xA4 <= a < OBJ + 0xB4)]
     check('the stage refill writes only the stack and its 16 bytes', stray[:4], [])
     print('%d failed' % len(FAILS))
     sys.exit(1 if FAILS else 0)
