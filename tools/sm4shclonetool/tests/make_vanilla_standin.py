@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Test fixture: a stand-in for a vanilla cross_f.rpx, made from an executable that has other mods' caves.
 
-  python3 tools/clone_engine/tests/make_vanilla_standin.py MODDED.rpx OUT.rpx
+  python3 tools/sm4shclonetool/tests/make_vanilla_standin.py MODDED.rpx OUT.rpx
 
 No vanilla cross_f.rpx was available where this tool was built, so the tests run on this stand-in: MODDED with
 - its code section cut back to the game's end (0x04B77E1C) and the text region size back to the game's (0x2BB8670):
   every cave in the grown code space is gone;
-- every word the clone engine's generators hook put back to the original the generators state (the kind expansion's
+- every word the Sm4shCloneTool's generators hook put back to the original the generators state (the kind expansion's
   switch bounds, per-kind array sites, table readers and immediates; the weapon tables' readers and switches; the
   effect-bank call sites; the custom-move functions), read the way tools/kind_expand_incremental.py reads an
   executable that already has those patches;
@@ -14,7 +14,7 @@ No vanilla cross_f.rpx was available where this tool was built, so the tests run
   counts 0x80 / 0x4F, `mflr r0` at the two DLC checks' entries); the four words at 0x030A926C (the DLC unlock index)
   stay as MODDED has them (their originals are not recorded in the research).
 Other mods' words elsewhere (hooks into the cut-off code space, data edits) stay: the stand-in is for static and
-emulated tests of the clone engine only and would not run in a game. Prints the words it restored.
+emulated tests of the Sm4shCloneTool only and would not run in a game. Prints the words it restored.
 """
 import json
 import os
@@ -22,9 +22,9 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-from clone_engine import _paths  # noqa: E402,F401
-from clone_engine.rpx import Rpx  # noqa: E402
-from clone_engine import exe as E  # noqa: E402
+from sm4shclonetool import _paths  # noqa: E402,F401
+from sm4shclonetool.rpx import Rpx  # noqa: E402
+from sm4shclonetool import exe as E  # noqa: E402
 import kind_expand as K  # noqa: E402
 from ppcasm import ha  # noqa: E402
 
@@ -70,7 +70,7 @@ def generator_originals(path):
 
 
 def reloc_targets():
-    """the game's tables whose readers the clone engine's generators repoint (their relocations target them)"""
+    """the game's tables whose readers the Sm4shCloneTool's generators repoint (their relocations target them)"""
     import weapon_expand as W
     import stage_slot_cave as SS
     t = {a for _n, a in W.NAME_TABLES} | {a for _n, a, _e, _i in W.STATIC_TABLES}

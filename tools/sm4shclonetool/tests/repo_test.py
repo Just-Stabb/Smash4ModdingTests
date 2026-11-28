@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Run one of the research repository's executable tests on a clone-engine build, with the generators pointed at the
-clone engine's code space (the tests import the generators and read their layout).
+Sm4shCloneTool's code space (the tests import the generators and read their layout).
 
-  python3 tools/clone_engine/tests/repo_test.py TEST PATCHED.rpx ORIGINAL.rpx [ARGS...]
+  python3 tools/sm4shclonetool/tests/repo_test.py TEST PATCHED.rpx ORIGINAL.rpx [ARGS...]
 
 TEST: kind_expand_test, weapon_expand_test, base_effects_test, base_customs_test, stage_slot_test,
 import_call_check (ORIGINAL first for that one). The kinds JSON the tests take is written from PATCHED's own marker
@@ -16,8 +16,8 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-from clone_engine import exe as E  # noqa: E402
-from clone_engine.rpx import Rpx  # noqa: E402
+from sm4shclonetool import exe as E  # noqa: E402
+from sm4shclonetool.rpx import Rpx  # noqa: E402
 
 TOOLS = os.path.dirname(os.path.dirname(HERE))
 

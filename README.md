@@ -18,4 +18,5 @@ Moveset code experiments for Super Smash Bros. for Wii U, written in MSC-C.
 - [`fighters/metaknight/README.md`](fighters/metaknight/README.md): Meta Knight ledge grab during Mach Tornado
 - [`docs/native-notes.md`](docs/native-notes.md): notes from reading the game executable (Kirby BattleObject commands, homing investigation)
 - [`docs/stage-expansion.md`](docs/stage-expansion.md): adding a new stage slot (`NewStage01`) to the stage select
+- [`tools/sm4shclonetool/`](tools/sm4shclonetool/README.md): **Sm4shCloneTool**, a standalone fighter / stage clone tool for vanilla Smash 4 creators (GUI + CLI; internals in [`docs/sm4shclonetool.md`](docs/sm4shclonetool.md))
 - [`docs/minecraft-world.md`](docs/minecraft-world.md): Smash Ultimate's Minecraft World ported to `NewStage01` (`tools/minecraft_world.py`; Ultimate textures `tools/nutexb.py`, models `tools/nud.py`, collision `tools/lvd.py`)

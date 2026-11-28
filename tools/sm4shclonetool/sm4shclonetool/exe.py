@@ -21,7 +21,7 @@ import zlib
 from . import _paths  # noqa: F401
 from .rpx import Rpx, sha1_file
 
-MAGIC = b'Sm4shCloneEngine'
+MAGIC = b'Sm4shCloneTool\0\0'
 FORMAT = 1
 VANILLA_TEXT_END = 0x04B77E1C        # the game's .text ends here (v288)
 VANILLA_REGION = 0x2BB8670           # RPL file info textRegionSize: code space to 0x04BB8670
@@ -79,7 +79,7 @@ def find_marker(x):
             fmt, n, crc = struct.unpack('>III', head[16:28])
             raw = x.blob(base + 28, n)
             if zlib.crc32(raw) & 0xFFFFFFFF != crc:
-                raise ExeError('the clone engine marker at 0x%08X is damaged (CRC)' % base)
+                raise ExeError('the Sm4shCloneTool marker at 0x%08X is damaged (CRC)' % base)
             rec = json.loads(zlib.decompress(raw).decode())
             rec['format'] = fmt
             return base, rec
@@ -95,8 +95,19 @@ def marker_bytes(rec):
 
 
 # ---------------------------------------------------------------- detection
+_INSPECTED = {}
+
+
 def inspect(path):
-    """what the executable is: {'state': 'vanilla' | 'patched' | 'modified', ...}"""
+    """what the executable is: {'state': 'vanilla' | 'patched' | 'modified', ...} (remembered per file)"""
+    st = os.stat(path)
+    key = (os.path.abspath(path), st.st_size, st.st_mtime)
+    if key not in _INSPECTED:
+        _INSPECTED[key] = _inspect(path)
+    return json.loads(json.dumps(_INSPECTED[key]))
+
+
+def _inspect(path):
     x = Rpx(path)
     info = {'path': path, 'sha1': sha1_file(path), 'text_end': x.text_end(), 'text_region': x.text_region()}
     info['research_sha1'] = info['sha1'] == RESEARCH_SHA1
@@ -113,7 +124,7 @@ def inspect(path):
         problems.append('text region 0x%X is smaller than the game\'s 0x%X' % (x.text_region(), VANILLA_REGION))
     sites = check_sites(path)
     if sites:
-        problems.append('%d word(s) the clone engine patches are not the game\'s originals (e.g. %s)'
+        problems.append('%d word(s) the Sm4shCloneTool patches are not the game\'s originals (e.g. %s)'
                         % (len(sites), sites[0]))
     info['problems'] = problems
     info['site_conflicts'] = sites
@@ -165,7 +176,7 @@ def vanilla_view(path, force=False):
             x.set_reloc_offset(sec, entry, off)
         x.set_text_end(rec['text_end'])
         x.set_text_region(rec['text_region'])
-        notes.append('patched by Sm4sh Clone Engine %s before: %d fighter clone(s), %d stage clone(s) kept'
+        notes.append('patched by Sm4shCloneTool %s before: %d fighter clone(s), %d stage clone(s) kept'
                      % (rec.get('tool'), len(rec['registry']['fighters']), len(rec['registry']['stages'])))
         return x, base, rec['registry'], notes
     info = inspect(path)
@@ -174,7 +185,7 @@ def vanilla_view(path, force=False):
                      % (info['sha1'], ', the research base' if info['research_sha1'] else ''))
         return x, DEFAULT_BASE, info['registry'], notes
     if info['site_conflicts']:
-        raise ExeError('this cross_f.rpx is modified where the clone engine patches it, so it can\'t be patched '
+        raise ExeError('this cross_f.rpx is modified where the Sm4shCloneTool patches it, so it can\'t be patched '
                        'safely:\n  ' + '\n  '.join(info['site_conflicts'][:10]))
     if not force:
         raise ExeError('this cross_f.rpx is not vanilla: ' + '; '.join(info['problems']) +

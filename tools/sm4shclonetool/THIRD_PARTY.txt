@@ -1,0 +1,23 @@
+Sm4shCloneTool builds on this work. Thank you to everyone below.
+
+Research and formats
+- Manifold (Fitz Null), zlib licence, https://gitlab.com/fitz.lol/manifold
+  Found several of the executable addresses the stage-slot and fighter-kind patches use first (the stage-kind table and
+  its readers, the kind-count bounds). The rest of the executable research (the kind expansion, weapon kinds, effect
+  banks, custom moves, save records) is the Smash 4 research repository's own static analysis of cross_f.rpx.
+  zlib licence: This software is provided 'as-is', without any express or implied warranty. In no event will the
+  authors be held liable for any damages arising from the use of this software. Permission is granted to anyone to
+  use this software for any purpose, including commercial applications, and to alter it and redistribute it freely,
+  subject to the following restrictions: 1. The origin of this software must not be misrepresented; you must not
+  claim that you wrote the original software. If you use this software in a product, an acknowledgment in the
+  product documentation would be appreciated but is not required. 2. Altered source versions must be plainly marked
+  as such, and must not be misrepresented as being the original software. 3. This notice may not be removed or
+  altered from any source distribution.
+- Smash Forge (MIT): the NUT texture header layout and the GX2 (de)swizzle (NUT.cs / GTX.cs) followed by
+  vendor/nut.py; GTX.cs ports AboodXD's GTX Extractor.
+- SALT, Sammi Husky (MIT): the ACMD command table (vendor/acmd_info.json, from Scripting/AnimCMD/CMD_INFO.cs).
+- The community parameter spreadsheets (Sm4sh_params.xlsx) for the parameter files' layouts.
+- Lumen (.lm) layout reading: vendor/chara_layout.py.
+
+Python packages (installed by setup.bat, not shipped): numpy (BSD-3-Clause), Pillow (MIT-CMU / HPND).
+Python's Tkinter (Tcl/Tk licence) comes with Python.

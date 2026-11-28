@@ -1,2 +1,0 @@
-"""Sm4sh Clone Engine: clone Smash 4 (Wii U) fighters and stages into new slots."""
-VERSION = "1.0.0"
