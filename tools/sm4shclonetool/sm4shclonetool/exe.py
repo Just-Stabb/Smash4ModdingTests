@@ -241,7 +241,13 @@ def base_articles(path, base):
     import kind_expand as K
     import weapon_expand as W
     img = K.Image(path)
-    fdesc = W.fighter_descriptor(img, {'desc_from': base})
+    names = [img.cstr(img.w(K.TABLES['lower'][0] + 4 * k)) for k in range(K.OLD_N)]
+    # the descriptor switch's own jump table (kept as it is by the kind expansion): case -> bl getter -> lis / addi
+    _c, _r, _s, table = K.SWITCHES['descriptor']
+    e = table + 4 * K.kind_index(names, base)
+    case = K.branch_target(e, img.w(e))
+    g = K.branch_target(case, img.w(case))
+    fdesc = ((img.w(g) & 0xFFFF) << 16) + K.sx16(img.w(g + 4))
     alist = img.w(fdesc + 8)
     entries, count = img.w(alist), img.w(alist + 4)
     out = []

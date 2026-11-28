@@ -443,7 +443,8 @@ def name_plates(rec, out_root, portraits, logs):
             tmp.close()
             pic.save(tmp.name)
             ids = [t for _o, t in T.texture_ids(T.read_nut(p))]
-            open(p, 'wb').write(T.put_png(p, tmp.name, ids))
+            blob = T.put_png(p, tmp.name, ids)
+            open(p, 'wb').write(blob)
             os.unlink(tmp.name)
             done.append('%s/%s' % (st, f))
     logs.append('name plates redrawn with %r: %s' % ((rec.get('title') or rec['ui_name']).upper(),

@@ -250,12 +250,22 @@ its mirror, the random state, the lazy-init guard and the stack.
 - Effects: `"effects_base": false` in the generators' spec for a clone with its own effects: base_effects_cave then
   doesn't register the base's banks for it. Its effect ids are already its own (`0x3KK` / `0x4KK`, the folder copy).
 - Results panel: `param/ui/result_param.bin` gets the clone's entry (the source's, by model name; vendor/result_param.py).
+- Name plates (`chrn_*`): redrawn with the clone's title (`fighter.name_plates`), unless a PNG is imported for the set.
+- Own articles default to all of the base's: its article list's entries before the special ones, named by the weapon
+  name table (`exe.base_articles`, read through the descriptor switch's own jump table, which the kind expansion keeps).
 
 ## Not done / open
 
-- The announcer call and the fanfare's own music (the records point at the base's), Kirby copying clones, an own
-  custom-move save bitfield, MSC sound-id remapping, and a mode-by-mode check (All-Star, Stadium, Smash Tour, Events,
-  online, replays) with new kinds: not done in 1.2.
+- Not done in 1.2 (asked for, not built): the clone's own CSS / results announcer call (a new label in the
+  character-call narration bank: a TONE section append and a soundlabeltable label; the narration bank isn't in the
+  test data), its own fanfare / results music track (new BGM entries and streams), Kirby copying clones with their own
+  hats (copy_grant refuses kinds >= 0x3A; the copy tables, the ~22 copy-kind switches and the hat / motion loaders
+  would need the new kinds: the research's Kirby copy work for added kinds is the reference), its own Final Smash
+  cutscene / transformation kinds (camera/final and Fin<Cap> are copied by folder; the scene tables per kind and the
+  transformation map 0x030BF9C0 / 0x030C1FDC were not extended), an own custom-move save bitfield, MSC sound-id
+  remapping (needs an MSC reader), per-language msbt files, and a mode-by-mode emulated check (All-Star, Stadium,
+  Smash Tour, Events, online, replays) with new kinds. Classic's save records, the random selects, the CPU AI files
+  and amiibo rows are covered.
 
 - In-game confirmation (nothing here ran in Cemu or on a console).
 - Own sound banks (soundlabeltable rows), the announcer call, Kirby's copy: not offered (vanilla Kirby refuses new

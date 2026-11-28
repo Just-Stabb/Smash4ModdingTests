@@ -180,13 +180,23 @@ AI scripts, sounds, effects, cameras) under its own name; its own sound banks an
 (above); its victory fanfare and KO-voice records; its results-screen loser panel (`param/ui/result_param.bin`,
 keyed by its name); its own random-select bit.
 
+Name plates (`chrn_11`, `chrn_12`, `chrn_40`, `chrn_41`: the name drawn as a picture) are redrawn with the clone's
+title: white capitals with a dark edge on a clear background, in each plate's size and format. That is not the game's
+plate lettering; import your own PNG per plate set for an exact look. The name text itself (`MmelChara*`) goes into
+the one `melee.msbt` your data has (one language per install: run the tool on each region's file for others).
+
 Shared with the base, because that is how a Smash 4 clone works:
 - **the base's native code**: special moves, status logic, articles' behaviour, anything the game does for that
   kind in code. The clone's files decide what it looks and sounds like and its ACMD / MSC / params, but its moveset
   structure is the base's. The base's per-fighter state lives in each fighter, so a clone and its base in one match
   behave like two copies of the base (the game shares the kind's static specializer object between every fighter of
   a kind already); the clone has its own parameter slot (its vl file) and article kinds;
-- the announcer call and the fanfare's music track (its own records point at the base's: re-point them to change);
+- the announcer call on the character select and the results (the clone's 16 call ids are the base's), the
+  victory fanfare's and the results screen's music track (its own records point at the base's tracks);
+- its Final Smash cutscene assets that the game finds by kind instead of by folder (its `camera/final/` and
+  `effect/Fin<Cap>/` folders are copied and renamed, but whether the game loads them for a new kind was not traced),
+  and a transformation (a clone of Bowser, Wario, Little Mac or Lucario transforms into the base's transformation);
+- sound ids inside MSC scripts (only ACMD ids are moved to its own banks);
 - the custom moves' unlock bits (the clone owns what its base owns: the save has no room for new characters);
 - Kirby: Kirby can't copy a new kind (the game refuses kinds past its own); swallowing the clone gives no ability.
 
