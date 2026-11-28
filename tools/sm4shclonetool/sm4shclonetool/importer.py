@@ -213,7 +213,7 @@ def import_motions(tgt, items, reg, out_dir, log=print, read=None):
         omo = open(it['omo'], 'rb').read()
         if omo[:4] != b'OMO ':
             raise ImportError_('%s: not an OMO animation' % it['omo'])
-        anim = '%sMain%s%s.omo' % (prefix, _code(it['omo']), name)
+        anim = it.get('anim') or '%sMain%s%s.omo' % (prefix, _code(it['omo']), name)
         old = by_name.get(name)
         if old is None:
             if h in known:
@@ -235,7 +235,7 @@ def import_motions(tgt, items, reg, out_dir, log=print, read=None):
             pp = tgt.writable(tgt.rel('motion', 'body', part_pacs[stem]))
             ppac = PAC.Pac.load(pp)
             tag = _part_tag(ppac, prefix) or stem.capitalize()
-            pname = '%s%s%s%s.omo' % (prefix, tag, _code(it['omo']), name)
+            pname = (it.get('part_names') or {}).get(stem) or '%s%s%s%s.omo' % (prefix, tag, _code(it['omo']), name)
             d = open(path, 'rb').read()
             if d[:4] != b'OMO ':
                 raise ImportError_('%s: not an OMO animation' % path)
@@ -248,14 +248,19 @@ def import_motions(tgt, items, reg, out_dir, log=print, read=None):
             src_i = src if isinstance(src, int) else next((i for i, x in enumerate(mt) if x == acmd.crc(src)), None)
             if src_i is None or not 0 <= src_i < len(mt):
                 raise ImportError_('%s: no motion %r to copy from' % (tgt.name, src))
-        for f in files.values():
+        for fn, f in files.items():
             sh = mt[src_i] if src_i is not None else 0
-            f.scripts[h] = copy.deepcopy(f.scripts[sh]) if sh and sh in f.scripts else [acmd.Command(acmd.END)]
+            if it.get('scripts') and fn in it['scripts']:          # (a repair's replay: the package's own scripts)
+                f.scripts[h] = copy.deepcopy(it['scripts'][fn])
+            else:
+                f.scripts[h] = copy.deepcopy(f.scripts[sh]) if sh and sh in f.scripts else [acmd.Command(acmd.END)]
         ve = list(vents[src_i]) if src_i is not None else [0] * 6
+        if it.get('vl') is not None:
+            ve = list(it['vl'])
         if it.get('loop') is not None:
             ve[1] = 6 if it['loop'] else (ve[1] if ve[1] != 6 else 0)
-        r = {'name': name, 'anim': anim[:-4], 'hash': PAC.anim_hash(anim), 'index': index, 'flags_from': src_i,
-             'part_hashes': part_hashes, 'vl': ve}
+        r = {'name': name, 'anim': anim[:-4], 'hash': PAC.anim_hash(anim), 'index': index,
+             'flags_from': it['flags_from'] if 'flags_from' in it else src_i, 'part_hashes': part_hashes, 'vl': ve}
         if old is None:
             mt.append(h)
             vents.append(ve)
@@ -844,3 +849,117 @@ def run(items, reg, pkg, data, out_dir, log=print, exe=None):
             from . import articles as A
             out['articles'] += A.import_articles(tgt, its, reg, pkg, data, out_dir, log, exe)
     return out
+
+
+# ---------------------------------------------------------------- a repair: the recorded imports made again
+def replay(old_imp, reg, old_pkg, pkg, data, out_dir, log=print):
+    """after a repair rebuilt the shared files from the data folder (session._repair): the recorded imports put back
+    from the broken package's own files (old_pkg), with the same motion numbers, effect ids and sound ids.
+    - into a vanilla fighter (its files are shared: rebuilt from the data folder): each imported motion (its .omo and
+      part animations, its scripts as they are in the package (your edits kept), its vl entry), effect (its emitter set
+      from the package's bank) and sound (its tone's audio from the package's bank) imported again;
+    - into a clone (its files are its own: the repair kept them as they were, imports included): only the shared
+      soundlabeltable row of its imported sounds is grown again;
+    - articles: their records (the executable makes them again); their folders are the owner's own files (kept), the
+      effects / sounds imported with them are put back as above.
+    Returns a list of problems (an id that came out different: the data folder changed since)."""
+    import acmd
+    import tempfile
+    from . import audio as AU
+    from . import sound as SND
+    problems = []
+    imp = imports(reg)
+    for k in ('motions', 'effects', 'sounds', 'articles'):
+        imp.pop(k, None)
+    tmp = tempfile.mkdtemp(prefix='s4ct_replay_')
+    try:
+        # ---- motions
+        for t, recs in sorted((old_imp.get('motions') or {}).items()):
+            tgt = Target(reg, t, pkg, data)
+            if tgt.clone:
+                imp.setdefault('motions', {})[t] = copy.deepcopy(recs)
+                write_names(out_dir, '// ---- %s: imported motions' % t,
+                            [r['name'] for r in recs] + ['%s -> body/%s.omo' % (r['name'], r['anim']) for r in recs])
+                continue
+            oroot = os.path.join(old_pkg, 'fighter', t)
+            opac = PAC.Pac.load(os.path.join(oroot, 'motion', 'body', 'main.pac'))
+            obins = {f: acmd.ACMDFile.load(os.path.join(oroot, 'script', 'animcmd', 'body', f)) for f in BINS
+                     if os.path.exists(os.path.join(oroot, 'script', 'animcmd', 'body', f))}
+            parts = {}
+            d = os.path.join(oroot, 'motion', 'body')
+            for f in sorted(os.listdir(d)):
+                if f.endswith('.pac') and f != 'main.pac':
+                    for n, blob in PAC.Pac.load(os.path.join(d, f)).entries:
+                        parts[PAC.anim_hash(n)] = (f[:-4], n, blob)
+            items = []
+            for r in recs:
+                p = os.path.join(tmp, '%s_%s.omo' % (t, r['name']))
+                open(p, 'wb').write(opac.get(r['anim'] + '.omo'))
+                it = {'name': r['name'], 'omo': p, 'anim': r['anim'] + '.omo', 'vl': r['vl'],
+                      'flags_from': r.get('flags_from'), 'parts': {}, 'part_names': {},
+                      'scripts': {f: a.scripts[acmd.crc(r['name'])] for f, a in obins.items()
+                                  if acmd.crc(r['name']) in a.scripts}}
+                for h in (r.get('part_hashes') or {}).values():
+                    if h in parts:
+                        stem, n, blob = parts[h]
+                        pp = os.path.join(tmp, '%s_%s_%s.omo' % (t, r['name'], stem))
+                        open(pp, 'wb').write(blob)
+                        it['parts'][stem] = pp
+                        it['part_names'][stem] = n
+                items.append(it)
+            got = import_motions(tgt, items, reg, out_dir, log)
+            problems += ['%s: motion %s is 0x%X again, was 0x%X' % (t, a['name'], a['index'], b['index'])
+                         for a, b in zip(got, recs) if a['index'] != b['index']]
+        # ---- effects
+        for t, recs in sorted((old_imp.get('effects') or {}).items()):
+            tgt = Target(reg, t, pkg, data)
+            if tgt.clone:
+                imp.setdefault('effects', {})[t] = copy.deepcopy(recs)
+                continue
+            efc, ptcl = bank_paths(os.path.join(old_pkg, 'fighter', t), t)
+            items = [{'efc': efc, 'ptcl': ptcl, 'entry': r['id'] & 0xFFFF, 'name': r['name']} for r in recs]
+            got = import_effects(tgt, items, reg, out_dir, log)
+            imp['effects'][t] = copy.deepcopy(recs)          # their keys: the sources first imported from
+            problems += ['%s: effect %s is 0x%08X again, was 0x%08X' % (t, r['name'], e, r['id'])
+                         for (_n, e), r in zip(got, recs) if e != r['id']]
+        # ---- sounds
+        tp = os.path.join(pkg, 'sound', 'config', 'soundlabeltable.bin')
+        for t, recs in sorted((old_imp.get('sounds') or {}).items()):
+            tgt = Target(reg, t, pkg, data)
+            if tgt.clone:
+                table = SND.Table(open(R.first([pkg, data], os.path.join('sound', 'config', 'soundlabeltable.bin')),
+                                       'rb').read())
+                for r in sorted(recs, key=lambda x: x['id']):
+                    row, lab = r['id'] >> 16, r['id'] & 0xFFFF
+                    labels = table.tones(row)
+                    if len(labels) != lab:
+                        problems.append('%s: sound %s: row 0x%X has %d labels, its label is %d' % (
+                            t, r['name'], row, len(labels), lab))
+                        continue
+                    table.set_row(row, labels + [r['tone']])
+                os.makedirs(os.path.dirname(tp), exist_ok=True)
+                open(tp, 'wb').write(table.data())
+                imp.setdefault('sounds', {})[t] = copy.deepcopy(recs)
+                continue
+            for bank in sorted({r['bank'] for r in recs}):
+                ob = AU.Bank(open(os.path.join(old_pkg, 'fighter', t, 'sound', bank), 'rb').read())
+                items = []
+                mine = sorted((r for r in recs if r['bank'] == bank), key=lambda x: x['id'])
+                for r in mine:
+                    tone = ob.tones[r['tone']]
+                    e = ob.raw[r['tone']]
+                    p = os.path.join(tmp, '%s_%s.idsp' % (t, r['name']))
+                    open(p, 'wb').write(ob.data_of(r['tone']))
+                    items.append({'file': p, 'name': r['name'], 'alias': r.get('alias'), 'volume': tone['volume'],
+                                  'loop': bool(struct.unpack('<I', e[-0x0C:-0x08])[0])})
+                got = import_sounds(tgt, items, reg, out_dir, log, bank=bank)
+                problems += ['%s: sound %s is 0x%08X again, was 0x%08X' % (t, r['name'], i, r['id'])
+                             for (_n, i), r in zip(got, mine) if i != r['id']]
+        # ---- articles: their records
+        if old_imp.get('articles'):
+            imp['articles'] = copy.deepcopy(old_imp['articles'])
+    finally:
+        shutil.rmtree(tmp)
+    for p in problems:
+        log('repair: ' + p)
+    return problems
