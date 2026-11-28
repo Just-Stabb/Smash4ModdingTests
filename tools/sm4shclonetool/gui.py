@@ -132,7 +132,7 @@ class App:
         self.fv = {}
         fields = [('source', 'Base fighter'), ('name', 'Internal name (lowercase)'), ('cap', 'Cap name (files)'),
                   ('ui_name', 'UI name (portraits / labels)'), ('title', 'Title (shown name)'),
-                  ('subtitle', 'Subtitle (CSS line)'), ('series', 'Series icon id'), ('costumes', 'Costumes'),
+                  ('subtitle', 'Title line (CSS, Boxing Ring)'), ('series', 'Series icon id'), ('costumes', 'Costumes'),
                   ('kind', 'Fighter kind (auto)'), ('ui_id', 'Character id (auto)'),
                   ('after', 'CSS: place after (name / id)'), ('sort_key', 'CSS: or first sort key')]
         for i, (k, label) in enumerate(fields):

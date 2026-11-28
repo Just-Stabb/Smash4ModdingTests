@@ -54,7 +54,7 @@ marks your clones, which can be bases too). Then fill in:
 | Cap name | the capitalised file name (`snd_se_<Cap>.nus3bank`, `Fin<Cap>` effects) | a capital, then letters / digits |
 | UI name | portraits (`chr_00_<UiName>_01.nut`) and text labels (`MmelCharaN_01_<UiName>`) | a capital, then letters / digits, no spaces, not taken |
 | Title | the name the game shows (the character select, results); capitals version made for you | any text |
-| Subtitle | the character select's second line (`MmelCharaA`); empty = the base's | any text |
+| Title line | the line under the name (`MmelCharaA_NN_<UiName>`, every costume: the character select and the screens that show a fighter's title, the Boxing Ring's included as far as traced: the game builds this label from the UI name in one place, `0x10156228`); empty = the base's text | any text |
 | Series icon id | the series emblem (the base's by default) | number |
 | Costumes | how many costumes the character select offers (the base's by default) | 1-16 |
 | Fighter kind / Character id | filled in: the next free kind (from 0x41) and id (from 59) | they must be consecutive; the tool checks every database, name table and label |
