@@ -202,6 +202,15 @@ def run(work, proj, data, patched, vanilla, s4c=None):
           (sorted(k for k in again if again.get(k) != after.get(k)), sha1_file(os.path.join(proj, 'INSTALL_TO_code',
                                                                                              'cross_f.rpx'))),
           ([], sha1_file(e4)))
+    # (with 1.5.1's repair) a repair rebuilds the package from the project: the imports come back the same
+    s = Session(data, proj, e4, None, log=lambda t: None)
+    if hasattr(s, 'repair'):
+        s.repair()
+        rep = snapshot(pkg, data)
+        diff = sorted(k for k in set(rep) | set(after) if rep.get(k) != after.get(k))
+        check('a repair (the package rebuilt from the project): every imported motion, effect, sound and article back '
+              'with the same numbers / ids, the package files and the executable as before (%d differ)' % len(diff),
+              (diff[:6], sha1_file(os.path.join(proj, 'INSTALL_TO_code', 'cross_f.rpx'))), ([], sha1_file(e4)))
     # the executable
     o = os.path.join(work, 'import_exe_test.txt')
     rc = RA.run([sys.executable, os.path.join(HERE, 'import_exe_test.py'), e4, vanilla, os.path.join(work, 'import_ps')], o)
