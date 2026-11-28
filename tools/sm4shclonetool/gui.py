@@ -61,7 +61,7 @@ class App:
     def __init__(self, root, args):
         self.root = root
         root.title(TITLE)
-        root.geometry('1480x960')
+        root.geometry('1480x1010')
         self.q = queue.Queue()
         self.session = None
         self.images = []
@@ -144,6 +144,8 @@ class App:
         self.fv['name'].trace_add('write', self._auto_names)
         opt = ttk.LabelFrame(mid, text='Options')
         opt.pack(fill='x', pady=4)
+        self.random = tk.BooleanVar(value=True)
+        ttk.Checkbutton(opt, text='In the random select (the first 37 clones can be)', variable=self.random).pack(anchor='w')
         self.customs = tk.BooleanVar(value=True)
         self.fanfare = tk.BooleanVar(value=True)
         ttk.Checkbutton(opt, text='Custom moves (owns the base\'s; menu labels / icons)', variable=self.customs).pack(anchor='w')
@@ -210,19 +212,21 @@ class App:
         self.sss_label.pack(fill='both', expand=True)
 
     def _bottom(self):
+        self.limits_label = ttk.Label(self.root, text='', foreground='#205080')
+        self.limits_label.pack(fill='x', padx=8)
         f = ttk.Frame(self.root)
         f.pack(fill='both', padx=6, pady=4)
         left = ttk.Frame(f)
         left.pack(side='left', fill='y')
         ttk.Label(left, text='Plan (built together):').pack(anchor='w')
-        self.plan_list = tk.Listbox(left, height=5, width=48)
+        self.plan_list = tk.Listbox(left, height=4, width=48)
         self.plan_list.pack()
         btn = ttk.Frame(left)
         btn.pack(fill='x', pady=4)
         ttk.Button(btn, text='Check', command=self.check).pack(side='left')
         ttk.Button(btn, text='Build', command=self.build).pack(side='left', padx=4)
         ttk.Button(btn, text='Open output', command=self.open_output).pack(side='left')
-        self.log = tk.Text(f, height=10, wrap='word', background='#10141c', foreground='#d8e0f0')
+        self.log = tk.Text(f, height=8, wrap='word', background='#10141c', foreground='#d8e0f0')
         self.log.pack(side='left', fill='both', expand=True, padx=6)
 
     # ------------------------------------------------------------ data
@@ -376,7 +380,7 @@ class App:
         if not (v['source'] and v['name']):
             return None
         opt = {'cap': v['cap'] or None, 'ui_name': v['ui_name'] or None, 'title': v['title'] or None,
-               'customs': self.customs.get(), 'fanfare': self.fanfare.get(),
+               'customs': self.customs.get(), 'fanfare': self.fanfare.get(), 'random': self.random.get(),
                'weapons': [self.weapons.get(i) for i in self.weapons.curselection()]}
         if v['subtitle']:
             opt['subtitle'] = v['subtitle']
@@ -460,6 +464,10 @@ class App:
             return
         new_f = [f['ui_id'] for f in reg['fighters'] if f['name'] in {x['name'] for x in fs}]
         new_s = [s['cosmetic'] for s in reg['stages'] if s['name'] in {x['name'] for x in ss}]
+        try:
+            self.limits_label.configure(text=self.session.limits_text(reg))
+        except Exception as e:
+            self.limits_label.configure(text='limits: %s' % e)
         try:
             img, info = self.session.css(reg, new_f)
             self.css_img = photo(img, (640, 360))
@@ -567,7 +575,8 @@ def main():
             w, h = root.winfo_width(), root.winfo_height()
             ImageGrab.grab(bbox=(x, y, x + w, y + h), xdisplay=os.environ.get('DISPLAY')).save(a.screenshot)
             info = {'title': root.title(), 'fighters': app.f_count, 'fighter_icons': app.f_icon_count,
-                    'css': {k: v for k, v in getattr(app, 'css_slots', {}).items() if k != 'slot'}}
+                    'css': {k: v for k, v in getattr(app, 'css_slots', {}).items() if k != 'slot'},
+                    'limits': app.limits_label.cget('text')}
             print(json.dumps(info))
             root.destroy()
         root.after(500, shoot)

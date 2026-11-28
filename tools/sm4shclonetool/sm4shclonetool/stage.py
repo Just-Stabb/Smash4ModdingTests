@@ -15,6 +15,8 @@ import s4param  # noqa: E402
 
 NAME_RX = re.compile(r'^[A-Z][A-Za-z0-9_]{1,23}$')
 FIRST_COSMETIC = 0x38
+PAGE_SLOTS = 48               # the stage select's slots per page (lumen/stage/stage.lm img_01-img_48), 2 pages
+MAX_CLONES = 0xC7 - FIRST_COSMETIC + 1   # cosmetic ids up to 0xC7 are found by position
 ICON_SETS = ['stage_00', 'stage_10', 'stage_11', 'stage_12', 'stage_13', 'stage_30', 'stage_31', 'stage_32',
              'stage_40', 'stage_41']
 
@@ -59,10 +61,11 @@ def validate(spec, param_dirs, ui_dirs, reg):
         err.append('no param/ui/ui_stage_db.bin')
     elif spec['cosmetic'] in [e[0][1] for e in g[2]]:
         err.append('cosmetic id 0x%X is already in ui_stage_db.bin' % spec['cosmetic'])
-    if spec.get('page', 1) == 1:
-        ss = R.sss_pages(param_dirs, reg)[1] if g is not None else []
-        if len(ss) >= 48:
-            err.append('page 1 of the stage select has 48 slots and all are used: choose page 2')
+    page = spec.get('page', 1)
+    ss = R.sss_pages(param_dirs, reg)[page] if g is not None else []
+    if len(ss) >= PAGE_SLOTS:
+        err.append('page %d of the stage select has %d slots and all are used%s' % (
+            page, PAGE_SLOTS, ': choose page 2' if page == 1 else ''))
     try:
         source_info(spec['source'], param_dirs, reg)
     except StageError as e:

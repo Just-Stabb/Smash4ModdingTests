@@ -114,6 +114,16 @@ class Session:
             reg['stages'].append(rec)
             recs.append(('stage', rec, spec))
             files += self._stage_files(rec)
+        if fighters:
+            lim = self.limits(reg)
+            if lim['css_entries'] > lim['css_capacity']:
+                errors.append('the character select would show %d entries; its layout has places for %d (%s). '
+                              'Use a UI whose lumen/chara/chara.lm has arrangements up to num_%03d'
+                              % (lim['css_entries'], lim['css_capacity'], lim['css_source'], lim['css_entries']))
+        for p in (1, 2):
+            if stages and len(R.sss_pages(self.param_dirs(), reg)[p]) > S.PAGE_SLOTS:
+                errors.append('stage select page %d would have %d stages; it has %d slots' % (
+                    p, len(R.sss_pages(self.param_dirs(), reg)[p]), S.PAGE_SLOTS))
         wk = X.weapon_kinds(reg)
         for f in reg['fighters']:
             f['weapon_kinds'] = wk.get(f['name'], {})
@@ -155,6 +165,31 @@ class Session:
             'ui/message/melee.msbt (MmelStageN_ / MmelStageG_%s)' % rec['name'],
             'ui/replace/stage/<set>/<set>_%s.nut (icons)' % rec['name'],
             'stage/melee/%s/, stage/end/%s/ (copies of %s)' % (rec['name'], rec['name'], rec['source'])]
+
+    def limits(self, reg=None):
+        """how many clones fit, and why (docs: README "Limits")"""
+        reg = reg or self.reg
+        cap, src = P.css_capacity(self.ui_dirs())
+        entries = len(R.css_entries(self.param_dirs(), reg))
+        n = len(reg['fighters'])
+        vanilla_entries = entries - sum(1 for f in reg['fighters'])
+        pages = R.sss_pages(self.param_dirs(), reg)
+        return {'fighters': n, 'fighters_max': min(F.MAX_CLONES, cap - vanilla_entries),
+                'ids_max': F.MAX_CLONES, 'css_entries': entries, 'css_capacity': cap, 'css_source': src,
+                'random_max': 96 - 59,
+                'random': sum(1 for f in reg['fighters'] if f['ui_id'] < 96 and f.get('random', True)),
+                'stages': len(reg['stages']), 'page1': len(pages[1]), 'page2': len(pages[2]),
+                'page_slots': S.PAGE_SLOTS,
+                'stages_max': min(S.MAX_CLONES, 2 * S.PAGE_SLOTS - len([s for p in (1, 2) for s in pages[p]
+                                                                         if not s['clone']]))}
+
+    def limits_text(self, reg=None):
+        m = self.limits(reg)
+        return ('Fighter clones: %d of %d (character select: %d of %d places, %s; random select: the first %d '
+                'clones) | Stage clones: %d of %d (page 1: %d / %d, page 2: %d / %d)'
+                % (m['fighters'], m['fighters_max'], m['css_entries'], m['css_capacity'], m['css_source'],
+                   m['random_max'], m['stages'], m['stages_max'], m['page1'], m['page_slots'], m['page2'],
+                   m['page_slots']))
 
     # ------------------------------------------------------------ build
     def build(self, fighters=(), stages=(), portraits=None, icons=None):

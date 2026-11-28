@@ -18,7 +18,7 @@ GUI = os.path.join(os.path.dirname(HERE), 'gui.py')
 
 
 def shot(py, args, png, home):
-    cmd = ['xvfb-run', '-a', '-s', '-screen 0 1600x1000x24', py, GUI, '--screenshot', png] + args
+    cmd = ['xvfb-run', '-a', '-s', '-screen 0 1600x1080x24', py, GUI, '--screenshot', png] + args
     r = subprocess.run(cmd, capture_output=True, text=True, env=dict(os.environ, HOME=home), timeout=600)
     line = [x for x in r.stdout.splitlines() if x.startswith('{')]
     return json.loads(line[-1]) if line else {'error': r.stderr[-1500:]}

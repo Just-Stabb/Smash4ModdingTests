@@ -57,6 +57,30 @@ def lm_layout(path, count):
     return out, 'chara.lm frame %s' % want
 
 
+VANILLA_CSS = 96          # the game's chara.lm: arrangements num_013 ... num_096, faces face_001 ... face_096
+
+
+def css_capacity(ui_dirs):
+    """(how many entries the character select can show, where that comes from): the highest num_NNN frame of the UI's
+    chara.lm, else the game's layout (96)"""
+    for d in ui_dirs:
+        if not d:
+            continue
+        prof = profile(d)
+        p = os.path.join(d, prof['css_layout'])
+        if os.path.exists(p):
+            try:
+                import chara_layout as cl
+                lm = cl.Lm(open(p, 'rb').read())
+                _f, labels = lm.frames()
+                nums = [int(n[4:]) for n in labels.values() if n.startswith('num_') and n[4:].isdigit()]
+                if nums:
+                    return max(nums), '%s (frames up to num_%03d)' % (prof['css_layout'], max(nums))
+            except Exception as e:
+                return VANILLA_CSS, 'unreadable %s (%s): the game\'s %d assumed' % (prof['css_layout'], e, VANILLA_CSS)
+    return VANILLA_CSS, 'the game\'s layout (num_096: %d entries)' % VANILLA_CSS
+
+
 def check_layout(pos, count):
     """problems with a layout for `count` entries: missing faces, two faces on one place"""
     probs = []

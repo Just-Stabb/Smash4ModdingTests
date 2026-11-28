@@ -81,6 +81,11 @@ EDITS = [
     ('kind_expand', 'CAVE = 0x04BA0000', 'CAVE = 0x%08X' % LAYOUT['kinds'][0]),
     ('kind_expand', 'LIMIT = 0x04BB0000', 'LIMIT = 0x%08X' % LAYOUT['kinds'][1]),
     ('kind_expand', 'RELOC_DUMMY = 0x037EE73C', 'RELOC_DUMMY = 0x%08X' % LAYOUT['dummy']),
+    # the random-select pool is 96 bits (ids 0-95): scan at most that many entries (later ids are left out of random;
+    # sm4shclonetool/random_select.py patches the pool's other two bounds and the per-clone choice)
+    ('kind_expand', """    n_sel = RANDOM_SELECT_COUNT + len(uis)
+    assert n_sel <= 96, 'the random-select set holds 96 database entries'""",
+     """    n_sel = min(96, RANDOM_SELECT_COUNT + len(uis))"""),
     ('weapon_expand', 'CAVE = 0x04BB0000', 'CAVE = 0x%08X' % LAYOUT['weapons'][0]),
     ('weapon_expand', 'LIMIT = 0x04BB8000', 'LIMIT = 0x%08X' % LAYOUT['weapons'][1]),
     ('weapon_expand', """                if 'kirby_copy' in spec:

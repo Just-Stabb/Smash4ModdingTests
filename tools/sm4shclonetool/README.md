@@ -25,7 +25,7 @@ your full UI every tile is its portrait. More in `screenshots/`: the stage tab, 
 
 ## Install
 
-1. Unzip `Sm4shCloneTool_v1.zip` anywhere.
+1. Unzip `Sm4shCloneTool_v1_1.zip` anywhere.
 2. Double-click **setup.bat** once (installs numpy and Pillow with pip).
 3. Double-click **run.bat** (the window) or use **run_cli.bat** (the command line).
 
@@ -72,6 +72,8 @@ marks your clones, which can be bases too). Then fill in:
   as new weapon kinds (0x185 on): their files then load from the clone's own folder (`fighter/<name>/model/<article>`,
   `script/animcmd/weapon/<article>`, ...) so you can change them without changing the base's. Articles not selected
   keep loading from the base's folder.
+- **In the random select**: whether the character select's random pick can choose the clone (on by default; the
+  first 37 clones can be, see "Limits").
 - Kirby: Kirby cannot copy a new fighter kind (the game refuses kinds past its own); swallowing the clone gives no
   ability. This is the game's behaviour, not changed by the tool.
 
@@ -198,27 +200,41 @@ python cli.py css    --data DATA --out OUT [--ui UI] --fighter fox:wolf --png pr
 
 `python cli.py --help` lists every key.
 
-## Limits and what is not confirmed in game
+## Limits
+
+The window shows the current counts and limits under the plan ("Fighter clones: 3 of 37 ...").
+
+| limit | how many | why |
+|---|---|---|
+| fighter clones on the character select | **37** with the game's layout; more with a layout that has more places | the select shows arrangement `num_<count>` of `lumen/chara/chara.lm` and binds `face_001` ... in order; the game's file has arrangements up to `num_096` (96 entries: 59 are the game's). A UI whose `chara.lm` has more arrangements and faces raises it: the tool reads its highest `num_NNN` |
+| fighter clones in all | **141** | character ids up to 199 are found by their place in the character database (59-199 are free); kinds 0x41-0xCD fit the kind tables (the tool sizes them to the clones) |
+| clones the character select's random pick can choose | **the first 37** | the random pool is a 96-bit set (ids 0-95) inside a game object, with the next field right after it. Clones with ids 96 and up are never picked by random; any clone can be left out with "In the random select" off |
+| own articles (weapon kinds) | grows with them (0x185 on) | the weapon tables are sized to the articles |
+| stage clones | **41**: 1 on page 1, 40 on page 2 | the stage select has 48 slots a page (`img_01`-`img_48`) and 2 pages; the game has 47 + 8 stages. More pages are not supported |
+| stage clones in random stage select | the first 43 | the random stage pool covers stage-select ids below 0x63 |
+| stage-select ids | 0x38-0xC7 | ids up to 0xC7 are found by position |
+| code space | grows with the clones (about 6 KB a fighter, more with articles) | from `0x04B78000`; past `0x04BB8000` the executable's code region is enlarged (as other code mods do; tested on Cemu by such mods, not on a console) |
+| effect banks in one match | 8 | the game's bank slot table; a clone whose base isn't in the match uses two. A per-match limit, not a clone count |
+
+## What is not confirmed in game
 
 - **Tested by emulating the patched code** (the game's own functions run on the patched executable), not yet in a
   game: please report what you see. The tool was built without an untouched v288 executable at hand: the patch was
   tested on a stand-in rebuilt from a modded one (every word the tool touches restored to the game's original), so
   the first run on a real vanilla executable is the first true one. If the tool says your vanilla executable is not
   vanilla, please report its SHA-1.
-- Up to 15 fighter clones (the random select's set holds 96 database entries; the kind tables hold kinds up to 0x5F)
-  and stage-select ids up to 0xC7.
+- Many clones: 40 fighter and 8 stage clones were built and emulated; the enlarged code region (to about 0x04BD1000,
+  356 KB, for 40 fighters and 8 stages), high kinds' resource ids (`kind * 0x11 + n`, map keys) and a select screen with 99 entries were not
+  seen in a game.
 - A clone shares its base's **native code**: special moves, articles and anything the game does for that kind
   in code. What is in its files (model, motions, ACMD, MSC, params, effects, sounds) is its own to change.
 - **Sounds**: the clone's sound banks are the base's files renamed; they keep the base's bank ids, so with the base
   and the clone in one match their banks may answer for each other (not tested). A bank of its own needs the
   soundlabeltable edited (not in this version).
-- The announcer calls the clone with the base's call.
-- **Effects**: the clone's own effects use its kind's bank (0x3KK); its articles' effects keep the base's ids, which
-  the patch loads with the clone. With a base whose effect bank count is already high, a match of clones and bases
-  can run out of the game's 8 effect bank slots (not tested).
+- The announcer calls the clone with the base's call. Kirby can't copy clones.
 - **Records / Classic mode**: the new characters' records live in memory only (the save file has no room for them).
 - **Stages**: a clone is the base's folder renamed; the game builds it as a generic stage (its own models, collision
   and parameters). Stages whose behaviour is native code (moving platforms, hazards) may not move (not tested).
 - Mii Fighters, transformations and Mii enemies are not offered as bases.
-- The character-select preview approximates the vanilla layout (no `chara.lm` in your UI folder) and the stage-select
-  grid; ties between equal sort keys are drawn in id order (the game's order for ties is not known).
+- The character-select preview approximates the game's layout when your UI folder has no `chara.lm`, and the
+  stage-select grid; ties between equal sort keys are drawn in id order (the game's order for ties is not known).

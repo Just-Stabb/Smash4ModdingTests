@@ -127,7 +127,7 @@ def main():
                 else (30, 120, 60))
     png(os.path.join(pngs, 'clone_stage_10.png'), 'CLONE FIELD', (128, 64), (150, 40, 120))
     # a custom UI: the dumps' modded portraits (CUSTOM_CHR, optional 6th argument) and a honeycomb CSS layout
-    # (tools/chara_layout.py's user5 rows) for 13-70 entries
+    # (tools/chara_layout.py's user5 rows) for 13-112 entries
     if len(sys.argv) > 6:
         cui = os.path.join(out, 'custom_ui')
         link(sys.argv[6], os.path.join(cui, 'replace', 'chr'))
@@ -137,7 +137,7 @@ def main():
             'research_chara_layout', os.path.join(os.path.dirname(os.path.dirname(HERE)), 'chara_layout.py'))
         cl = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cl)
-        synth_chara_lm(os.path.join(cui, 'lumen', 'chara', 'chara.lm'), list(range(13, 71)), cl.user5)
+        synth_chara_lm(os.path.join(cui, 'lumen', 'chara', 'chara.lm'), list(range(13, 113)), cl.user5)
     print('fixtures in', out)
 
 

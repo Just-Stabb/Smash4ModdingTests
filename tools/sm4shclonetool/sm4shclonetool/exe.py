@@ -26,10 +26,14 @@ FORMAT = 1
 VANILLA_TEXT_END = 0x04B77E1C        # the game's .text ends here (v288)
 VANILLA_REGION = 0x2BB8670           # RPL file info textRegionSize: code space to 0x04BB8670
 DEFAULT_BASE = 0x04B78000
-SIZE = 0x40000                       # the tool's code space: marker, stages, customs, effects, kinds, weapons
-# offsets in the code space
+SIZE = 0x40000                       # the tool's code space at least (to 0x04BB8000, inside the game's text region)
+MAX_SPACE = 0x300000                 # at most (3 MB: the kinds part's calls back into the game stay in a branch's reach)
+# offsets in the code space; the weapons part grows with the articles, the kinds part (last) with the fighters
+# (the effect wrappers stay where v1 put them: the game's own calls to imported functions point into this space in
+# the file, and a wrapper on one of those addresses would look like such a call to tools that check for them)
 PARTS = [('marker', 0x0000, 0x4000), ('stage', 0x4000, 0x5000), ('customs', 0x5000, 0x6000),
-         ('effects', 0x6000, 0x8000), ('kinds', 0x8000, 0x30000), ('weapons', 0x30000, 0x40000)]
+         ('effects', 0x6000, 0x8000), ('random', 0x8000, 0x8100)]
+WEAPONS_AT = 0xA000                  # past 0x04B811D0, the last of the file's import-call targets
 DUMMY_OFF = 0x3FF8                   # the marker block's last 8 bytes: never read or run (moved relocations land here)
 # SHA-1 of the cross_f.rpx the research was done on; reported, not required (see README)
 RESEARCH_SHA1 = '3b7e1b3f421f330e259a3200d391f47ee6b5931a'
@@ -41,18 +45,26 @@ class ExeError(Exception):
     pass
 
 
-def layout(base):
-    return {name: (base + lo, base + hi) for name, lo, hi in PARTS}
+def n_weapons(reg):
+    return sum(len(f.get('weapons') or []) for f in (reg or {}).get('fighters', []))
 
 
-def configure(base):
+def layout(base, reg=None):
+    out = {name: (base + lo, base + hi) for name, lo, hi in PARTS}
+    wsize = (0x10000 + 0x1800 * n_weapons(reg) + 0xFFF) & ~0xFFF
+    out['weapons'] = (base + WEAPONS_AT, base + WEAPONS_AT + wsize)
+    out['kinds'] = (base + WEAPONS_AT + wsize, base + MAX_SPACE)
+    return out
+
+
+def configure(base, reg=None):
     """point the generators at the tool's code space starting at base"""
     import kind_expand as K
     import weapon_expand as W
     import base_effects_cave as BE
     import base_customs_cave as BC
     import stage_slot_cave as SS
-    lay = layout(base)
+    lay = layout(base, reg)
     dummy = base + DUMMY_OFF
     K.CAVE, K.LIMIT = lay['kinds']
     K.RELOC_DUMMY = dummy
@@ -156,6 +168,12 @@ def check_sites(path):
                 run()
             except AssertionError as e:
                 out.append('%s: %s' % (name, e))
+        from . import random_select as RS
+        try:
+            img = K.Image(path)
+            RS.build(img.w, [], DEFAULT_BASE + 0x8000, DEFAULT_BASE + 0x8100)
+        except AssertionError as e:
+            out.append(str(e))
     finally:
         K.Image.text_end = te
         os.unlink(spec)
@@ -210,7 +228,10 @@ def kind_spec(reg):
                 r['weapons'][art] = '0x%X' % weapon
                 weapon += 1
         kinds.append(r)
-    return {'capacity': '0x60', 'kinds': kinds}
+    n = len(kinds)
+    cap = max(0x60, (FIRST_KIND + n + 0xF) & ~0xF)
+    wcap = max(0x1C0, (WEAPON_FIRST + n_weapons(reg) + 0xF) & ~0xF)
+    return {'capacity': '0x%X' % cap, 'weapon_capacity': '0x%X' % wcap, 'kinds': kinds}
 
 
 def weapon_kinds(reg):
@@ -232,8 +253,8 @@ def build(in_path, out_path, reg, force=False, log=print, work=None):
     x, base, old_reg, notes = vanilla_view(in_path, force)
     for n in notes:
         log(n)
-    lay = configure(base)
-    lo, hi = base, base + SIZE
+    lay = configure(base, reg)
+    lo, hi = base, base + MAX_SPACE
     work = work or os.path.dirname(os.path.abspath(out_path))
     view = os.path.join(work, '.ce_vanilla_view.rpx')
     x.save(view)
@@ -257,6 +278,9 @@ def build(in_path, out_path, reg, force=False, log=print, work=None):
             if reg['fighters']:
                 B, info = K.build(spec_path, view)
                 add('kind expansion', B.words, B.reloc_args())
+                from . import random_select as RS
+                rv = Rpx(view)
+                add('random select', RS.build(rv.r32, reg['fighters'], *lay['random']))
                 if any(f.get('weapons') for f in reg['fighters']):
                     WB, _wi = W.build(spec_path, view)
                     add('weapons', WB.words, WB.reloc_args())
@@ -279,6 +303,8 @@ def build(in_path, out_path, reg, force=False, log=print, work=None):
                     assert s['kind'] == k, 'stage %s: kind 0x%X, the slot cave gives 0x%X' % (s['name'], s['kind'], k)
         finally:
             K.Image.text_end = te
+        # the code space's end: the last word written (at least SIZE)
+        hi = max(base + SIZE, (max(a for a in words if lo <= a < hi) + 4 + 0xFFF) & ~0xFFF) if words else base + SIZE
         # the originals of every word outside the tool's space, read from the vanilla view
         vx = Rpx(view)
         orig = {}
@@ -306,7 +332,7 @@ def build(in_path, out_path, reg, force=False, log=print, work=None):
             raise ExeError('patched words a relocation would still rewrite:\n  ' + '\n  '.join(clashes[:10]))
         from . import VERSION
         rec = {'tool': VERSION, 'registry': reg, 'orig': orig, 'relocs': [list(m) for m in moved],
-               'text_end': text_end_orig, 'text_region': region_orig, 'base': base}
+               'text_end': text_end_orig, 'text_region': region_orig, 'base': base, 'end': hi}
         mb = marker_bytes(rec)
         for i in range(0, len(mb), 4):
             out.w32(base + i, struct.unpack('>I', mb[i:i + 4])[0])
@@ -315,7 +341,7 @@ def build(in_path, out_path, reg, force=False, log=print, work=None):
         for p in (view, spec_path, spec_path + '.c'):
             if os.path.exists(p):
                 os.unlink(p)
-    summary = {'base': base, 'layout': lay, 'parts': parts, 'in_place': len(orig), 'relocs_moved': len(moved),
+    summary = {'base': base, 'end': hi, 'layout': lay, 'parts': parts, 'in_place': len(orig), 'relocs_moved': len(moved),
                'words': len(words), 'notes': notes, 'sha1': sha1_file(out_path)}
     log('exe: %d words (%d in place, originals kept in the marker), %d relocations moved; code space '
         '0x%08X-0x%08X; parts: %s' % (len(words), len(orig), len(moved), lo, hi,
@@ -326,8 +352,8 @@ def build(in_path, out_path, reg, force=False, log=print, work=None):
 def plan(in_path, reg, force=False):
     """what build() would do, without writing: (notes, list of patch descriptions)"""
     x, base, old_reg, notes = vanilla_view(in_path, force)
-    lay = layout(base)
-    items = ['code space 0x%08X-0x%08X (%s)' % (base, base + SIZE, ', '.join(
+    lay = layout(base, reg)
+    items = ['code space from 0x%08X (%s)' % (base, ', '.join(
         '%s 0x%08X' % (k, v[0]) for k, v in lay.items()))]
     if reg['fighters']:
         items.append('kind expansion: %d new kind(s) 0x41-0x%X (switches, name / size / sound tables, '

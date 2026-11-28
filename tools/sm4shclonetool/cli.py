@@ -12,6 +12,7 @@ CLONES:
   --fighter SOURCE:NAME[:key=value,...]   e.g. --fighter fox:foxclone:ui_name=Wolfo,title=Wolfo,costumes=8
        keys: cap, ui_name, title, subtitle, series, costumes, after (place after this character on the CSS),
              sort_key (first sort key), weapons (article names joined by +), customs (1), fanfare (0 / 1),
+             random (0: never picked by the character select's random; ids past 95 never are),
              kind, ui_id (overrides; must be the next free ones)
   --portrait NAME:SET:NN=PNG              e.g. --portrait foxclone:chr_00:01=red.png  (NN empty for one-file sets)
   --stage SOURCE:NAME[:key=value,...]     e.g. --stage BattleField_f:CloneField:title=Clone Field,page=1
@@ -31,7 +32,7 @@ from sm4shclonetool import exe as X  # noqa: E402
 from sm4shclonetool import roster as R  # noqa: E402
 from sm4shclonetool.session import Session  # noqa: E402
 
-INTS = {'costumes', 'series', 'sort_key', 'kind', 'ui_id', 'page', 'cosmetic', 'customs', 'fanfare'}
+INTS = {'costumes', 'series', 'sort_key', 'kind', 'ui_id', 'page', 'cosmetic', 'customs', 'fanfare', 'random'}
 
 
 def kv(text):
@@ -51,8 +52,9 @@ def parse_clones(a, s):
             opt['weapons'] = [w for w in opt['weapons'].split('+') if w]
         if 'customs' in opt:
             opt['customs'] = bool(opt['customs'])
-        if 'fanfare' in opt:
-            opt['fanfare'] = bool(opt['fanfare'])
+        for k in ('fanfare', 'random'):
+            if k in opt:
+                opt[k] = bool(opt[k])
         fighters.append(opt.pop('_spec', None) or s.fighter_spec(src, name, **opt))
         if fighters[-1]['kind'] is None:
             pass
@@ -112,6 +114,7 @@ def main():
         for f in R.fighters(s.param_dirs(), s.reg):
             print('%3d %-14s kind 0x%02X %-12s sort %s%s' % (f['id'], f['ui_name'], f['kind'], f['name'],
                                                            f['sort'], ' (clone)' if f['clone'] else ''))
+        print(s.limits_text())
         for st in R.stages(s.param_dirs(), s.reg):
             print('stage 0x%02X %-16s kind 0x%02X page %d order %d%s' % (st['id'], st['name'], st['kind'], st['page'],
                                                                      st['order'], ' (clone)' if st['clone'] else ''))
@@ -129,6 +132,7 @@ def main():
         print('executable:')
         for i in items:
             print('  ' + i)
+        print(s.limits_text(reg))
         sys.exit(1 if errors else 0)
     if a.command in ('css', 'sss'):
         reg = s.plan(fighters, stages)[0]

@@ -472,8 +472,7 @@ def build(spec_path=SPEC, rpx=RPX):
     for site, orig, new in CHR_READER:
         B.asm(site, new.format(ha='0x%X' % ha(chr_at), lo='%d' % slo(chr_at)), orig)
     B.asm(CHR_COUNT_SITE, 'li r4, %d' % len(rows), 'li r4, 0x%X' % CHR_COUNT)
-    n_sel = RANDOM_SELECT_COUNT + len(uis)
-    assert n_sel <= 96, 'the random-select set holds 96 database entries'
+    n_sel = min(96, RANDOM_SELECT_COUNT + len(uis))
     B.asm(RANDOM_SELECT, 'li r23, %d' % n_sel, 'li r23, 0x%X' % RANDOM_SELECT_COUNT)
     info['chr_table'], info['chr_count'] = (chr_at, len(rows))
     n_ui = len(uis)

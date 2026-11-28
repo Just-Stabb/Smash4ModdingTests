@@ -20,6 +20,10 @@ NAME_RX = re.compile(r'^[a-z][a-z0-9]{1,15}$')
 UINAME_RX = re.compile(r'^[A-Z][A-Za-z0-9]{1,15}$')
 
 
+MAX_ID = 0xC7                 # ui_character_db ids up to 0xC7 are looked up by position (ids >= 200: searched)
+MAX_CLONES = MAX_ID - 59 + 1  # 141 (kinds 0x41-0xCD: the kind tables hold up to 0x13F)
+
+
 class CloneError(Exception):
     pass
 
@@ -91,8 +95,9 @@ def validate(spec, param_dirs, ui_dirs, reg):
         err.append('kind 0x%X: new kinds are consecutive from 0x41 (the next is 0x%X)' % (spec['kind'], kind))
     if spec['ui_id'] != cid:
         err.append('character id %d: new ids are consecutive from 59 (the next is %d)' % (spec['ui_id'], cid))
-    if kind >= 0x60 or cid >= 59 + 15:
-        err.append('no room for another fighter clone (15 at most: the random select holds 96 entries)')
+    if cid > MAX_ID:
+        err.append('no character id left: ids up to 0x%X are found by their place in the database (%d clones)'
+                   % (MAX_ID, MAX_CLONES))
     g, _ = R.load_db(param_dirs, 'ui/ui_character_db.bin')
     if g is not None:
         ids = [e[0][1] for e in g[2]]
@@ -129,7 +134,7 @@ def record(spec, reg):
             'base_ui_name': R.UI_NAMES[base_ui_id], 'series': spec.get('series'), 'costumes': spec.get('costumes'),
             'sort': spec.get('sort'), 'subtitle': spec.get('subtitle'),
             'weapons': list(spec.get('weapons') or []), 'customs': bool(spec.get('customs')),
-            'fanfare': bool(spec.get('fanfare', True))}
+            'fanfare': bool(spec.get('fanfare', True)), 'random': bool(spec.get('random', True))}
 
 
 def sort_keys(param_dirs, reg, after=None, value=None):

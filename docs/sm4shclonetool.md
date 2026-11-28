@@ -58,19 +58,23 @@ paths or its authors appears in it.
 ### Code space
 
 The game's `.text` ends at `0x04B77E1C`; its text region (RPL file info `textRegionSize` 0x2BB8670) reaches
-`0x04BB8670`. The tool takes `0x04B78000`-`0x04BB8000` (`exe.PARTS`, offsets from the base):
+`0x04BB8670`. The tool's code space starts at `0x04B78000` (`exe.PARTS`, offsets from the base; `exe.configure(base,
+registry)` sets each generator's `CAVE` / `LIMIT`):
 
-| part | offset | generator (module globals set by `exe.configure(base)`) |
+| part | offset | |
 |---|---|---|
 | marker | 0x0000-0x4000 | the registry and the originals; its last 8 bytes = the relocation dummy (`DUMMY_OFF`) |
-| stage | 0x4000-0x5000 | `stage_slot_cave` `CAVE` / `LIMIT` / `RELOC_DUMMY` |
+| stage | 0x4000-0x5000 | `stage_slot_cave` |
 | customs | 0x5000-0x6000 | `base_customs_cave` |
-| effects | 0x6000-0x8000 | `base_effects_cave` |
-| kinds | 0x8000-0x30000 | `kind_expand` `CAVE` / `LIMIT` / `RELOC_DUMMY` |
-| weapons | 0x30000-0x40000 | `weapon_expand` |
+| effects | 0x6000-0x8000 | `base_effects_cave` (kept at v1's place: the game's calls to imported functions point into this space in the file, and a wrapper on one of those addresses would look like such a call to `import_call_check`) |
+| random | 0x8000-0x8100 | `random_select.py` (the allow mask, the store stub) |
+| weapons | 0xA000- (past the file's import-call targets, which end at 0x04B811D0), 0x10000 + 0x1800 per own article | `weapon_expand` |
+| kinds | after the weapons, up to `MAX_SPACE` (3 MB) | `kind_expand` (about 5-6 KB a fighter: descriptor, motion table, vl cases) |
 
-Moved relocations go to the tool's own dummy word (in the marker block), not to a game function. The research's
-dummy `0x037EE73C` is not used.
+The code section is grown to the last word written, at least to `0x04BB8000` (`SIZE`); past the text region's end
+the region is raised (`textregion`). The marker records the end. `MAX_SPACE` keeps the copied vl load / unload cases'
+calls into the game (`0x02EA....`) inside a branch's reach (the generators assert it). Moved relocations go to the
+tool's own dummy word.
 
 ### Detection
 
@@ -109,8 +113,8 @@ So the output depends only on the vanilla view and the registry: three builds on
 memory image as one build of all three (files differ only in section placement), and patching again with the same
 registry gives the same bytes.
 
-Per new kind (kind_expand's cave, ~6 KB a kind with a 600-motion table), the 160 KB kinds part holds the 15 kinds the
-random select allows (`RANDOM_SELECT` 0x51 + new ids <= 96).
+The spec's capacity grows with the clones: kinds `max(0x60, 0x41 + n rounded up to 0x10)` (kind_expand's bound is
+0x13F), weapon kinds `max(0x1C0, 0x185 + articles rounded up)`.
 
 ## The data side
 
@@ -176,9 +180,39 @@ effect ids, portraits, icons; CSS / SSS placement on the vanilla and the custom 
 DATA CUSTOM_UI EXE OUT SHOTS` (`gui.py --screenshot` under Xvfb: the window built, roster icons, the previews, the
 remembered folders). Package: `make_package.py OUT.zip --check-exe EXE` unpacks the zip and runs its CLI with `python -I`.
 
+`many_clones_test.py WORK STANDIN FIXTURES` (v1.1): 40 fighter clones (8 vanilla bases, own articles, two left out of
+random) + 8 stage clones (page 2) at once and as 20 + 20 (same memory image; code space to `0x04BD1000`, 356 KB), the
+research tests on it (kind_expand_test 1428 checks), `random_select_test.py` (the refill `0x02FFB610` run with its
+database calls stubbed: the pool holds the game's fighters and the random clones below id 96, nothing written outside
+its 12 bytes, the saved registers restored; the remove `0x02FFC5BC` for ids 0-0xFF), and a 40-clone data build:
+refused with the game's 96-place layout, built with a custom layout to `num_112` and previewed. With 40 new kinds
+kind_expand_test's check of the unpatched game reading past its own 58-name fanfare table finds two stray matches in
+the data after it: a property of the unpatched executable, read as such.
+
 `weapon_expand_test` has one Mario-specific expectation (weapon 0x185 = the fireball's module row); with Fox's
 blaster as 0x185 it fails by design and `run_all.py` reads it as such. `base_customs_test` is written for this
 repository's own mapping and isn't run; `run_all.py`'s customs check replaces it.
+
+## Limits (v1.1)
+
+Every cap on the number of clones found, and what the tool does about it:
+
+| cap | where | old | now |
+|---|---|---|---|
+| character ids looked up by position | `ui_character_db` accessors `0x0309FB94`-`0x030A0C58` (ids `<= 0xC7`; `>= 200` searched) | - | stays: 141 clones (ids 59-199) |
+| kind tables / per-kind arrays | kind_expand's capacity (names, sizes, sound class, switches, the parameter manager's arrays `0x25B0 + cap * 0x48`, the equipment object `0x320 + 4 cap`, the bounds) | 0x60 (31 kinds) | sized to the clones; kind_expand's own bound 0x13F |
+| random select pool | refill `0x02FFB610` (scan `li r23` at `0x02FFB644`), count of picks left `0x02FFC4A8` (`li r11, 0x51` at `0x02FFC4BC`), remove `0x02FFC5BC` (`cmplwi r4, 0x51` at `0x02FFC5C4`); the set is 12 bytes at `+0x98` of the pool object, `+0xA4` / `+0xB4` are the stage pools | v1: 15 clones (`n_sel <= 96` asserted); the count / remove bounds stayed 0x51 (clones with ids 0x51-0x5F, past v1's cap, would never have been removed) | scan `min(96, 0x51 + n)`, both other bounds the same; a stub on the refill's store (`0x02FFB6C4`) masks out clones with `"random": false`; ids >= 96 are never scanned (out of the random select). Not enlarged: the set is inside the object (the stage pools follow it) and the getter `0x02FFC5B4` hands its address to callers not traced |
+| character select places | `chara.lm` arrangements `num_%03d` (`0x028BEE20`) and faces bound in order (`0x028BE920`); the list builder `0x028BF6AC` uses a growable list | 96 (the game's file: `num_013`-`num_096`) | the UI's highest `num_NNN` (`preview.css_capacity`); a plan past it is refused |
+| stage select | `0x0298D068` fills `img_01`-`img_48` of each of the 2 pages (`lumen/stage/stage.lm`) | page 1: 48 (47 used) | 48 a page checked; 41 clones (1 + 40). More pages: not researched |
+| stage-select ids | positional `<= 0xC7` | | stays: 144 |
+| random stage pools | `+0xA4` / `+0xB4` (16 bytes each), bound `cmplwi r4, 0x63` at `0x02FFC620` | | stays: the first 43 stage clones (ids < 0x63) |
+| weapon kinds | weapon_expand's capacity | 0x1C0 (59 articles) | sized to the articles |
+| effect banks | the 8-slot bank table (`0x030C1278`), per match | | stays (a clone without its base uses 2 slots) |
+| effect ids | `0x3KK....` (8-bit kind) | | kinds up to 0xFF: not reached (0xCD) |
+| resource ids | `kind * 0x11 + n`, `kind * 9 + n` (map keys, `0x030C010C` ...) | | not a cap; collisions for high kinds not checked |
+| custom moves | owned-move bits `0x02A51368` (51 ids) | | mapped to the base (base_customs_cave; the table covers every new id) |
+| save records | `0x02A53C54` | | the new ids' records in the code space (RAM only), one per clone |
+| code space | `0x04B78000`-`0x04BB8000` | v1 fixed 256 KB (kinds part 160 KB: ~27 fighters) | grows with the clones (text region raised), up to 3 MB |
 
 ## Not done / open
 

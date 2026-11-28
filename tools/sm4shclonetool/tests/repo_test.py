@@ -26,8 +26,8 @@ def main():
     test, patched, orig = sys.argv[1:4]
     rest = sys.argv[4:]
     base, rec = E.find_marker(Rpx(patched))
-    E.configure(base)
     reg = rec['registry']
+    E.configure(base, reg)
     spec = os.path.join(tempfile.mkdtemp(prefix='ce_t_'), 'kinds.json')
     json.dump(E.kind_spec(reg), open(spec, 'w'))
     if test == 'import_call_check':

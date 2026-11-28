@@ -127,10 +127,10 @@ def main():
             w = blob[o:o + 4]
             if old[o:o + 4] != w and not (len(old) <= o and w == b'\0' * 4):     # grown zeros
                 at = addr + o
-                if not (base <= at < base + X.SIZE) and at not in orig:
+                if not (base <= at < rec['end']) and at not in orig:
                     stray.append(at)
     check('every changed word is in the tool\'s code space (0x%08X-0x%08X) or recorded with its original (%d words)'
-          % (base, base + X.SIZE, len(orig)), stray[:5], [])
+          % (base, rec['end'], len(orig)), stray[:5], [])
     va = Rpx(standin)
     vb = Rpx(e3)
     moved = {(m[0], m[1]) for m in rec['relocs']}
@@ -142,7 +142,7 @@ def main():
                 rdiff.append((i, o))
     check('every changed relocation is one the marker records (%d moved)' % len(moved), rdiff[:5], [])
     check('the code space past the game\'s is the tool\'s alone (text ends at its end)', Rpx(e3).text_end(),
-          base + X.SIZE)
+          rec['end'])
 
     # ---------------------------------------------------------------- the research tests on build 3
     for t in ('kind_expand_test', 'weapon_expand_test', 'base_effects_test', 'stage_slot_test', 'import_call_check'):
@@ -221,7 +221,7 @@ def main():
         check('custom UI: Foxclone at face_%03d, the place after Fox\'s face_%03d' % (slot, ic['slot'][10]),
               slot, ic['slot'][10] + 1)
         big = copy.deepcopy(reg)
-        for i in range(10):
+        for i in range(60):
             big['fighters'].append(dict(reg['fighters'][0], name='x%d' % i, ui_id=62 + i, ui_name='X%d' % i,
                                         sort=None))
         _img, ib = P.render_css(pd, uid, big, [], None)
