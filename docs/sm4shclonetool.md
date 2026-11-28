@@ -886,7 +886,8 @@ source), effect (from the old bank's entry) and sound (its tone's IDSP from the 
 imported again, and every new number / id is compared with the recorded one (a difference is logged and returned in
 the summary). Article records are kept (their folders are owner-own files, kept by the repair; their effects and sounds
 are in the effect / sound records). import_test checks that a repair of the imported project gives the same package
-files and the same executable.
+files and the same executable (its memory image but the marker block; the marker's registry the same but the
+`renumber` list 1.5's builds leave in it, which nothing reads).
 
 ### Sm4shCommand
 

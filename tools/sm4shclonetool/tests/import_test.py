@@ -208,9 +208,12 @@ def run(work, proj, data, patched, vanilla, s4c=None):
         s.repair()
         rep = snapshot(pkg, data)
         diff = sorted(k for k in set(rep) | set(after) if rep.get(k) != after.get(k))
+        e5 = os.path.join(proj, 'INSTALL_TO_code', 'cross_f.rpx')
         check('a repair (the package rebuilt from the project): every imported motion, effect, sound and article back '
-              'with the same numbers / ids, the package files and the executable as before (%d differ)' % len(diff),
-              (diff[:6], sha1_file(os.path.join(proj, 'INSTALL_TO_code', 'cross_f.rpx'))), ([], sha1_file(e4)))
+              'with the same numbers / ids, the package files as before (%d differ), the executable\'s memory image '
+              'the same but its marker block, the marker\'s registry the same (but the "renumber" a 1.5 build leaves in '
+              'it)' % len(diff), (diff[:6], image_but_marker(e5), marker_reg(e5)),
+              ([], image_but_marker(e4), marker_reg(e4)))
     # the executable
     o = os.path.join(work, 'import_exe_test.txt')
     rc = RA.run([sys.executable, os.path.join(HERE, 'import_exe_test.py'), e4, vanilla, os.path.join(work, 'import_ps')], o)
@@ -227,6 +230,30 @@ def run(work, proj, data, patched, vanilla, s4c=None):
           'path builders): %d ok, failures only its fireball-specific check (%d)' % (text.count('\nok '), len(fails)),
           other, [])
     sm4shcommand(work, proj, data, imp, s4c)
+
+
+def image_but_marker(path):
+    """the SHA-1 of an executable's loaded sections with the tool's marker block zeroed"""
+    from sm4shclonetool.rpx import Rpx
+    x = Rpx(path)
+    base, _rec = X.find_marker(x)
+    h = hashlib.sha1()
+    for a, b in sorted(x.memory().items()):
+        b = bytearray(b)
+        if a <= base < a + len(b):
+            o = base - a
+            b[o:o + 0x4000] = bytes(0x4000)
+        h.update(struct.pack('>I', a) + bytes(b))
+    return h.hexdigest()
+
+
+def marker_reg(path):
+    import json
+    from sm4shclonetool.rpx import Rpx
+    reg = X.find_marker(Rpx(path))[1]['registry']
+    for f in reg['fighters']:
+        f.pop('renumber', None)
+    return json.dumps(reg, sort_keys=True)
 
 
 def snapshot(pkg, data):
