@@ -135,7 +135,8 @@ def record(spec, reg):
             'sort': spec.get('sort'), 'subtitle': spec.get('subtitle'),
             'weapons': list(spec.get('weapons') or []), 'customs': bool(spec.get('customs')),
             'fanfare': bool(spec.get('fanfare', True)), 'random': bool(spec.get('random', True)),
-            'own_sound': bool(spec.get('own_sound', True)), 'own_effects': bool(spec.get('own_effects', True))}
+            'own_sound': bool(spec.get('own_sound', True)), 'own_effects': bool(spec.get('own_effects', True)),
+            'plates': bool(spec.get('plates', True))}
 
 
 def sort_keys(param_dirs, reg, after=None, value=None):
@@ -192,6 +193,8 @@ def build(rec, data_dir, ui_dir, out_data, reg, portraits=None, log=print, renum
         A.copy_portraits([r], ns(**dict(vars(a), ui=pkg_ui)), logs)     # a clone's portraits: in the package
     else:
         A.copy_portraits([r], a, logs)
+    if rec.get('plates', True):
+        out += name_plates(rec, a.out, portraits or {}, logs)
     out += _portraits(r, rec, a, ui_dirs, portraits or {}, logs)
     # the fighter folder
     src = R.first([os.path.join(out_data, 'fighter'), os.path.join(data_dir, 'fighter')], rec['source'])
@@ -390,3 +393,59 @@ def result_panel(rec, data_dir, out_data):
     open(dst, 'wb').write(new)
     assert [e[0] for e in RP.entries(new)[1]] == names + [rec['name']]
     return ['param/ui/result_param.bin: entry %s = %s\'s (loser panel camera, win frames)' % (rec['name'], rec['source'])]
+
+
+PLATE_SETS = ('chrn_11', 'chrn_12', 'chrn_40', 'chrn_41')     # the name plates (pictures of the name)
+
+
+def name_plates(rec, out_root, portraits, logs):
+    """the clone's name plates: its copies of the base's plates (the base's name as a picture) redrawn with the clone's
+    title: white capitals with a dark edge, as large as the plate allows, on a clear background, in each plate's own
+    size and format (an imported PNG for a plate set wins)"""
+    import tempfile
+    from PIL import Image, ImageDraw, ImageFont
+    done = []
+    d = os.path.join(out_root, 'ui', 'replace', 'chr')
+    for st in PLATE_SETS:
+        sd = os.path.join(d, st)
+        if not os.path.isdir(sd):
+            continue
+        for f in sorted(os.listdir(sd)):
+            if not f.startswith('%s_%s' % (st, rec['ui_name'])) or any(k[0] == st for k in portraits):
+                continue
+            p = os.path.join(sd, f)
+            img = T.decode(p)
+            if img is None:
+                continue
+            w, h = img.size
+            text = (rec.get('title') or rec['ui_name']).upper()
+            pic = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+            dr = ImageDraw.Draw(pic)
+            size, font = max(8, int(h * 0.7)), None
+            while size >= 8:
+                for name in ('DejaVuSans-Bold.ttf', 'arialbd.ttf', 'Arial Bold.ttf', 'DejaVuSans.ttf', 'arial.ttf'):
+                    try:
+                        font = ImageFont.truetype(name, size)
+                        break
+                    except Exception:
+                        font = None
+                font = font or ImageFont.load_default()
+                box = dr.textbbox((0, 0), text, font=font, stroke_width=max(1, size // 12))
+                if box[2] - box[0] <= w * 0.94 and box[3] - box[1] <= h * 0.9:
+                    break
+                size -= 2
+            box = dr.textbbox((0, 0), text, font=font, stroke_width=max(1, size // 12))
+            x = (w - (box[2] - box[0])) / 2 - box[0]
+            y = (h - (box[3] - box[1])) / 2 - box[1]
+            dr.text((x, y), text, font=font, fill=(255, 255, 255, 255), stroke_width=max(1, size // 12),
+                    stroke_fill=(20, 20, 30, 255))
+            tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+            tmp.close()
+            pic.save(tmp.name)
+            ids = [t for _o, t in T.texture_ids(T.read_nut(p))]
+            open(p, 'wb').write(T.put_png(p, tmp.name, ids))
+            os.unlink(tmp.name)
+            done.append('%s/%s' % (st, f))
+    logs.append('name plates redrawn with %r: %s' % ((rec.get('title') or rec['ui_name']).upper(),
+                                                       ', '.join(done) or 'none (the base has no plate files)'))
+    return [os.path.join(d, x) for x in done]
